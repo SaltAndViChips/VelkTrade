@@ -1,17 +1,41 @@
 const axios = require('axios');
 
 function extractImgurId(url) {
-  const filename = url.split('/').pop() || '';
-  return filename.split('.')[0];
+  try {
+    const parsed = new URL(url);
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    const last = parts[parts.length - 1] || '';
+    return last.split('.')[0];
+  } catch {
+    const filename = String(url || '').split('/').pop() || '';
+    return filename.split('.')[0];
+  }
 }
 
-async function fetchImgurTitle(url) {
+function isImgurUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return ['imgur.com', 'www.imgur.com', 'i.imgur.com'].includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+async function fetchImgurItem(url) {
   const id = extractImgurId(url);
 
-  if (!id) return 'Untitled Item';
+  if (!id) {
+    return {
+      title: 'Untitled Item',
+      image: url
+    };
+  }
 
   if (!process.env.IMGUR_CLIENT_ID || process.env.IMGUR_CLIENT_ID === 'your_imgur_client_id') {
-    return id;
+    return {
+      title: id,
+      image: url.includes('i.imgur.com') ? url : `https://i.imgur.com/${id}.png`
+    };
   }
 
   try {
@@ -21,10 +45,18 @@ async function fetchImgurTitle(url) {
       }
     });
 
-    return response.data?.data?.title || id;
+    const data = response.data?.data;
+
+    return {
+      title: data?.title || id,
+      image: data?.link || `https://i.imgur.com/${id}.png`
+    };
   } catch {
-    return id;
+    return {
+      title: id,
+      image: url.includes('i.imgur.com') ? url : `https://i.imgur.com/${id}.png`
+    };
   }
 }
 
-module.exports = { extractImgurId, fetchImgurTitle };
+module.exports = { extractImgurId, isImgurUrl, fetchImgurItem };
