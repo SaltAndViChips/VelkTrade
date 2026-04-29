@@ -11,6 +11,12 @@ const { get, all, run, transaction, getDatabaseDiagnostics } = require('./db');
 const { createToken, authMiddleware } = require('./auth');
 const { fetchImgurItem, isImgurUrl } = require('./imgur');
 const {
+  normalizeUsername,
+  isSaltUsername,
+  isAdminUser,
+  publicUser
+} = require('./admin');
+const {
   createRoom,
   joinRoom,
   setOffer,
@@ -39,35 +45,11 @@ const io = new Server(server, {
   }
 });
 
-function normalizeUsername(username) {
-  return String(username || '').trim();
-}
-
-function isSaltUsername(username) {
-  return normalizeUsername(username).toLowerCase() === 'salt';
-}
-
-function boolFromDb(value) {
-  return value === true || value === 'true' || value === 1 || value === '1';
-}
-
-function isAdminUser(user) {
-  return isSaltUsername(user?.username) || boolFromDb(user?.isAdmin ?? user?.isadmin);
-}
-
-function publicUser(user) {
-  return {
-    id: user.id,
-    username: user.username,
-    isAdmin: isAdminUser(user)
-  };
-}
-
 async function hydrateAuthUser(user) {
   if (!user?.id) return user;
 
   const dbUser = await get(
-    `SELECT id, username, isAdmin AS "isAdmin"
+    `SELECT id, username, is_admin
      FROM users
      WHERE id = ?`,
     [user.id]
@@ -249,17 +231,17 @@ app.post('/api/register', async (req, res) => {
 
   try {
     const result = await run(
-      'INSERT INTO users (username, password, isAdmin) VALUES (?, ?, ?) RETURNING id',
+      'INSERT INTO users (username, password, is_admin) VALUES (?, ?, ?) RETURNING id',
       [cleanUsername, passwordHash, isSaltUsername(cleanUsername)]
     );
 
     const user = {
       id: result.lastID,
       username: cleanUsername,
-      isAdmin: isSaltUsername(cleanUsername)
+      is_admin: isSaltUsername(cleanUsername)
     };
 
-    res.json({ token: createToken(user), user: publicUser(user) });
+    res.json({ token: createToken(publicUser(user)), user: publicUser(user) });
   } catch {
     res.status(400).json({ error: 'Username already exists' });
   }
@@ -269,13 +251,18 @@ app.post('/api/login', async (req, res) => {
   const cleanUsername = normalizeUsername(req.body.username);
 
   const user = await get(
-    `SELECT id, username, password, isAdmin AS "isAdmin"
+    `SELECT id, username, password, is_admin
      FROM users
      WHERE LOWER(username) = LOWER(?)`,
     [cleanUsername]
   );
 
   if (!user) return res.status(401).json({ error: 'Invalid login' });
+
+  if (isSaltUsername(user.username) && !user.is_admin) {
+    await run('UPDATE users SET is_admin = TRUE WHERE id = ?', [user.id]);
+    user.is_admin = true;
+  }
 
   const valid = await bcrypt.compare(req.body.password, user.password);
   if (!valid) return res.status(401).json({ error: 'Invalid login' });
@@ -288,11 +275,16 @@ app.post('/api/login', async (req, res) => {
 
 app.get('/api/me', authMiddleware, async (req, res) => {
   const user = await get(
-    `SELECT id, username, isAdmin AS "isAdmin"
+    `SELECT id, username, is_admin
      FROM users
      WHERE id = ?`,
     [req.user.id]
   );
+
+  if (user && isSaltUsername(user.username) && !user.is_admin) {
+    await run('UPDATE users SET is_admin = TRUE WHERE id = ?', [user.id]);
+    user.is_admin = true;
+  }
 
   res.json({ user: user ? publicUser(user) : null });
 });
@@ -346,10 +338,7 @@ app.delete('/api/items/:id', authMiddleware, async (req, res) => {
 });
 
 app.get('/api/inventory/:username', async (req, res) => {
-  const user = await get(
-    'SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)',
-    [normalizeUsername(req.params.username)]
-  );
+  const user = await get('SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)', [normalizeUsername(req.params.username)]);
 
   if (!user) return res.json({ user: null, items: [] });
 
@@ -478,10 +467,7 @@ app.post('/api/trades/:id/decline', authMiddleware, async (req, res) => {
 
 app.get('/api/admin/users', authMiddleware, requireAdmin, async (req, res) => {
   const rows = await all(
-    `SELECT
-      id,
-      username,
-      isAdmin AS "isAdmin"
+    `SELECT id, username, is_admin
      FROM users
      ORDER BY LOWER(username) ASC`
   );
@@ -500,7 +486,7 @@ app.post('/api/admin/set-admin', authMiddleware, requireAdmin, async (req, res) 
   }
 
   const target = await get(
-    `SELECT id, username, isAdmin AS "isAdmin"
+    `SELECT id, username, is_admin
      FROM users
      WHERE LOWER(username) = LOWER(?)`,
     [cleanUsername]
@@ -515,12 +501,12 @@ app.post('/api/admin/set-admin', authMiddleware, requireAdmin, async (req, res) 
   }
 
   await run(
-    'UPDATE users SET isAdmin = ? WHERE id = ?',
+    'UPDATE users SET is_admin = ? WHERE id = ?',
     [Boolean(isAdmin), target.id]
   );
 
   const updated = await get(
-    `SELECT id, username, isAdmin AS "isAdmin"
+    `SELECT id, username, is_admin
      FROM users
      WHERE id = ?`,
     [target.id]
@@ -568,13 +554,7 @@ app.post('/api/admin/reset-password', authMiddleware, requireAdmin, async (req, 
     return res.status(400).json({ error: 'Password must be at least 4 characters' });
   }
 
-  const target = await get(
-    `SELECT id, username
-     FROM users
-     WHERE LOWER(username) = LOWER(?)`,
-    [cleanUsername]
-  );
-
+  const target = await get('SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)', [cleanUsername]);
   if (!target) return res.status(404).json({ error: 'User not found' });
 
   const passwordHash = await bcrypt.hash(newPassword, 10);

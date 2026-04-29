@@ -34,13 +34,21 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      isAdmin BOOLEAN DEFAULT FALSE
+      password TEXT NOT NULL
     )
   `);
 
-  if (!(await columnExists('users', 'isAdmin'))) {
-    await pool.query(`ALTER TABLE users ADD COLUMN isAdmin BOOLEAN DEFAULT FALSE`);
+  if (!(await columnExists('users', 'is_admin'))) {
+    await pool.query(`ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE`);
+  }
+
+  // Backfill from the older camelCase patch. PostgreSQL stores unquoted isAdmin as isadmin.
+  if (await columnExists('users', 'isadmin')) {
+    await pool.query(`
+      UPDATE users
+      SET is_admin = TRUE
+      WHERE isadmin = TRUE
+    `);
   }
 
   await pool.query(`
@@ -71,9 +79,10 @@ async function initDb() {
     ON users (LOWER(username))
   `);
 
+  // Salt is always admin, regardless of capitalization.
   await pool.query(`
     UPDATE users
-    SET isAdmin = TRUE
+    SET is_admin = TRUE
     WHERE LOWER(username) = 'salt'
   `);
 }
