@@ -28,7 +28,7 @@ export default function App() {
   const isAdmin = String(user?.username || '').trim().toLowerCase() === 'salt';
 
   const myOfferIds = useMemo(() => (room && user ? room.offers?.[user.id] || [] : []), [room, user]);
-  const theirPlayer = useMemo(() => room && user ? room.players.find(player => player.id !== user.id) || null : null, [room, user]);
+  const theirPlayer = useMemo(() => room && user ? room.players.find(player => Number(player.id) !== Number(user.id)) || null : null, [room, user]);
   const theirOfferIds = useMemo(() => room && theirPlayer ? room.offers?.[theirPlayer.id] || [] : [], [room, theirPlayer]);
   const visibleInventory = useMemo(() => inventory.filter(item => !myOfferIds.includes(item.id)), [inventory, myOfferIds]);
   const myOfferItems = useMemo(() => inventory.filter(item => myOfferIds.includes(item.id)), [inventory, myOfferIds]);
@@ -66,6 +66,22 @@ export default function App() {
       refreshAll();
     });
 
+    nextSocket.on('inventory:updated', ({ username }) => {
+      if (!username) return;
+
+      if (username === user.username) {
+        refreshInventory(user.username);
+      }
+
+      if (theirPlayer?.username && username === theirPlayer.username) {
+        loadViewedInventory(username);
+      }
+    });
+
+    nextSocket.on('trade:accepted-saved', () => {
+      loadTrades();
+    });
+
     nextSocket.on('trade:completed', () => {
       setRoom(null);
       setView('dashboard');
@@ -83,7 +99,7 @@ export default function App() {
     });
 
     return () => nextSocket.disconnect();
-  }, [user]);
+  }, [user, theirPlayer?.username]);
 
   useEffect(() => {
     if (theirPlayer?.username) loadViewedInventory(theirPlayer.username);
@@ -110,14 +126,22 @@ export default function App() {
     setTrades(data.trades || []);
   }
 
+  function notifyRoomInventoryUpdated() {
+    if (room?.roomId) {
+      socket?.emit('inventory:updated', { roomId: room.roomId });
+    }
+  }
+
   async function addImgurItem(image) {
     await api('/api/items', { method: 'POST', body: JSON.stringify({ image }) });
     await refreshInventory(user.username);
+    notifyRoomInventoryUpdated();
   }
 
   async function deleteItem(itemId) {
     await api(`/api/items/${itemId}`, { method: 'DELETE' });
     await refreshInventory(user.username);
+    notifyRoomInventoryUpdated();
   }
 
   function createRoom() {
@@ -262,6 +286,7 @@ export default function App() {
               <div>
                 <h2>Live Room</h2>
                 <p>Room ID: <strong>{room?.roomId || 'Not in a room'}</strong></p>
+                {room?.acceptedTradeId && <p className="muted">Accepted trade saved as #{room.acceptedTradeId}</p>}
               </div>
               {room?.roomId && <button onClick={() => navigator.clipboard?.writeText(room.roomId)}>Copy Room ID</button>}
             </section>

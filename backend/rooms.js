@@ -13,6 +13,7 @@ function createRoom(owner) {
     confirmed: { [owner.id]: false },
     messages: [],
     acceptedSnapshotSaved: false,
+    acceptedTradeId: null,
     completed: false
   });
 
@@ -39,7 +40,7 @@ function joinRoom(roomId, player) {
 }
 
 function assertPlayerInRoom(room, userId) {
-  if (!room.players.some(player => player.id === userId)) {
+  if (!room.players.some(player => Number(player.id) === Number(userId))) {
     throw new Error('You are not in this room');
   }
 }
@@ -50,7 +51,9 @@ function resetApprovals(room) {
     room.confirmed[player.id] = false;
   }
 
+  // A counter/live offer change invalidates the previous accepted snapshot.
   room.acceptedSnapshotSaved = false;
+  room.acceptedTradeId = null;
 }
 
 function setOffer(roomId, userId, itemIds) {
@@ -60,7 +63,7 @@ function setOffer(roomId, userId, itemIds) {
 
   assertPlayerInRoom(room, userId);
 
-  room.offers[userId] = Array.from(new Set(itemIds.map(Number)));
+  room.offers[userId] = Array.from(new Set((itemIds || []).map(Number))).filter(Boolean);
   resetApprovals(room);
 
   return room;
@@ -145,10 +148,13 @@ async function saveTradeSnapshot(room, status) {
 }
 
 async function maybeSaveAcceptedSnapshot(room) {
-  if (!everyoneAccepted(room) || room.acceptedSnapshotSaved) return;
+  if (!everyoneAccepted(room) || room.acceptedSnapshotSaved) return null;
 
-  await saveTradeSnapshot(room, 'accepted');
+  const result = await saveTradeSnapshot(room, 'accepted');
   room.acceptedSnapshotSaved = true;
+  room.acceptedTradeId = result?.lastID || null;
+
+  return result;
 }
 
 async function finalizeTrade(room) {
@@ -230,6 +236,7 @@ function publicRoomState(room) {
     accepted: room.accepted,
     confirmed: room.confirmed,
     messages: room.messages || [],
+    acceptedTradeId: room.acceptedTradeId || null,
     completed: Boolean(room.completed)
   };
 }

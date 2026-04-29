@@ -1,3 +1,10 @@
+/*
+Patch target:
+- Adds socket event inventory:updated.
+- Ensures live accept calls maybeSaveAcceptedSnapshot(room).
+If you already have a newer server.js, merge the inventory:updated socket handler and keep your existing routes.
+*/
+
 require('dotenv').config();
 
 const express = require('express');
@@ -48,10 +55,7 @@ function isSaltAdmin(user) {
 }
 
 function requireSaltAdmin(req, res, next) {
-  if (!isSaltAdmin(req.user)) {
-    return res.status(403).json({ error: 'Admin only' });
-  }
-
+  if (!isSaltAdmin(req.user)) return res.status(403).json({ error: 'Admin only' });
   next();
 }
 
@@ -82,7 +86,6 @@ function normalizeRawTrade(row) {
 
 async function getItemsByIds(itemIds) {
   const ids = Array.from(new Set((itemIds || []).map(Number))).filter(Boolean);
-
   if (ids.length === 0) return [];
 
   const placeholders = ids.map((_, index) => `$${index + 1}`).join(', ');
@@ -136,10 +139,7 @@ async function getTradeById(tradeId) {
 async function assertItemOwnership(tx, itemIds, userId) {
   for (const itemId of itemIds) {
     const item = await tx.get('SELECT id FROM items WHERE id = ? AND userId = ?', [itemId, userId]);
-
-    if (!item) {
-      throw new Error(`Invalid item ownership for item ${itemId}`);
-    }
+    if (!item) throw new Error(`Invalid item ownership for item ${itemId}`);
   }
 }
 
@@ -179,16 +179,9 @@ async function createStoredTrade({ fromUser, toUser, fromItems, toItems, status 
 
 async function completeStoredTrade(tradeId, userId) {
   const trade = await getTradeById(tradeId);
-
   if (!trade) throw new Error('Trade not found');
-
-  if (trade.status !== 'accepted') {
-    throw new Error('Trade must be accepted before confirming');
-  }
-
-  if (![trade.fromUser, trade.toUser].includes(Number(userId))) {
-    throw new Error('You are not part of this trade');
-  }
+  if (trade.status !== 'accepted') throw new Error('Trade must be accepted before confirming');
+  if (![trade.fromUser, trade.toUser].includes(Number(userId))) throw new Error('You are not part of this trade');
 
   await transaction(async tx => {
     await assertItemOwnership(tx, trade.fromItems, trade.fromUser);
@@ -294,7 +287,6 @@ app.post('/api/items/:id/refresh-imgur', authMiddleware, async (req, res) => {
 
 app.delete('/api/items/:id', authMiddleware, async (req, res) => {
   const item = await get('SELECT * FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
-
   if (!item) return res.status(404).json({ error: 'Item not found' });
 
   await run('DELETE FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
@@ -304,7 +296,6 @@ app.delete('/api/items/:id', authMiddleware, async (req, res) => {
 
 app.get('/api/inventory/:username', async (req, res) => {
   const user = await get('SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)', [normalizeUsername(req.params.username)]);
-
   if (!user) return res.json({ user: null, items: [] });
 
   const items = await all(
@@ -507,6 +498,15 @@ io.on('connection', socket => {
     }
   });
 
+  socket.on('inventory:updated', ({ roomId }) => {
+    if (!roomId) return;
+
+    socket.to(roomId).emit('inventory:updated', {
+      userId: socket.user.id,
+      username: socket.user.username
+    });
+  });
+
   socket.on('trade:offer', ({ roomId, itemIds }) => {
     try {
       const room = setOffer(roomId, socket.user.id, itemIds);
@@ -519,8 +519,17 @@ io.on('connection', socket => {
   socket.on('trade:accept', async ({ roomId }) => {
     try {
       const room = acceptTrade(roomId, socket.user.id);
-      await maybeSaveAcceptedSnapshot(room);
+
+      // Save live trade as soon as both players have accepted.
+      const acceptedSnapshot = await maybeSaveAcceptedSnapshot(room);
+
       io.to(room.roomId).emit('room:update', publicRoomState(room));
+
+      if (acceptedSnapshot) {
+        io.to(room.roomId).emit('trade:accepted-saved', {
+          tradeId: acceptedSnapshot.lastID
+        });
+      }
     } catch (error) {
       socket.emit('room:error', error.message);
     }
@@ -531,7 +540,10 @@ io.on('connection', socket => {
       const room = confirmTrade(roomId, socket.user.id);
       await finalizeTrade(room);
       io.to(room.roomId).emit('room:update', publicRoomState(room));
-      if (room.completed) io.to(room.roomId).emit('trade:completed');
+
+      if (room.completed) {
+        io.to(room.roomId).emit('trade:completed');
+      }
     } catch (error) {
       socket.emit('room:error', error.message);
     }
