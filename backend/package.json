@@ -2,6 +2,9 @@
   "name": "trading-app-backend",
   "version": "1.0.0",
   "main": "server.js",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js"
