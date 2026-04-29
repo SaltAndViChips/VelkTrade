@@ -40,8 +40,19 @@ function TradeItem({ item, dragPrefix, onDoubleClick }) {
   );
 }
 
-export default function TradeOfferPanel({ currentUser, inventory, counterTrade, onClose }) {
-  const [targetUsername, setTargetUsername] = useState('');
+function InventoryDrop({ id, children }) {
+  const { setNodeRef } = useDroppable({ id });
+
+  return (
+    <div ref={setNodeRef} className="item-grid drop-zone trade-zone">
+      {children}
+      {!children?.length && <p className="muted">No items.</p>}
+    </div>
+  );
+}
+
+export default function TradeOfferPanel({ currentUser, inventory, counterTrade, initialTargetUsername = '', onClose }) {
+  const [targetUsername, setTargetUsername] = useState(initialTargetUsername);
   const [targetInventory, setTargetInventory] = useState([]);
   const [offerIds, setOfferIds] = useState([]);
   const [requestIds, setRequestIds] = useState([]);
@@ -66,11 +77,6 @@ export default function TradeOfferPanel({ currentUser, inventory, counterTrade, 
     setTargetUsername(otherUsername);
     setMessage(`Counter offer for trade #${counterTrade.id}`);
 
-    // Counter starts with the current trade state from this user's perspective.
-    // If I was original sender:
-    //   my offer = fromItems, requested = toItems
-    // If I was original receiver:
-    //   my offer = toItems, requested = fromItems
     if (currentUserIsOriginalSender) {
       setOfferIds(counterTrade.fromItems || []);
       setRequestIds(counterTrade.toItems || []);
@@ -83,13 +89,20 @@ export default function TradeOfferPanel({ currentUser, inventory, counterTrade, 
   }, [counterTrade, currentUser]);
 
   useEffect(() => {
-    if (targetUsername && !counterTrade) loadTargetInventory();
+    if (initialTargetUsername && !counterTrade) {
+      setTargetUsername(initialTargetUsername);
+    }
+  }, [initialTargetUsername, counterTrade]);
+
+  useEffect(() => {
+    if (targetUsername && !counterTrade) loadTargetInventory(targetUsername);
   }, [targetUsername]);
 
-  async function loadTargetInventory() {
-    if (!targetUsername.trim()) return;
+  async function loadTargetInventory(username = targetUsername) {
+    const cleanUsername = String(username || '').trim();
+    if (!cleanUsername) return;
 
-    const data = await api(`/api/inventory/${targetUsername.trim()}`);
+    const data = await api(`/api/inventory/${encodeURIComponent(cleanUsername)}`);
 
     if (!data.user) {
       setTargetInventory([]);
@@ -197,7 +210,7 @@ export default function TradeOfferPanel({ currentUser, inventory, counterTrade, 
             placeholder="Other player's username"
             disabled={Boolean(counterTrade)}
           />
-          <button onClick={loadTargetInventory} disabled={Boolean(counterTrade)}>Load Player</button>
+          <button type="button" onClick={() => loadTargetInventory()} disabled={Boolean(counterTrade)}>Load Player</button>
         </div>
 
         <textarea
@@ -248,16 +261,5 @@ export default function TradeOfferPanel({ currentUser, inventory, counterTrade, 
         ) : null}
       </DragOverlay>
     </DndContext>
-  );
-}
-
-function InventoryDrop({ id, children }) {
-  const { setNodeRef } = useDroppable({ id });
-
-  return (
-    <div ref={setNodeRef} className="item-grid drop-zone trade-zone">
-      {children}
-      {!children?.length && <p className="muted">No items.</p>}
-    </div>
   );
 }

@@ -1,5 +1,16 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
+
+function parseBulkUrls(value) {
+  return Array.from(
+    new Set(
+      String(value || '')
+        .split(/[\s,]+/)
+        .map(part => part.trim())
+        .filter(Boolean)
+    )
+  );
+}
 
 function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem }) {
   const {
@@ -42,6 +53,7 @@ function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem }) {
           <button
             type="button"
             className="mini-action"
+            title="Add this item to your live trade offer"
             onPointerDown={event => event.stopPropagation()}
             onClick={event => {
               event.preventDefault();
@@ -86,6 +98,12 @@ export default function Inventory({
   onSearch
 }) {
   const [imgurUrl, setImgurUrl] = useState('');
+  const [bulkText, setBulkText] = useState('');
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState('');
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  const parsedBulkUrls = useMemo(() => parseBulkUrls(bulkText), [bulkText]);
 
   const { setNodeRef, isOver } = useDroppable({
     id: droppableId || 'readonly',
@@ -103,19 +121,77 @@ export default function Inventory({
     setImgurUrl('');
   }
 
+  async function submitBulkItems(event) {
+    event.preventDefault();
+
+    if (!parsedBulkUrls.length || !onAddImgurItem) return;
+
+    setBulkBusy(true);
+    setBulkStatus('');
+
+    let added = 0;
+    const failed = [];
+
+    for (const url of parsedBulkUrls) {
+      try {
+        await onAddImgurItem(url);
+        added += 1;
+      } catch (error) {
+        failed.push(`${url} (${error.message || 'failed'})`);
+      }
+    }
+
+    setBulkBusy(false);
+
+    if (failed.length === 0) {
+      setBulkText('');
+      setBulkStatus(`Added ${added} item${added === 1 ? '' : 's'}.`);
+    } else {
+      setBulkStatus(`Added ${added}. Failed ${failed.length}: ${failed.join(', ')}`);
+    }
+  }
+
   return (
     <section className="card">
       <h2>{title}</h2>
 
       {!readOnly && onAddImgurItem && (
-        <form className="inline-controls" onSubmit={submitItem}>
-          <input
-            value={imgurUrl}
-            onChange={event => setImgurUrl(event.target.value)}
-            placeholder="https://imgur.com/6hUs12E"
-          />
-          <button type="submit">Add Item</button>
-        </form>
+        <>
+          <form className="inline-controls" onSubmit={submitItem}>
+            <input
+              value={imgurUrl}
+              onChange={event => setImgurUrl(event.target.value)}
+              placeholder="https://imgur.com/6hUs12E"
+            />
+            <button type="submit">Add Item</button>
+            <button type="button" className="ghost" onClick={() => setBulkOpen(open => !open)}>
+              {bulkOpen ? '▼' : '▶'} Bulk Add
+            </button>
+          </form>
+
+          {bulkOpen && (
+            <form onSubmit={submitBulkItems}>
+              <textarea
+                className="trade-message-box"
+                value={bulkText}
+                onChange={event => setBulkText(event.target.value)}
+                placeholder="Paste multiple Imgur links here, separated by new lines, commas, or spaces."
+                rows={5}
+              />
+
+              <div className="inline-controls">
+                <button type="submit" disabled={bulkBusy || parsedBulkUrls.length === 0}>
+                  {bulkBusy ? 'Adding...' : `Add ${parsedBulkUrls.length} Item${parsedBulkUrls.length === 1 ? '' : 's'}`}
+                </button>
+                <button type="button" className="ghost" onClick={() => setBulkText('')} disabled={bulkBusy}>
+                  Clear
+                </button>
+              </div>
+
+              {bulkStatus && <p className={bulkStatus.includes('Failed') ? 'error' : 'success'}>{bulkStatus}</p>}
+            </form>
+          )}
+        </>
       )}
 
       {readOnly && (
