@@ -1,0 +1,160 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #101114;
+  color: #f5f5f5;
+}
+
+button,
+input {
+  border-radius: 8px;
+  border: 1px solid #333842;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+button {
+  background: #6d7cff;
+  color: white;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+input {
+  background: #17191f;
+  color: white;
+}
+
+.app-shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.card {
+  background: #17191f;
+  border: 1px solid #252936;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+.auth-card {
+  width: min(420px, 90vw);
+  display: grid;
+  gap: 12px;
+}
+
+.topbar,
+.room-panel,
+.trade-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.grid.two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.inline-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.item-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.drop-zone {
+  min-height: 150px;
+  border: 2px dashed #343949;
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.trade-zone {
+  min-height: 220px;
+}
+
+.item-card {
+  background: #20232d;
+  border: 1px solid #303545;
+  border-radius: 12px;
+  padding: 8px;
+  cursor: grab;
+  display: grid;
+  gap: 6px;
+}
+
+.item-card.readonly {
+  cursor: default;
+}
+
+.item-card img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.item-card span {
+  font-size: 12px;
+  color: #d8d8d8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.error {
+  background: #4d1d1d;
+  border: 1px solid #9e3838;
+  color: #ffdada;
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
+
+.muted {
+  color: #9096a8;
+}
+
+.ghost {
+  background: transparent;
+  border-color: #4a5062;
+}
+
+@media (max-width: 800px) {
+  .grid.two,
+  .topbar,
+  .room-panel,
+  .trade-actions {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

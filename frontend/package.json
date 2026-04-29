@@ -1,0 +1,24 @@
+{
+  "name": "trading-app-frontend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "gh-pages -d dist",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "latest",
+    "@vitejs/plugin-react": "latest",
+    "gh-pages": "latest",
+    "socket.io-client": "latest",
+    "vite": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "vitest": "latest"
+  }
+}
