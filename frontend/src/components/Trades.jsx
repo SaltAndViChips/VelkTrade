@@ -3,6 +3,33 @@ import { api } from '../api';
 
 const FILTERS = ['all', 'pending', 'countered', 'accepted', 'completed', 'declined'];
 
+function MiniTradeItem({ item }) {
+  return (
+    <div className="mini-trade-item">
+      <img src={item.image} alt={item.title} />
+      <span>{item.title}</span>
+
+      <div className="item-full-preview">
+        <img src={item.image} alt={item.title} />
+        <strong>{item.title}</strong>
+      </div>
+    </div>
+  );
+}
+
+function ItemStrip({ label, items }) {
+  return (
+    <div className="trade-item-strip">
+      <strong>{label}</strong>
+      <div className="mini-trade-grid">
+        {items?.length ? items.map(item => (
+          <MiniTradeItem key={item.id} item={item} />
+        )) : <span className="muted">No items</span>}
+      </div>
+    </div>
+  );
+}
+
 export default function Trades({ trades, currentUser, onRefresh, onCounter }) {
   const [filter, setFilter] = useState('all');
   const [error, setError] = useState('');
@@ -24,7 +51,7 @@ export default function Trades({ trades, currentUser, onRefresh, onCounter }) {
   }
 
   function otherName(trade) {
-    return trade.fromUser === currentUser.id ? trade.toUsername : trade.fromUsername;
+    return Number(trade.fromUser) === Number(currentUser.id) ? trade.toUsername : trade.fromUsername;
   }
 
   return (
@@ -55,9 +82,12 @@ export default function Trades({ trades, currentUser, onRefresh, onCounter }) {
             </div>
 
             <span>With: {otherName(trade)}</span>
-            <span>{trade.fromUsername} offers item IDs: {(trade.fromItems || []).join(', ') || 'none'}</span>
-            <span>{trade.toUsername} requested item IDs: {(trade.toItems || []).join(', ') || 'none'}</span>
             <small>{trade.createdAt}</small>
+
+            <div className="grid two trade-items-grid">
+              <ItemStrip label={`${trade.fromUsername} offers`} items={trade.fromItemDetails || []} />
+              <ItemStrip label={`${trade.toUsername} offers/requested`} items={trade.toItemDetails || []} />
+            </div>
 
             <details>
               <summary>Chat / message history ({trade.chatHistory?.length || 0})</summary>

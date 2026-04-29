@@ -1,56 +1,54 @@
-/* Append these additions to your existing styles.css if you do not want to replace the file. */
+/* Append these styles to the end of your existing full styles.css */
 
-.room-info-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 18px;
+.trade-items-grid {
+  margin: 12px 0;
 }
 
-.trade-message-box {
-  width: 100%;
-  min-height: 90px;
-  margin: 14px 0;
-  resize: vertical;
-  border-radius: 8px;
+.trade-item-strip {
+  display: grid;
+  gap: 8px;
+}
+
+.mini-trade-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 10px;
+}
+
+.mini-trade-item {
+  position: relative;
+  background: linear-gradient(180deg, var(--panel-2), #171322);
   border: 1px solid var(--border);
-  background: #0f0d17;
-  color: var(--text);
-  padding: 12px;
-  font: inherit;
+  border-radius: 8px;
+  padding: 6px;
+  display: grid;
+  gap: 5px;
+  z-index: 1;
 }
 
-.offer-tile {
-  background: linear-gradient(180deg, #704fce, #463184);
-}
-
-.status-pending {
-  border-color: #d7b55e;
-  color: #ffe6a1;
-}
-
-.status-countered {
-  border-color: #8d63ff;
-  color: #e7dcff;
-}
-
-.status-accepted {
-  border-color: #66c7ff;
-  color: #cdefff;
-}
-
-.status-completed {
-  border-color: #62d18a;
-  color: #d9ffe5;
-}
-
-.status-declined {
-  border-color: #e15d71;
-  color: #ffd9df;
-}
-
-textarea:focus {
+.mini-trade-item:hover {
   border-color: var(--purple);
-  box-shadow: 0 0 0 3px rgba(141,99,255,.18);
-  outline: none;
+  z-index: 40;
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 18px 40px rgba(0,0,0,.45), 0 0 0 1px rgba(141,99,255,.35);
+}
+
+.mini-trade-item img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 5px;
+  pointer-events: none;
+}
+
+.mini-trade-item span {
+  font-size: 11px;
+  color: #ded8ff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini-trade-item .item-full-preview {
+  left: calc(100% + 14px);
 }

@@ -51,36 +51,92 @@ function requireSaltAdmin(req, res, next) {
   if (!isSaltAdmin(req.user)) {
     return res.status(403).json({ error: 'Admin only' });
   }
+
   next();
 }
 
 function safeParse(value, fallback) {
   try {
+    if (Array.isArray(value)) return value;
     return JSON.parse(value || '');
   } catch {
     return fallback;
   }
 }
 
-function normalizeTradeRows(rows) {
-  return rows.map(row => ({
+function normalizeRawTrade(row) {
+  return {
     id: row.id,
-    roomId: row.roomId,
-    fromUser: row.fromUser,
-    toUser: row.toUser,
-    fromUsername: row.fromUsername,
-    toUsername: row.toUsername,
-    fromItems: safeParse(row.fromItems, []),
-    toItems: safeParse(row.toItems, []),
-    chatHistory: safeParse(row.chatHistory, []),
+    roomId: row.roomId ?? row.roomid,
+    fromUser: Number(row.fromUser ?? row.fromuser),
+    toUser: Number(row.toUser ?? row.touser),
+    fromUsername: row.fromUsername ?? row.fromusername,
+    toUsername: row.toUsername ?? row.tousername,
+    fromItems: safeParse(row.fromItems ?? row.fromitems, []),
+    toItems: safeParse(row.toItems ?? row.toitems, []),
+    chatHistory: safeParse(row.chatHistory ?? row.chathistory, []),
     status: row.status,
-    createdAt: row.createdAt
-  }));
+    createdAt: row.createdAt ?? row.createdat
+  };
+}
+
+async function getItemsByIds(itemIds) {
+  const ids = Array.from(new Set((itemIds || []).map(Number))).filter(Boolean);
+
+  if (ids.length === 0) return [];
+
+  const placeholders = ids.map((_, index) => `$${index + 1}`).join(', ');
+  const rows = await all(
+    `SELECT id, title, image, userId AS "userId"
+     FROM items
+     WHERE id IN (${placeholders})`,
+    ids
+  );
+
+  const byId = new Map(rows.map(item => [Number(item.id), item]));
+  return ids.map(id => byId.get(id)).filter(Boolean);
+}
+
+async function enrichTradeRows(rows) {
+  const normalized = rows.map(normalizeRawTrade);
+
+  return Promise.all(
+    normalized.map(async trade => ({
+      ...trade,
+      fromItemDetails: await getItemsByIds(trade.fromItems),
+      toItemDetails: await getItemsByIds(trade.toItems)
+    }))
+  );
+}
+
+async function getTradeById(tradeId) {
+  const row = await get(
+    `SELECT
+      t.id,
+      t.roomId AS "roomId",
+      t.fromUser AS "fromUser",
+      t.toUser AS "toUser",
+      t.fromItems AS "fromItems",
+      t.toItems AS "toItems",
+      t.chatHistory AS "chatHistory",
+      t.status,
+      t.createdAt AS "createdAt",
+      from_user.username AS "fromUsername",
+      to_user.username AS "toUsername"
+    FROM trades t
+    JOIN users AS from_user ON from_user.id = t.fromUser
+    JOIN users AS to_user ON to_user.id = t.toUser
+    WHERE t.id = ?`,
+    [tradeId]
+  );
+
+  return row ? normalizeRawTrade(row) : null;
 }
 
 async function assertItemOwnership(tx, itemIds, userId) {
   for (const itemId of itemIds) {
     const item = await tx.get('SELECT id FROM items WHERE id = ? AND userId = ?', [itemId, userId]);
+
     if (!item) {
       throw new Error(`Invalid item ownership for item ${itemId}`);
     }
@@ -88,8 +144,8 @@ async function assertItemOwnership(tx, itemIds, userId) {
 }
 
 async function createStoredTrade({ fromUser, toUser, fromItems, toItems, status = 'pending', message = '' }) {
-  const cleanFromItems = Array.from(new Set((fromItems || []).map(Number)));
-  const cleanToItems = Array.from(new Set((toItems || []).map(Number)));
+  const cleanFromItems = Array.from(new Set((fromItems || []).map(Number))).filter(Boolean);
+  const cleanToItems = Array.from(new Set((toItems || []).map(Number))).filter(Boolean);
 
   const chatHistory = message
     ? [{
@@ -122,7 +178,7 @@ async function createStoredTrade({ fromUser, toUser, fromItems, toItems, status 
 }
 
 async function completeStoredTrade(tradeId, userId) {
-  const trade = await get('SELECT * FROM trades WHERE id = ?', [tradeId]);
+  const trade = await getTradeById(tradeId);
 
   if (!trade) throw new Error('Trade not found');
 
@@ -130,22 +186,19 @@ async function completeStoredTrade(tradeId, userId) {
     throw new Error('Trade must be accepted before confirming');
   }
 
-  if (![trade.fromUser, trade.toUser].includes(userId)) {
+  if (![trade.fromUser, trade.toUser].includes(Number(userId))) {
     throw new Error('You are not part of this trade');
   }
 
-  const fromItems = safeParse(trade.fromItems, []);
-  const toItems = safeParse(trade.toItems, []);
-
   await transaction(async tx => {
-    await assertItemOwnership(tx, fromItems, trade.fromUser);
-    await assertItemOwnership(tx, toItems, trade.toUser);
+    await assertItemOwnership(tx, trade.fromItems, trade.fromUser);
+    await assertItemOwnership(tx, trade.toItems, trade.toUser);
 
-    for (const itemId of fromItems) {
+    for (const itemId of trade.fromItems) {
       await tx.run('UPDATE items SET userId = ? WHERE id = ?', [trade.toUser, itemId]);
     }
 
-    for (const itemId of toItems) {
+    for (const itemId of trade.toItems) {
       await tx.run('UPDATE items SET userId = ? WHERE id = ?', [trade.fromUser, itemId]);
     }
 
@@ -225,6 +278,7 @@ app.post('/api/items', authMiddleware, async (req, res) => {
 
 app.post('/api/items/:id/refresh-imgur', authMiddleware, async (req, res) => {
   const item = await get('SELECT * FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
+
   if (!item) return res.status(404).json({ error: 'Item not found' });
   if (!isImgurUrl(item.image)) return res.status(400).json({ error: 'Item image is not an Imgur URL' });
 
@@ -240,6 +294,7 @@ app.post('/api/items/:id/refresh-imgur', authMiddleware, async (req, res) => {
 
 app.delete('/api/items/:id', authMiddleware, async (req, res) => {
   const item = await get('SELECT * FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
+
   if (!item) return res.status(404).json({ error: 'Item not found' });
 
   await run('DELETE FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
@@ -249,9 +304,13 @@ app.delete('/api/items/:id', authMiddleware, async (req, res) => {
 
 app.get('/api/inventory/:username', async (req, res) => {
   const user = await get('SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)', [normalizeUsername(req.params.username)]);
+
   if (!user) return res.json({ user: null, items: [] });
 
-  const items = await all('SELECT id, title, image FROM items WHERE userId = ? ORDER BY id DESC', [user.id]);
+  const items = await all(
+    'SELECT id, title, image FROM items WHERE userId = ? ORDER BY id DESC',
+    [user.id]
+  );
 
   res.json({ user, items });
 });
@@ -278,7 +337,7 @@ app.get('/api/trades', authMiddleware, async (req, res) => {
     [req.user.id, req.user.id]
   );
 
-  res.json({ trades: normalizeTradeRows(rows) });
+  res.json({ trades: await enrichTradeRows(rows) });
 });
 
 app.post('/api/trades/offers', authMiddleware, async (req, res) => {
@@ -305,14 +364,21 @@ app.post('/api/trades/offers', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/trades/:id/counter', authMiddleware, async (req, res) => {
-  const original = await get('SELECT * FROM trades WHERE id = ?', [req.params.id]);
+  const original = await getTradeById(req.params.id);
 
   if (!original) return res.status(404).json({ error: 'Trade not found' });
-  if (![original.fromUser, original.toUser].includes(req.user.id)) {
+
+  const currentUserId = Number(req.user.id);
+
+  if (![original.fromUser, original.toUser].includes(currentUserId)) {
     return res.status(403).json({ error: 'You are not part of this trade' });
   }
 
-  const otherUserId = original.fromUser === req.user.id ? original.toUser : original.fromUser;
+  if (original.status === 'completed') {
+    return res.status(400).json({ error: 'Completed trades cannot be countered' });
+  }
+
+  const otherUserId = original.fromUser === currentUserId ? original.toUser : original.fromUser;
   const otherUser = await get('SELECT id, username FROM users WHERE id = ?', [otherUserId]);
 
   try {
@@ -324,7 +390,7 @@ app.post('/api/trades/:id/counter', authMiddleware, async (req, res) => {
       fromItems: req.body.fromItems || [],
       toItems: req.body.toItems || [],
       status: 'countered',
-      message: req.body.message || 'Counter offer sent.'
+      message: req.body.message || `Counter offer for trade #${original.id}`
     });
 
     res.json({ ok: true, tradeId: result.lastID });
@@ -334,10 +400,10 @@ app.post('/api/trades/:id/counter', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/trades/:id/accept', authMiddleware, async (req, res) => {
-  const trade = await get('SELECT * FROM trades WHERE id = ?', [req.params.id]);
+  const trade = await getTradeById(req.params.id);
 
   if (!trade) return res.status(404).json({ error: 'Trade not found' });
-  if (![trade.fromUser, trade.toUser].includes(req.user.id)) return res.status(403).json({ error: 'You are not part of this trade' });
+  if (![trade.fromUser, trade.toUser].includes(Number(req.user.id))) return res.status(403).json({ error: 'You are not part of this trade' });
   if (trade.status === 'completed') return res.status(400).json({ error: 'Trade already completed' });
   if (trade.status === 'declined') return res.status(400).json({ error: 'Trade already declined' });
 
@@ -356,10 +422,10 @@ app.post('/api/trades/:id/confirm', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/trades/:id/decline', authMiddleware, async (req, res) => {
-  const trade = await get('SELECT * FROM trades WHERE id = ?', [req.params.id]);
+  const trade = await getTradeById(req.params.id);
 
   if (!trade) return res.status(404).json({ error: 'Trade not found' });
-  if (![trade.fromUser, trade.toUser].includes(req.user.id)) return res.status(403).json({ error: 'You are not part of this trade' });
+  if (![trade.fromUser, trade.toUser].includes(Number(req.user.id))) return res.status(403).json({ error: 'You are not part of this trade' });
   if (trade.status === 'completed') return res.status(400).json({ error: 'Completed trades cannot be declined' });
 
   await run('UPDATE trades SET status = ? WHERE id = ?', ['declined', req.params.id]);
@@ -387,7 +453,7 @@ app.get('/api/admin/trades', authMiddleware, requireSaltAdmin, async (req, res) 
     ORDER BY t.createdAt DESC`
   );
 
-  res.json({ trades: normalizeTradeRows(rows) });
+  res.json({ trades: await enrichTradeRows(rows) });
 });
 
 app.post('/api/admin/reset-password', authMiddleware, requireSaltAdmin, async (req, res) => {

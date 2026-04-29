@@ -154,10 +154,11 @@ export default function App() {
   }
 
   function handleDragStart(event) {
-    const itemId = Number(String(event.active.id).replace(/^(own|their)-/, ''));
+    const itemId = Number(String(event.active.id).replace(/^(own|their|selected)-/, ''));
     setActiveDragItem(
       inventory.find(item => item.id === itemId) ||
       viewedInventory.find(item => item.id === itemId) ||
+      trades.flatMap(t => [...(t.fromItemDetails || []), ...(t.toItemDetails || [])]).find(item => item.id === itemId) ||
       null
     );
   }
@@ -167,7 +168,7 @@ export default function App() {
     setActiveDragItem(null);
     if (!over) return;
 
-    const itemId = Number(String(active.id).replace(/^(own|their)-/, ''));
+    const itemId = Number(String(active.id).replace(/^(own|their|selected)-/, ''));
 
     if (over.id === 'my-offer') moveToOffer(itemId);
     if (over.id === 'inventory') moveToInventory(itemId);

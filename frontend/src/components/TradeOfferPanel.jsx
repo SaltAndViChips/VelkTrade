@@ -32,6 +32,10 @@ function TradeItem({ item, dragPrefix, onDoubleClick }) {
     >
       <img src={item.image} alt={item.title} draggable="false" />
       <span>{item.title}</span>
+      <div className="item-full-preview">
+        <img src={item.image} alt={item.title} />
+        <strong>{item.title}</strong>
+      </div>
     </div>
   );
 }
@@ -54,16 +58,32 @@ export default function TradeOfferPanel({ currentUser, inventory, counterTrade, 
   useEffect(() => {
     if (!counterTrade || !currentUser) return;
 
-    const otherUsername = counterTrade.fromUser === currentUser.id
+    const currentUserIsOriginalSender = Number(counterTrade.fromUser) === Number(currentUser.id);
+    const otherUsername = currentUserIsOriginalSender
       ? counterTrade.toUsername
       : counterTrade.fromUsername;
 
     setTargetUsername(otherUsername);
     setMessage(`Counter offer for trade #${counterTrade.id}`);
+
+    // Counter starts with the current trade state from this user's perspective.
+    // If I was original sender:
+    //   my offer = fromItems, requested = toItems
+    // If I was original receiver:
+    //   my offer = toItems, requested = fromItems
+    if (currentUserIsOriginalSender) {
+      setOfferIds(counterTrade.fromItems || []);
+      setRequestIds(counterTrade.toItems || []);
+      setTargetInventory(counterTrade.toItemDetails || []);
+    } else {
+      setOfferIds(counterTrade.toItems || []);
+      setRequestIds(counterTrade.fromItems || []);
+      setTargetInventory(counterTrade.fromItemDetails || []);
+    }
   }, [counterTrade, currentUser]);
 
   useEffect(() => {
-    if (targetUsername) loadTargetInventory();
+    if (targetUsername && !counterTrade) loadTargetInventory();
   }, [targetUsername]);
 
   async function loadTargetInventory() {

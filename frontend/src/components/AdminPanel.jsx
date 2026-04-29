@@ -1,6 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 
+function MiniTradeItem({ item }) {
+  return (
+    <div className="mini-trade-item">
+      <img src={item.image} alt={item.title} />
+      <span>{item.title}</span>
+      <div className="item-full-preview">
+        <img src={item.image} alt={item.title} />
+        <strong>{item.title}</strong>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPanel() {
   const [trades, setTrades] = useState([]);
   const [filter, setFilter] = useState('all');
@@ -25,11 +38,13 @@ export default function AdminPanel() {
     event.preventDefault();
     setMessage('');
     setError('');
+
     try {
       const data = await api('/api/admin/reset-password', {
         method: 'POST',
         body: JSON.stringify({ username: targetUsername.trim(), newPassword })
       });
+
       setMessage(data.message || 'Password reset');
       setTargetUsername('');
       setNewPassword('');
@@ -57,12 +72,12 @@ export default function AdminPanel() {
       </form>
 
       <div className="admin-header">
-        <h3>All Trade History</h3>
+        <h3>All Trades</h3>
         <button type="button" onClick={loadTrades}>Refresh</button>
       </div>
 
       <div className="inline-controls filter-row">
-        {['all', 'accepted', 'completed', 'declined'].map(item => (
+        {['all', 'pending', 'countered', 'accepted', 'completed', 'declined'].map(item => (
           <button key={item} className={filter === item ? 'selected-filter' : 'ghost'} onClick={() => setFilter(item)}>{item}</button>
         ))}
       </div>
@@ -76,8 +91,16 @@ export default function AdminPanel() {
             <span>{trade.fromUsername} ↔ {trade.toUsername}</span>
             <span>Status: {trade.status}</span>
             <span>{trade.createdAt}</span>
-            <small>From items: {(trade.fromItems || []).join(', ') || 'none'}</small>
-            <small>To items: {(trade.toItems || []).join(', ') || 'none'}</small>
+
+            <div className="grid two trade-items-grid">
+              <div className="mini-trade-grid">
+                {(trade.fromItemDetails || []).map(item => <MiniTradeItem key={item.id} item={item} />)}
+              </div>
+              <div className="mini-trade-grid">
+                {(trade.toItemDetails || []).map(item => <MiniTradeItem key={item.id} item={item} />)}
+              </div>
+            </div>
+
             <details>
               <summary>Chat history ({trade.chatHistory?.length || 0})</summary>
               <div className="history-chat">
