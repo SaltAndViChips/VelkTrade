@@ -3,17 +3,34 @@ import { api } from '../api';
 
 const FILTERS = ['all', 'pending', 'countered', 'accepted', 'completed', 'declined'];
 
+function formatPriceDisplay(price) {
+  const clean = String(price || '').trim();
+  if (!clean) return '';
+
+  if (/^\d+(\.\d+)?\s*([kmb])?$/i.test(clean)) {
+    return `${clean} IC`;
+  }
+
+  if (/\bic\b/i.test(clean)) {
+    return clean.replace(/\bic\b/i, 'IC');
+  }
+
+  return clean.replace(/^\$\s*/, '');
+}
+
 function MiniTradeItem({ item }) {
+  const displayPrice = formatPriceDisplay(item.price);
+
   return (
     <div className="mini-trade-item">
       <img src={item.image} alt={item.title} />
       <span>{item.title}</span>
-      {item.price && <strong className="item-price">{item.price}</strong>}
+      {displayPrice && <strong className="item-price">{displayPrice}</strong>}
 
       <div className="item-full-preview">
         <img src={item.image} alt={item.title} />
         <strong>{item.title}</strong>
-        {item.price && <em>{item.price}</em>}
+        {displayPrice && <em>{displayPrice}</em>}
       </div>
     </div>
   );
@@ -34,8 +51,8 @@ function ItemStrip({ label, items }) {
 
 function tradeSearchText(trade) {
   const itemNames = [
-    ...(trade.fromItemDetails || []).map(item => `${item.title || ''} ${item.price || ''}`),
-    ...(trade.toItemDetails || []).map(item => `${item.title || ''} ${item.price || ''}`)
+    ...(trade.fromItemDetails || []).map(item => `${item.title || ''} ${formatPriceDisplay(item.price) || ''}`),
+    ...(trade.toItemDetails || []).map(item => `${item.title || ''} ${formatPriceDisplay(item.price) || ''}`)
   ];
 
   const chatText = (trade.chatHistory || [])
@@ -64,7 +81,7 @@ function buyRequestSearchText(request) {
     request.id,
     request.itemId,
     request.itemTitle,
-    request.itemPrice,
+    formatPriceDisplay(request.itemPrice),
     request.requesterUsername,
     request.ownerUsername,
     request.createdAt
@@ -102,7 +119,7 @@ function BuyRequestsTab({ requests, currentUser, onRefresh }) {
         <input
           value={search}
           onChange={event => setSearch(event.target.value)}
-          placeholder="Search buy requests by item, user, price..."
+          placeholder="Search buy requests by item, user, IC price..."
         />
 
         <button className={scope === 'all' ? 'selected-filter' : 'ghost'} onClick={() => setScope('all')}>All</button>
@@ -116,37 +133,41 @@ function BuyRequestsTab({ requests, currentUser, onRefresh }) {
       {filtered.length === 0 && <p className="muted">No buy requests match this filter/search.</p>}
 
       <div className="trade-history-list">
-        {filtered.map(request => (
-          <article className="trade-history-item" key={request.id}>
-            <div className="panel-title-row">
-              <strong>Buy Request #{request.id}</strong>
-              <span className="status-pill">
-                {Number(request.ownerId) === Number(currentUser.id) ? 'On your item' : 'Made by you'}
-              </span>
-            </div>
+        {filtered.map(request => {
+          const displayPrice = formatPriceDisplay(request.itemPrice);
 
-            <div className="grid two trade-items-grid">
-              <div className="mini-trade-grid">
-                <div className="mini-trade-item">
-                  <img src={request.itemImage} alt={request.itemTitle} />
-                  <span>{request.itemTitle}</span>
-                  {request.itemPrice && <strong className="item-price">{request.itemPrice}</strong>}
-                  <div className="item-full-preview">
+          return (
+            <article className="trade-history-item" key={request.id}>
+              <div className="panel-title-row">
+                <strong>Buy Request #{request.id}</strong>
+                <span className="status-pill">
+                  {Number(request.ownerId) === Number(currentUser.id) ? 'On your item' : 'Made by you'}
+                </span>
+              </div>
+
+              <div className="grid two trade-items-grid">
+                <div className="mini-trade-grid">
+                  <div className="mini-trade-item">
                     <img src={request.itemImage} alt={request.itemTitle} />
-                    <strong>{request.itemTitle}</strong>
-                    {request.itemPrice && <em>{request.itemPrice}</em>}
+                    <span>{request.itemTitle}</span>
+                    {displayPrice && <strong className="item-price">{displayPrice}</strong>}
+                    <div className="item-full-preview">
+                      <img src={request.itemImage} alt={request.itemTitle} />
+                      <strong>{request.itemTitle}</strong>
+                      {displayPrice && <em>{displayPrice}</em>}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div>
-                <p><strong>Requester:</strong> {request.requesterUsername}</p>
-                <p><strong>Owner:</strong> {request.ownerUsername}</p>
-                <p><strong>Created:</strong> {request.createdAt}</p>
+                <div>
+                  <p><strong>Requester:</strong> {request.requesterUsername}</p>
+                  <p><strong>Owner:</strong> {request.ownerUsername}</p>
+                  <p><strong>Created:</strong> {request.createdAt}</p>
+                </div>
               </div>
-            </div>
-          </article>
-        ))}
+            </article>
+          );
+        })}
       </div>
     </section>
   );
@@ -212,7 +233,7 @@ export default function Trades({ trades, buyRequests = [], currentUser, onRefres
             <input
               value={search}
               onChange={event => setSearch(event.target.value)}
-              placeholder="Search trades by user, item, price, status, room, chat..."
+              placeholder="Search trades by user, item, IC price, status, room, chat..."
               aria-label="Search trades"
             />
 

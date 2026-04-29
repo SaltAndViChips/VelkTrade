@@ -1,3 +1,18 @@
+function formatPriceDisplay(price) {
+  const clean = String(price || '').trim();
+  if (!clean) return '';
+
+  if (/^\d+(\.\d+)?\s*([kmb])?$/i.test(clean)) {
+    return `${clean} IC`;
+  }
+
+  if (/\bic\b/i.test(clean)) {
+    return clean.replace(/\bic\b/i, 'IC');
+  }
+
+  return clean.replace(/^\$\s*/, '');
+}
+
 export default function UserInventoryPage({
   username,
   userRecord,
@@ -61,18 +76,19 @@ export default function UserInventoryPage({
 
             {items.map(item => {
               const isOwnProfile = String(currentUsername || '').toLowerCase() === String(userRecord.username || '').toLowerCase();
+              const displayPrice = formatPriceDisplay(item.price);
 
               return (
                 <div key={item.id} className="item-card readonly">
                   <img src={item.image} alt={item.title} />
                   <span>{item.title}</span>
-                  {item.price ? <strong className="item-price">{item.price}</strong> : <small className="muted">No price set</small>}
+                  {displayPrice ? <strong className="item-price">{displayPrice}</strong> : <small className="muted">No IC price set</small>}
                   <small className="muted">{item.buyRequestCount || 0} buy request{Number(item.buyRequestCount || 0) === 1 ? '' : 's'}</small>
 
                   <div className="item-full-preview">
                     <img src={item.image} alt={item.title} />
                     <strong>{item.title}</strong>
-                    {item.price && <em>{item.price}</em>}
+                    {displayPrice && <em>{displayPrice}</em>}
                   </div>
 
                   {!isOwnProfile && (

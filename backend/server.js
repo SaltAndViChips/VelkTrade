@@ -50,7 +50,25 @@ function cleanBio(value) {
 }
 
 function cleanPrice(value) {
-  return String(value || '').trim().slice(0, 80);
+  const raw = String(value || '').trim().slice(0, 80);
+  if (!raw) return '';
+
+  // Normalize explicit dollar-style entries into IC wording.
+  const withoutDollar = raw.replace(/^\$\s*/, '').trim();
+
+  // If the player entered a plain number / abbreviated number, display it as IC.
+  // Examples: 150 -> 150 IC, 1.5k -> 1.5k IC, 2m -> 2m IC
+  if (/^\d+(\.\d+)?\s*([kmb])?$/i.test(withoutDollar)) {
+    return `${withoutDollar} IC`;
+  }
+
+  // If IC is already present, preserve it.
+  if (/\bIC\b/i.test(withoutDollar)) {
+    return withoutDollar.replace(/\bic\b/i, 'IC');
+  }
+
+  // Leave non-numeric terms flexible, such as "Offer", "Negotiable", etc.
+  return withoutDollar;
 }
 
 async function hydrateAuthUser(user) {

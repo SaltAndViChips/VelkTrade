@@ -12,9 +12,26 @@ function parseBulkUrls(value) {
   );
 }
 
+function formatPriceDisplay(price) {
+  const clean = String(price || '').trim();
+  if (!clean) return '';
+
+  if (/^\d+(\.\d+)?\s*([kmb])?$/i.test(clean)) {
+    return `${clean} IC`;
+  }
+
+  if (/\bic\b/i.test(clean)) {
+    return clean.replace(/\bic\b/i, 'IC');
+  }
+
+  return clean.replace(/^\$\s*/, '');
+}
+
 function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem, onUpdatePrice }) {
   const [editingPrice, setEditingPrice] = useState(false);
-  const [price, setPrice] = useState(item.price || '');
+  const [price, setPrice] = useState(formatPriceDisplay(item.price || ''));
+
+  const displayPrice = formatPriceDisplay(item.price);
 
   const {
     attributes,
@@ -54,12 +71,12 @@ function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem, onU
       <img src={item.image} alt={item.title} draggable="false" />
       <span>{item.title}</span>
 
-      {item.price ? <strong className="item-price">{item.price}</strong> : <small className="muted">No price set</small>}
+      {displayPrice ? <strong className="item-price">{displayPrice}</strong> : <small className="muted">No IC price set</small>}
 
       <div className="item-full-preview">
         <img src={item.image} alt={item.title} />
         <strong>{item.title}</strong>
-        {item.price && <em>{item.price}</em>}
+        {displayPrice && <em>{displayPrice}</em>}
       </div>
 
       {editingPrice && (
@@ -67,7 +84,7 @@ function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem, onU
           <input
             value={price}
             onChange={event => setPrice(event.target.value)}
-            placeholder="$10 / 150k / Offer"
+            placeholder="150 IC / 1.5k IC / Offer"
             maxLength={80}
             onPointerDown={event => event.stopPropagation()}
             onClick={event => event.stopPropagation()}
@@ -110,7 +127,7 @@ function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem, onU
               setEditingPrice(open => !open);
             }}
           >
-            Price
+            IC Price
           </button>
         )}
 
@@ -258,28 +275,32 @@ export default function Inventory({
       <div ref={setNodeRef} className={`item-grid drop-zone ${isOver ? 'drop-zone-active' : ''}`}>
         {items.length === 0 && <p className="muted">No items here.</p>}
 
-        {items.map(item => readOnly ? (
-          <div key={item.id} className="item-card readonly">
-            <img src={item.image} alt={item.title} />
-            <span>{item.title}</span>
-            {item.price ? <strong className="item-price">{item.price}</strong> : <small className="muted">No price set</small>}
+        {items.map(item => {
+          const displayPrice = formatPriceDisplay(item.price);
 
-            <div className="item-full-preview">
+          return readOnly ? (
+            <div key={item.id} className="item-card readonly">
               <img src={item.image} alt={item.title} />
-              <strong>{item.title}</strong>
-              {item.price && <em>{item.price}</em>}
+              <span>{item.title}</span>
+              {displayPrice ? <strong className="item-price">{displayPrice}</strong> : <small className="muted">No IC price set</small>}
+
+              <div className="item-full-preview">
+                <img src={item.image} alt={item.title} />
+                <strong>{item.title}</strong>
+                {displayPrice && <em>{displayPrice}</em>}
+              </div>
             </div>
-          </div>
-        ) : (
-          <DraggableItem
-            key={item.id}
-            item={item}
-            onDeleteItem={onDeleteItem}
-            onDoubleClickItem={onDoubleClickItem}
-            onOfferItem={onOfferItem}
-            onUpdatePrice={onUpdatePrice}
-          />
-        ))}
+          ) : (
+            <DraggableItem
+              key={item.id}
+              item={item}
+              onDeleteItem={onDeleteItem}
+              onDoubleClickItem={onDoubleClickItem}
+              onOfferItem={onOfferItem}
+              onUpdatePrice={onUpdatePrice}
+            />
+          );
+        })}
       </div>
     </section>
   );
