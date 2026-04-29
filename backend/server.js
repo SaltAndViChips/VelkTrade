@@ -1,7 +1,7 @@
 /*
-Merge note:
-The critical backend change is that setOffer() is synchronous again and no longer DB-validates during live offer updates.
-Keep this full file if your backend already uses the Neon/Postgres patch.
+Backend patch:
+Only socket event behavior changed.
+If you already have routes working, merge the socket section from this file.
 */
 
 require('dotenv').config();
@@ -468,6 +468,7 @@ io.on('connection', socket => {
       const room = joinRoom(roomId, socket.user);
       socket.join(room.roomId);
       io.to(room.roomId).emit('room:update', publicRoomState(room));
+      io.to(room.roomId).emit('inventory:refresh', { reason: 'room-join' });
     } catch (error) {
       socket.emit('room:error', error.message);
     }
@@ -485,7 +486,8 @@ io.on('connection', socket => {
   socket.on('inventory:updated', ({ roomId }) => {
     if (!roomId) return;
 
-    socket.to(roomId).emit('inventory:updated', {
+    io.to(roomId).emit('inventory:refresh', {
+      reason: 'inventory-updated',
       userId: socket.user.id,
       username: socket.user.username
     });
@@ -494,7 +496,19 @@ io.on('connection', socket => {
   socket.on('trade:offer', ({ roomId, itemIds }) => {
     try {
       const room = setOffer(roomId, socket.user.id, itemIds);
-      io.to(room.roomId).emit('room:update', publicRoomState(room));
+      const state = publicRoomState(room);
+
+      io.to(room.roomId).emit('room:update', state);
+      io.to(room.roomId).emit('trade:offer-updated', {
+        room: state,
+        userId: socket.user.id,
+        username: socket.user.username
+      });
+      io.to(room.roomId).emit('inventory:refresh', {
+        reason: 'offer-updated',
+        userId: socket.user.id,
+        username: socket.user.username
+      });
     } catch (error) {
       socket.emit('room:error', error.message || 'Could not update offer');
     }
@@ -525,6 +539,7 @@ io.on('connection', socket => {
 
       if (room.completed) {
         io.to(room.roomId).emit('trade:completed');
+        io.to(room.roomId).emit('inventory:refresh', { reason: 'trade-completed' });
       }
     } catch (error) {
       socket.emit('room:error', error.message);

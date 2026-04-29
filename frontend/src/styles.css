@@ -683,8 +683,13 @@ p {
 }
 
 
-/* Append these rules to the end of your existing full styles.css. */
+.drop-zone {
+  min-height: 180px;
+}
 
+.trade-zone {
+  min-height: 260px;
+}
 
 .drop-zone-active {
   border-color: var(--purple);
@@ -711,4 +716,8 @@ p {
 
 .item-card button {
   cursor: pointer;
+}
+
+.room-info-card .muted {
+  word-break: break-all;
 }
