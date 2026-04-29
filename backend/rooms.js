@@ -25,11 +25,11 @@ function joinRoom(roomId, player) {
 
   if (!room) throw new Error('Room not found');
   if (room.completed) throw new Error('Trade already completed');
-  if (room.players.length >= 2 && !room.players.some(p => p.id === player.id)) {
+  if (room.players.length >= 2 && !room.players.some(p => Number(p.id) === Number(player.id))) {
     throw new Error('Room is full');
   }
 
-  if (room.players.some(p => p.id === player.id)) return room;
+  if (room.players.some(p => Number(p.id) === Number(player.id))) return room;
 
   room.players.push(player);
   room.offers[player.id] = [];
@@ -37,6 +37,10 @@ function joinRoom(roomId, player) {
   room.confirmed[player.id] = false;
 
   return room;
+}
+
+function getRoom(roomId) {
+  return rooms.get(roomId);
 }
 
 function assertPlayerInRoom(room, userId) {
@@ -51,19 +55,32 @@ function resetApprovals(room) {
     room.confirmed[player.id] = false;
   }
 
-  // A counter/live offer change invalidates the previous accepted snapshot.
   room.acceptedSnapshotSaved = false;
   room.acceptedTradeId = null;
 }
 
-function setOffer(roomId, userId, itemIds) {
+async function validateItemOwnership(userId, itemIds) {
+  for (const itemId of itemIds) {
+    const item = await get('SELECT id FROM items WHERE id = ? AND userId = ?', [itemId, userId]);
+
+    if (!item) {
+      throw new Error(`Item ${itemId} does not belong to you`);
+    }
+  }
+}
+
+async function setOffer(roomId, userId, itemIds) {
   const room = rooms.get(roomId);
   if (!room) throw new Error('Room not found');
   if (room.completed) throw new Error('Trade already completed');
 
   assertPlayerInRoom(room, userId);
 
-  room.offers[userId] = Array.from(new Set((itemIds || []).map(Number))).filter(Boolean);
+  const cleanItemIds = Array.from(new Set((itemIds || []).map(Number))).filter(Number.isFinite);
+
+  await validateItemOwnership(userId, cleanItemIds);
+
+  room.offers[userId] = cleanItemIds;
   resetApprovals(room);
 
   return room;
@@ -244,6 +261,7 @@ function publicRoomState(room) {
 module.exports = {
   createRoom,
   joinRoom,
+  getRoom,
   setOffer,
   acceptTrade,
   confirmTrade,

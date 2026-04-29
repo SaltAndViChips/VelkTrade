@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 
-function getDragId(itemId) {
-  return `inv-${itemId}`;
-}
-
-function DraggableItem({ item, onDeleteItem, onDoubleClickItem }) {
+function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem }) {
   const {
     attributes,
     listeners,
     setNodeRef,
     isDragging
-  } = useDraggable({ id: getDragId(item.id) });
+  } = useDraggable({
+    id: `inventory-item-${item.id}`,
+    data: {
+      itemId: item.id,
+      source: 'inventory'
+    }
+  });
 
   function handleDoubleClick(event) {
     event.preventDefault();
@@ -35,20 +37,37 @@ function DraggableItem({ item, onDeleteItem, onDoubleClickItem }) {
         <strong>{item.title}</strong>
       </div>
 
-      {onDeleteItem && (
-        <button
-          type="button"
-          className="mini-danger"
-          onPointerDown={event => event.stopPropagation()}
-          onClick={event => {
-            event.preventDefault();
-            event.stopPropagation();
-            onDeleteItem(item.id);
-          }}
-        >
-          Remove
-        </button>
-      )}
+      <div className="item-card-actions">
+        {onOfferItem && (
+          <button
+            type="button"
+            className="mini-action"
+            onPointerDown={event => event.stopPropagation()}
+            onClick={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              onOfferItem(item.id);
+            }}
+          >
+            Offer
+          </button>
+        )}
+
+        {onDeleteItem && (
+          <button
+            type="button"
+            className="mini-danger"
+            onPointerDown={event => event.stopPropagation()}
+            onClick={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              onDeleteItem(item.id);
+            }}
+          >
+            Remove
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -61,15 +80,26 @@ export default function Inventory({
   onAddImgurItem,
   onDeleteItem,
   onDoubleClickItem,
+  onOfferItem,
   usernameValue,
   onUsernameChange,
   onSearch
 }) {
   const [imgurUrl, setImgurUrl] = useState('');
-  const { setNodeRef, isOver } = useDroppable({ id: droppableId || 'readonly' });
+
+  const {
+    setNodeRef,
+    isOver
+  } = useDroppable({
+    id: droppableId || 'readonly',
+    data: {
+      zone: droppableId || 'readonly'
+    }
+  });
 
   async function submitItem(event) {
     event.preventDefault();
+
     if (!imgurUrl.trim()) return;
 
     await onAddImgurItem(imgurUrl.trim());
@@ -121,6 +151,7 @@ export default function Inventory({
             item={item}
             onDeleteItem={onDeleteItem}
             onDoubleClickItem={onDoubleClickItem}
+            onOfferItem={onOfferItem}
           />
         ))}
       </div>

@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { DndContext, DragOverlay } from '@dnd-kit/core';
+import {
+  DndContext,
+  DragOverlay,
+  MouseSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors
+} from '@dnd-kit/core';
 
 import { api, clearToken, getToken } from './api';
 import { createSocket } from './socket';
@@ -12,14 +20,41 @@ import AdminPanel from './components/AdminPanel';
 import Trades from './components/Trades';
 import TradeOfferPanel from './components/TradeOfferPanel';
 
-function parseDraggedItemId(value) {
-  const raw = String(value || '');
-  const cleaned = raw.replace(/^(inv|offer|own|their|selected)-/, '');
+function parseDraggedItemId(active) {
+  const dataItemId = active?.data?.current?.itemId;
+
+  if (dataItemId !== undefined && dataItemId !== null) {
+    const itemId = Number(dataItemId);
+    return Number.isFinite(itemId) ? itemId : null;
+  }
+
+  const raw = String(active?.id || '');
+  const cleaned = raw.replace(/^(inventory-item|offer-item|inv|offer|own|their|selected)-/, '');
   const itemId = Number(cleaned);
+
   return Number.isFinite(itemId) ? itemId : null;
 }
 
 export default function App() {
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 3
+      }
+    }),
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 3
+      }
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 120,
+        tolerance: 6
+      }
+    })
+  );
+
   const [view, setView] = useState('dashboard');
   const [user, setUser] = useState(null);
   const [socket, setSocket] = useState(null);
@@ -47,17 +82,17 @@ export default function App() {
   );
 
   const visibleInventory = useMemo(
-    () => inventory.filter(item => !myOfferIds.includes(item.id)),
+    () => inventory.filter(item => !myOfferIds.includes(Number(item.id))),
     [inventory, myOfferIds]
   );
 
   const myOfferItems = useMemo(
-    () => inventory.filter(item => myOfferIds.includes(item.id)),
+    () => inventory.filter(item => myOfferIds.includes(Number(item.id))),
     [inventory, myOfferIds]
   );
 
   const theirOfferItems = useMemo(
-    () => viewedInventory.filter(item => theirOfferIds.includes(item.id)),
+    () => viewedInventory.filter(item => theirOfferIds.includes(Number(item.id))),
     [viewedInventory, theirOfferIds]
   );
 
@@ -218,9 +253,11 @@ export default function App() {
   function updateOffer(nextOfferIds) {
     if (!room) return;
 
+    const cleanOfferIds = Array.from(new Set((nextOfferIds || []).map(Number))).filter(Number.isFinite);
+
     socket?.emit('trade:offer', {
       roomId: room.roomId,
-      itemIds: nextOfferIds
+      itemIds: cleanOfferIds
     });
   }
 
@@ -236,11 +273,11 @@ export default function App() {
     const id = Number(itemId);
     if (!room || !Number.isFinite(id)) return;
 
-    updateOffer(myOfferIds.filter(existingId => existingId !== id));
+    updateOffer(myOfferIds.filter(existingId => Number(existingId) !== id));
   }
 
   function handleDragStart(event) {
-    const itemId = parseDraggedItemId(event.active.id);
+    const itemId = parseDraggedItemId(event.active);
 
     if (!itemId) {
       setActiveDragItem(null);
@@ -264,16 +301,16 @@ export default function App() {
 
     if (!over) return;
 
-    const itemId = parseDraggedItemId(active.id);
+    const itemId = parseDraggedItemId(active);
 
     if (!itemId) return;
 
-    if (over.id === 'my-offer') {
+    if (over.id === 'my-offer-drop') {
       moveToOffer(itemId);
       return;
     }
 
-    if (over.id === 'inventory') {
+    if (over.id === 'inventory-drop') {
       moveToInventory(itemId);
     }
   }
@@ -310,7 +347,12 @@ export default function App() {
   }
 
   return (
-    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={() => setActiveDragItem(null)}
+    >
       <main className="app-shell">
         <header className="topbar">
           <div>
@@ -349,10 +391,11 @@ export default function App() {
           <Inventory
             title="My Inventory"
             items={inventory}
-            droppableId="inventory"
+            droppableId="inventory-drop"
             onAddImgurItem={addImgurItem}
             onDeleteItem={deleteItem}
             onDoubleClickItem={moveToOffer}
+            onOfferItem={room ? moveToOffer : undefined}
           />
         )}
 
@@ -402,10 +445,11 @@ export default function App() {
               <Inventory
                 title="Your Inventory"
                 items={visibleInventory}
-                droppableId="inventory"
+                droppableId="inventory-drop"
                 onAddImgurItem={addImgurItem}
                 onDeleteItem={deleteItem}
                 onDoubleClickItem={moveToOffer}
+                onOfferItem={moveToOffer}
               />
 
               <Inventory

@@ -1,16 +1,18 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 
-function getOfferDragId(itemId) {
-  return `offer-${itemId}`;
-}
-
-function OfferItem({ item, onDoubleClick }) {
+function OfferItem({ item, onDoubleClick, onRemove }) {
   const {
     attributes,
     listeners,
     setNodeRef,
     isDragging
-  } = useDraggable({ id: getOfferDragId(item.id) });
+  } = useDraggable({
+    id: `offer-item-${item.id}`,
+    data: {
+      itemId: item.id,
+      source: 'offer'
+    }
+  });
 
   function handleDoubleClick(event) {
     event.preventDefault();
@@ -28,12 +30,24 @@ function OfferItem({ item, onDoubleClick }) {
     >
       <img src={item.image} alt={item.title} draggable="false" />
       <span>{item.title}</span>
-      <small className="muted">Double-click to remove</small>
 
       <div className="item-full-preview">
         <img src={item.image} alt={item.title} />
         <strong>{item.title}</strong>
       </div>
+
+      <button
+        type="button"
+        className="mini-danger"
+        onPointerDown={event => event.stopPropagation()}
+        onClick={event => {
+          event.preventDefault();
+          event.stopPropagation();
+          onRemove?.(item.id);
+        }}
+      >
+        Remove
+      </button>
     </div>
   );
 }
@@ -53,7 +67,15 @@ function ReadOnlyOfferItem({ item }) {
 }
 
 function OfferZone({ title, items, droppableId, readOnly, onDoubleClickOfferItem }) {
-  const { setNodeRef, isOver } = useDroppable({ id: droppableId });
+  const {
+    setNodeRef,
+    isOver
+  } = useDroppable({
+    id: droppableId,
+    data: {
+      zone: droppableId
+    }
+  });
 
   return (
     <div className="card">
@@ -69,6 +91,7 @@ function OfferZone({ title, items, droppableId, readOnly, onDoubleClickOfferItem
             key={item.id}
             item={item}
             onDoubleClick={onDoubleClickOfferItem}
+            onRemove={onDoubleClickOfferItem}
           />
         ))}
       </div>
@@ -95,14 +118,14 @@ export default function TradeBoard({
         <OfferZone
           title="Your Offer"
           items={myOfferItems}
-          droppableId="my-offer"
+          droppableId="my-offer-drop"
           onDoubleClickOfferItem={onDoubleClickOfferItem}
         />
 
         <OfferZone
           title="Their Offer"
           items={theirOfferItems}
-          droppableId="their-offer"
+          droppableId="their-offer-drop"
           readOnly
         />
       </div>

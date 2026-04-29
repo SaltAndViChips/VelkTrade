@@ -1,10 +1,3 @@
-/*
-Patch target:
-- Adds socket event inventory:updated.
-- Ensures live accept calls maybeSaveAcceptedSnapshot(room).
-If you already have a newer server.js, merge the inventory:updated socket handler and keep your existing routes.
-*/
-
 require('dotenv').config();
 
 const express = require('express');
@@ -269,24 +262,9 @@ app.post('/api/items', authMiddleware, async (req, res) => {
   });
 });
 
-app.post('/api/items/:id/refresh-imgur', authMiddleware, async (req, res) => {
-  const item = await get('SELECT * FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
-
-  if (!item) return res.status(404).json({ error: 'Item not found' });
-  if (!isImgurUrl(item.image)) return res.status(400).json({ error: 'Item image is not an Imgur URL' });
-
-  const imgurItem = await fetchImgurItem(item.image);
-
-  await run(
-    'UPDATE items SET title = ?, image = ? WHERE id = ? AND userId = ?',
-    [imgurItem.title, imgurItem.image, req.params.id, req.user.id]
-  );
-
-  res.json({ item: { ...item, title: imgurItem.title, image: imgurItem.image } });
-});
-
 app.delete('/api/items/:id', authMiddleware, async (req, res) => {
   const item = await get('SELECT * FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
+
   if (!item) return res.status(404).json({ error: 'Item not found' });
 
   await run('DELETE FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
@@ -507,9 +485,9 @@ io.on('connection', socket => {
     });
   });
 
-  socket.on('trade:offer', ({ roomId, itemIds }) => {
+  socket.on('trade:offer', async ({ roomId, itemIds }) => {
     try {
-      const room = setOffer(roomId, socket.user.id, itemIds);
+      const room = await setOffer(roomId, socket.user.id, itemIds);
       io.to(room.roomId).emit('room:update', publicRoomState(room));
     } catch (error) {
       socket.emit('room:error', error.message);
@@ -519,8 +497,6 @@ io.on('connection', socket => {
   socket.on('trade:accept', async ({ roomId }) => {
     try {
       const room = acceptTrade(roomId, socket.user.id);
-
-      // Save live trade as soon as both players have accepted.
       const acceptedSnapshot = await maybeSaveAcceptedSnapshot(room);
 
       io.to(room.roomId).emit('room:update', publicRoomState(room));
