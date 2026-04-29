@@ -32,6 +32,7 @@ function parseDraggedItemId(active) {
   const raw = String(active?.id || '');
   const cleaned = raw.replace(/^(inventory-item|offer-item|inv|offer|own|their|selected)-/, '');
   const itemId = Number(cleaned);
+
   return Number.isFinite(itemId) ? itemId : null;
 }
 
@@ -62,6 +63,22 @@ function getInitialRouteFromUrl() {
   return { type: '', value: '' };
 }
 
+function getAppHomeUrl() {
+  const base = import.meta.env.BASE_URL || '/';
+  const cleanBase = base.endsWith('/') ? base : `${base}/`;
+  return `${window.location.origin}${cleanBase}`;
+}
+
+function clearUserDeepLinkUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const isUserQuery = params.has('user');
+  const isUserPath = /(?:\/VelkTrade)?\/user\/([^\/?#]+)/i.test(window.location.pathname);
+
+  if (isUserQuery || isUserPath) {
+    window.history.replaceState({}, '', getAppHomeUrl());
+  }
+}
+
 function makeRoomPath(roomId) {
   const base = import.meta.env.BASE_URL || '/';
   const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
@@ -75,7 +92,7 @@ export default function App() {
   );
 
   const initialRoute = useMemo(() => getInitialRouteFromUrl(), []);
-  const [view, setView] = useState(initialRoute.type === 'user' ? 'userProfile' : 'dashboard');
+  const [view, rawSetView] = useState(initialRoute.type === 'user' ? 'userProfile' : 'dashboard');
   const [user, setUser] = useState(null);
   const [socket, setSocket] = useState(null);
   const [inventory, setInventory] = useState([]);
@@ -105,8 +122,21 @@ export default function App() {
   const socketRef = useRef(null);
   const joinedInitialRoomRef = useRef(false);
 
-  useEffect(() => { userRef.current = user; }, [user]);
-  useEffect(() => { roomRef.current = room; }, [room]);
+  function setView(nextView) {
+    if (nextView !== 'userProfile') {
+      clearUserDeepLinkUrl();
+    }
+
+    rawSetView(nextView);
+  }
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  useEffect(() => {
+    roomRef.current = room;
+  }, [room]);
 
   const isAdmin = Boolean(user?.isAdmin);
 
@@ -147,6 +177,7 @@ export default function App() {
 
   useEffect(() => {
     if (!getToken()) return;
+
     api('/api/me')
       .then(data => {
         setUser(data.user);
@@ -192,6 +223,7 @@ export default function App() {
         roomRef.current = nextRoom;
         setView('trade');
       }
+
       refreshRoomInventories(nextRoom || roomRef.current, userRef.current);
       loadTrades();
     });
@@ -204,9 +236,12 @@ export default function App() {
     nextSocket.on('inventory:updated', ({ username }) => {
       const currentUser = userRef.current;
       const activeRoom = roomRef.current;
+
       if (!username || !currentUser) return;
 
-      if (username === currentUser.username) refreshInventory(username);
+      if (username === currentUser.username) {
+        refreshInventory(username);
+      }
 
       const otherPlayer = activeRoom?.players?.find(player => Number(player.id) !== Number(currentUser.id));
       if (otherPlayer?.username && username === otherPlayer.username) {
@@ -214,7 +249,9 @@ export default function App() {
       }
     });
 
-    nextSocket.on('room:error', message => setError(message || 'Room error'));
+    nextSocket.on('room:error', message => {
+      setError(message || 'Room error');
+    });
 
     nextSocket.on('room:closed', () => {
       setRoom(null);
@@ -223,7 +260,9 @@ export default function App() {
       refreshAllForUser(userRef.current);
     });
 
-    nextSocket.on('trade:accepted-saved', () => loadTrades());
+    nextSocket.on('trade:accepted-saved', () => {
+      loadTrades();
+    });
 
     nextSocket.on('trade:completed', () => {
       setRoom(null);
@@ -236,8 +275,10 @@ export default function App() {
     nextSocket.on('chat:message', message => {
       setRoom(current => {
         if (!current) return current;
+
         const existing = current.messages || [];
         if (existing.some(item => item.id === message.id)) return current;
+
         const nextRoomState = { ...current, messages: [...existing, message] };
         roomRef.current = nextRoomState;
         return nextRoomState;
@@ -251,7 +292,9 @@ export default function App() {
   }, [user?.id]);
 
   useEffect(() => {
-    if (theirPlayer?.username) loadViewedInventory(theirPlayer.username);
+    if (theirPlayer?.username) {
+      loadViewedInventory(theirPlayer.username);
+    }
   }, [theirPlayer?.username]);
 
   async function refreshAllForUser(targetUser = user) {
@@ -276,7 +319,9 @@ export default function App() {
 
     await refreshInventory(activeUser.username);
 
-    if (otherPlayer?.username) await loadViewedInventory(otherPlayer.username);
+    if (otherPlayer?.username) {
+      await loadViewedInventory(otherPlayer.username);
+    }
   }
 
   async function refreshInventory(username) {
@@ -286,6 +331,7 @@ export default function App() {
 
   async function loadViewedInventory(username = viewUsername) {
     if (!username) return;
+
     const data = await api(`/api/inventory/${encodeURIComponent(username)}`);
     setViewedInventory(data.items || []);
   }
@@ -299,6 +345,7 @@ export default function App() {
 
     try {
       const data = await api(`/api/profile/${encodeURIComponent(cleanUsername)}`);
+
       if (!data.user) {
         setProfileUser(null);
         setProfileItems([]);
@@ -317,6 +364,7 @@ export default function App() {
 
   async function loadTrades() {
     if (!getToken()) return;
+
     const data = await api('/api/trades');
     setTrades(data.trades || []);
     setBuyRequests(data.buyRequests || []);
@@ -341,17 +389,27 @@ export default function App() {
 
   function notifyRoomInventoryUpdated() {
     const activeRoom = roomRef.current;
-    if (activeRoom?.roomId) socketRef.current?.emit('inventory:updated', { roomId: activeRoom.roomId });
+
+    if (activeRoom?.roomId) {
+      socketRef.current?.emit('inventory:updated', { roomId: activeRoom.roomId });
+    }
   }
 
   async function addImgurItem(image) {
-    await api('/api/items', { method: 'POST', body: JSON.stringify({ image }) });
+    await api('/api/items', {
+      method: 'POST',
+      body: JSON.stringify({ image })
+    });
+
     await refreshInventory(user.username);
     notifyRoomInventoryUpdated();
   }
 
   async function deleteItem(itemId) {
-    await api(`/api/items/${itemId}`, { method: 'DELETE' });
+    await api(`/api/items/${itemId}`, {
+      method: 'DELETE'
+    });
+
     await refreshInventory(user.username);
     notifyRoomInventoryUpdated();
   }
@@ -384,19 +442,25 @@ export default function App() {
   }
 
   function createRoom() {
+    setView('dashboard');
     socketRef.current?.emit('room:create');
   }
 
   function joinRoom(roomId) {
     const cleanRoomId = String(roomId || '').trim();
     if (!cleanRoomId) return;
+
+    clearUserDeepLinkUrl();
     setPendingRoomId(cleanRoomId);
     joinedInitialRoomRef.current = true;
     socketRef.current?.emit('room:join', { roomId: cleanRoomId });
   }
 
   function leaveRoom() {
-    if (roomRef.current) socketRef.current?.emit('room:leave', { roomId: roomRef.current.roomId });
+    if (roomRef.current) {
+      socketRef.current?.emit('room:leave', { roomId: roomRef.current.roomId });
+    }
+
     setRoom(null);
     roomRef.current = null;
     setView('dashboard');
@@ -408,10 +472,12 @@ export default function App() {
 
   function updateOffer(nextOfferIds) {
     const activeRoom = roomRef.current;
+
     if (!activeRoom) {
       setError('You are not in a room.');
       return;
     }
+
     socketRef.current?.emit('trade:offer', {
       roomId: activeRoom.roomId,
       itemIds: normalizeIds(nextOfferIds)
@@ -420,19 +486,24 @@ export default function App() {
 
   function moveToOffer(itemId) {
     const id = Number(itemId);
+
     if (!roomRef.current || !Number.isFinite(id)) return;
     if (myOfferIds.includes(id)) return;
+
     updateOffer([...myOfferIds, id]);
   }
 
   function moveToInventory(itemId) {
     const id = Number(itemId);
+
     if (!roomRef.current || !Number.isFinite(id)) return;
+
     updateOffer(myOfferIds.filter(existingId => Number(existingId) !== id));
   }
 
   function handleDragStart(event) {
     const itemId = parseDraggedItemId(event.active);
+
     if (!itemId) {
       setActiveDragItem(null);
       return;
@@ -452,13 +523,19 @@ export default function App() {
   function handleDragEnd(event) {
     const { active, over } = event;
     setActiveDragItem(null);
+
     if (!over) return;
 
     const itemId = parseDraggedItemId(active);
     if (!itemId) return;
 
-    if (over.id === 'my-offer-drop') moveToOffer(itemId);
-    if (over.id === 'inventory-drop') moveToInventory(itemId);
+    if (over.id === 'my-offer-drop') {
+      moveToOffer(itemId);
+    }
+
+    if (over.id === 'inventory-drop') {
+      moveToInventory(itemId);
+    }
   }
 
   function acceptTrade() {
@@ -471,12 +548,17 @@ export default function App() {
 
   function sendChatMessage(message) {
     if (!roomRef.current) return;
-    socketRef.current?.emit('chat:send', { roomId: roomRef.current.roomId, message });
+
+    socketRef.current?.emit('chat:send', {
+      roomId: roomRef.current.roomId,
+      message
+    });
   }
 
   function logout() {
+    clearUserDeepLinkUrl();
     clearToken();
-    window.location.reload();
+    window.location.href = getAppHomeUrl();
   }
 
   function openCounter(trade) {
@@ -495,6 +577,10 @@ export default function App() {
     setOfferTargetUsername(username);
     setCounterTrade(null);
     setView('offer');
+  }
+
+  function navigateFromDashboard(nextView) {
+    setView(nextView);
   }
 
   const roomUrl = room?.roomId ? makeRoomPath(room.roomId) : '';
@@ -531,10 +617,15 @@ export default function App() {
             {view !== 'dashboard' && user && (
               <button className="ghost" onClick={returnToDashboard}>Dashboard</button>
             )}
+
             {view === 'userProfile' && !user && (
               <button onClick={() => setView('login')}>Login / Register</button>
             )}
-            {room && <button className="ghost danger" onClick={leaveRoom}>Exit Room</button>}
+
+            {room && (
+              <button className="ghost danger" onClick={leaveRoom}>Exit Room</button>
+            )}
+
             {user && <button onClick={logout}>Logout</button>}
           </div>
         </header>
@@ -565,7 +656,7 @@ export default function App() {
             isAdmin={isAdmin}
             inventory={inventory}
             trades={trades}
-            onNavigate={setView}
+            onNavigate={navigateFromDashboard}
             onCreateRoom={createRoom}
             onJoinRoom={joinRoom}
           />
