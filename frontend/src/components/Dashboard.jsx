@@ -20,7 +20,8 @@ export default function Dashboard({ user, isAdmin, inventory, trades, onNavigate
         </div>
 
         <button className="dashboard-tile inventory-tile" onClick={() => onNavigate('inventory')}>My Inventory</button>
-        <button className="dashboard-tile history-tile" onClick={() => onNavigate('history')}>My Trade History</button>
+        <button className="dashboard-tile history-tile" onClick={() => onNavigate('trades')}>Trades</button>
+        <button className="dashboard-tile offer-tile" onClick={() => onNavigate('offer')}>Make Offline Trade Offer</button>
         <button className="dashboard-tile create-tile" onClick={onCreateRoom}>Create Room</button>
 
         <div className="dashboard-tile join-tile join-card">

@@ -9,7 +9,8 @@ import Inventory from './components/Inventory';
 import TradeBoard from './components/TradeBoard';
 import TradeChat from './components/TradeChat';
 import AdminPanel from './components/AdminPanel';
-import MyTradeHistory from './components/MyTradeHistory';
+import Trades from './components/Trades';
+import TradeOfferPanel from './components/TradeOfferPanel';
 
 export default function App() {
   const [view, setView] = useState('dashboard');
@@ -22,13 +23,13 @@ export default function App() {
   const [room, setRoom] = useState(null);
   const [error, setError] = useState('');
   const [activeDragItem, setActiveDragItem] = useState(null);
+  const [counterTrade, setCounterTrade] = useState(null);
 
   const isAdmin = String(user?.username || '').trim().toLowerCase() === 'salt';
 
   const myOfferIds = useMemo(() => (room && user ? room.offers?.[user.id] || [] : []), [room, user]);
   const theirPlayer = useMemo(() => room && user ? room.players.find(player => player.id !== user.id) || null : null, [room, user]);
   const theirOfferIds = useMemo(() => room && theirPlayer ? room.offers?.[theirPlayer.id] || [] : [], [room, theirPlayer]);
-
   const visibleInventory = useMemo(() => inventory.filter(item => !myOfferIds.includes(item.id)), [inventory, myOfferIds]);
   const myOfferItems = useMemo(() => inventory.filter(item => myOfferIds.includes(item.id)), [inventory, myOfferIds]);
   const theirOfferItems = useMemo(() => viewedInventory.filter(item => theirOfferIds.includes(item.id)), [viewedInventory, theirOfferIds]);
@@ -45,6 +46,7 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return;
+
     refreshAll();
 
     const nextSocket = createSocket();
@@ -152,8 +154,12 @@ export default function App() {
   }
 
   function handleDragStart(event) {
-    const itemId = Number(event.active.id);
-    setActiveDragItem(inventory.find(item => item.id === itemId) || null);
+    const itemId = Number(String(event.active.id).replace(/^(own|their)-/, ''));
+    setActiveDragItem(
+      inventory.find(item => item.id === itemId) ||
+      viewedInventory.find(item => item.id === itemId) ||
+      null
+    );
   }
 
   function handleDragEnd(event) {
@@ -161,7 +167,7 @@ export default function App() {
     setActiveDragItem(null);
     if (!over) return;
 
-    const itemId = Number(active.id);
+    const itemId = Number(String(active.id).replace(/^(own|their)-/, ''));
 
     if (over.id === 'my-offer') moveToOffer(itemId);
     if (over.id === 'inventory') moveToInventory(itemId);
@@ -183,6 +189,11 @@ export default function App() {
   function logout() {
     clearToken();
     window.location.reload();
+  }
+
+  function openCounter(trade) {
+    setCounterTrade(trade);
+    setView('offer');
   }
 
   if (!user) return <AuthForm onLogin={setUser} />;
@@ -220,12 +231,40 @@ export default function App() {
           <Inventory title="My Inventory" items={inventory} droppableId="inventory" onAddImgurItem={addImgurItem} onDeleteItem={deleteItem} onDoubleClickItem={moveToOffer} />
         )}
 
-        {view === 'history' && <MyTradeHistory trades={trades} />}
+        {view === 'trades' && (
+          <Trades
+            trades={trades}
+            currentUser={user}
+            onRefresh={refreshAll}
+            onCounter={openCounter}
+          />
+        )}
+
+        {view === 'offer' && (
+          <TradeOfferPanel
+            currentUser={user}
+            inventory={inventory}
+            counterTrade={counterTrade}
+            onClose={() => {
+              setCounterTrade(null);
+              setView('dashboard');
+              refreshAll();
+            }}
+          />
+        )}
 
         {view === 'admin' && isAdmin && <AdminPanel />}
 
         {view === 'trade' && (
           <>
+            <section className="card room-info-card">
+              <div>
+                <h2>Live Room</h2>
+                <p>Room ID: <strong>{room?.roomId || 'Not in a room'}</strong></p>
+              </div>
+              {room?.roomId && <button onClick={() => navigator.clipboard?.writeText(room.roomId)}>Copy Room ID</button>}
+            </section>
+
             <section className="grid two">
               <Inventory title="Your Inventory" items={visibleInventory} droppableId="inventory" onAddImgurItem={addImgurItem} onDeleteItem={deleteItem} onDoubleClickItem={moveToOffer} />
               <Inventory title="View Player Inventory" items={viewedInventory} readOnly usernameValue={viewUsername} onUsernameChange={setViewUsername} onSearch={() => loadViewedInventory()} />

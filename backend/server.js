@@ -1,7 +1,3 @@
-// PATCH NOTE:
-// Only the item-related sections need to be merged if your server.js already contains Postgres/admin/chat code.
-// This full server.js is compatible with the Neon/Postgres patch.
-
 require('dotenv').config();
 
 const express = require('express');
@@ -11,7 +7,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
 
-const { get, all, run, getDatabaseDiagnostics } = require('./db');
+const { get, all, run, transaction, getDatabaseDiagnostics } = require('./db');
 const { createToken, authMiddleware } = require('./auth');
 const { fetchImgurItem, isImgurUrl } = require('./imgur');
 const {
@@ -52,7 +48,9 @@ function isSaltAdmin(user) {
 }
 
 function requireSaltAdmin(req, res, next) {
-  if (!isSaltAdmin(req.user)) return res.status(403).json({ error: 'Admin only' });
+  if (!isSaltAdmin(req.user)) {
+    return res.status(403).json({ error: 'Admin only' });
+  }
   next();
 }
 
@@ -80,6 +78,81 @@ function normalizeTradeRows(rows) {
   }));
 }
 
+async function assertItemOwnership(tx, itemIds, userId) {
+  for (const itemId of itemIds) {
+    const item = await tx.get('SELECT id FROM items WHERE id = ? AND userId = ?', [itemId, userId]);
+    if (!item) {
+      throw new Error(`Invalid item ownership for item ${itemId}`);
+    }
+  }
+}
+
+async function createStoredTrade({ fromUser, toUser, fromItems, toItems, status = 'pending', message = '' }) {
+  const cleanFromItems = Array.from(new Set((fromItems || []).map(Number)));
+  const cleanToItems = Array.from(new Set((toItems || []).map(Number)));
+
+  const chatHistory = message
+    ? [{
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        userId: fromUser.id,
+        username: fromUser.username,
+        message: String(message).trim().slice(0, 500),
+        createdAt: new Date().toISOString()
+      }]
+    : [];
+
+  return transaction(async tx => {
+    await assertItemOwnership(tx, cleanFromItems, fromUser.id);
+    await assertItemOwnership(tx, cleanToItems, toUser.id);
+
+    return tx.run(
+      `INSERT INTO trades (roomId, fromUser, toUser, fromItems, toItems, chatHistory, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+      [
+        `offline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        fromUser.id,
+        toUser.id,
+        JSON.stringify(cleanFromItems),
+        JSON.stringify(cleanToItems),
+        JSON.stringify(chatHistory),
+        status
+      ]
+    );
+  });
+}
+
+async function completeStoredTrade(tradeId, userId) {
+  const trade = await get('SELECT * FROM trades WHERE id = ?', [tradeId]);
+
+  if (!trade) throw new Error('Trade not found');
+
+  if (trade.status !== 'accepted') {
+    throw new Error('Trade must be accepted before confirming');
+  }
+
+  if (![trade.fromUser, trade.toUser].includes(userId)) {
+    throw new Error('You are not part of this trade');
+  }
+
+  const fromItems = safeParse(trade.fromItems, []);
+  const toItems = safeParse(trade.toItems, []);
+
+  await transaction(async tx => {
+    await assertItemOwnership(tx, fromItems, trade.fromUser);
+    await assertItemOwnership(tx, toItems, trade.toUser);
+
+    for (const itemId of fromItems) {
+      await tx.run('UPDATE items SET userId = ? WHERE id = ?', [trade.toUser, itemId]);
+    }
+
+    for (const itemId of toItems) {
+      await tx.run('UPDATE items SET userId = ? WHERE id = ?', [trade.fromUser, itemId]);
+    }
+
+    await tx.run('UPDATE trades SET status = ? WHERE id = ?', ['completed', tradeId]);
+  });
+}
+
 app.get('/api/health', async (req, res) => {
   res.json({
     ok: true,
@@ -96,7 +169,6 @@ app.post('/api/register', async (req, res) => {
   if (String(password).length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
 
   const existingUser = await get('SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)', [cleanUsername]);
-
   if (existingUser) return res.status(400).json({ error: `Username already exists as ${existingUser.username}` });
 
   const passwordHash = await bcrypt.hash(password, 10);
@@ -153,14 +225,8 @@ app.post('/api/items', authMiddleware, async (req, res) => {
 
 app.post('/api/items/:id/refresh-imgur', authMiddleware, async (req, res) => {
   const item = await get('SELECT * FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
-
-  if (!item) {
-    return res.status(404).json({ error: 'Item not found' });
-  }
-
-  if (!isImgurUrl(item.image)) {
-    return res.status(400).json({ error: 'Item image is not an Imgur URL' });
-  }
+  if (!item) return res.status(404).json({ error: 'Item not found' });
+  if (!isImgurUrl(item.image)) return res.status(400).json({ error: 'Item image is not an Imgur URL' });
 
   const imgurItem = await fetchImgurItem(item.image);
 
@@ -169,18 +235,11 @@ app.post('/api/items/:id/refresh-imgur', authMiddleware, async (req, res) => {
     [imgurItem.title, imgurItem.image, req.params.id, req.user.id]
   );
 
-  res.json({
-    item: {
-      ...item,
-      title: imgurItem.title,
-      image: imgurItem.image
-    }
-  });
+  res.json({ item: { ...item, title: imgurItem.title, image: imgurItem.image } });
 });
 
 app.delete('/api/items/:id', authMiddleware, async (req, res) => {
   const item = await get('SELECT * FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
-
   if (!item) return res.status(404).json({ error: 'Item not found' });
 
   await run('DELETE FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
@@ -190,7 +249,6 @@ app.delete('/api/items/:id', authMiddleware, async (req, res) => {
 
 app.get('/api/inventory/:username', async (req, res) => {
   const user = await get('SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)', [normalizeUsername(req.params.username)]);
-
   if (!user) return res.json({ user: null, items: [] });
 
   const items = await all('SELECT id, title, image FROM items WHERE userId = ? ORDER BY id DESC', [user.id]);
@@ -221,6 +279,92 @@ app.get('/api/trades', authMiddleware, async (req, res) => {
   );
 
   res.json({ trades: normalizeTradeRows(rows) });
+});
+
+app.post('/api/trades/offers', authMiddleware, async (req, res) => {
+  const { toUsername, fromItems = [], toItems = [], message = '' } = req.body;
+  const target = await get('SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)', [normalizeUsername(toUsername)]);
+
+  if (!target) return res.status(404).json({ error: 'Target user not found' });
+  if (target.id === req.user.id) return res.status(400).json({ error: 'You cannot trade with yourself' });
+
+  try {
+    const result = await createStoredTrade({
+      fromUser: req.user,
+      toUser: target,
+      fromItems,
+      toItems,
+      status: 'pending',
+      message
+    });
+
+    res.json({ ok: true, tradeId: result.lastID });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/trades/:id/counter', authMiddleware, async (req, res) => {
+  const original = await get('SELECT * FROM trades WHERE id = ?', [req.params.id]);
+
+  if (!original) return res.status(404).json({ error: 'Trade not found' });
+  if (![original.fromUser, original.toUser].includes(req.user.id)) {
+    return res.status(403).json({ error: 'You are not part of this trade' });
+  }
+
+  const otherUserId = original.fromUser === req.user.id ? original.toUser : original.fromUser;
+  const otherUser = await get('SELECT id, username FROM users WHERE id = ?', [otherUserId]);
+
+  try {
+    await run('UPDATE trades SET status = ? WHERE id = ?', ['declined', req.params.id]);
+
+    const result = await createStoredTrade({
+      fromUser: req.user,
+      toUser: otherUser,
+      fromItems: req.body.fromItems || [],
+      toItems: req.body.toItems || [],
+      status: 'countered',
+      message: req.body.message || 'Counter offer sent.'
+    });
+
+    res.json({ ok: true, tradeId: result.lastID });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/trades/:id/accept', authMiddleware, async (req, res) => {
+  const trade = await get('SELECT * FROM trades WHERE id = ?', [req.params.id]);
+
+  if (!trade) return res.status(404).json({ error: 'Trade not found' });
+  if (![trade.fromUser, trade.toUser].includes(req.user.id)) return res.status(403).json({ error: 'You are not part of this trade' });
+  if (trade.status === 'completed') return res.status(400).json({ error: 'Trade already completed' });
+  if (trade.status === 'declined') return res.status(400).json({ error: 'Trade already declined' });
+
+  await run('UPDATE trades SET status = ? WHERE id = ?', ['accepted', req.params.id]);
+
+  res.json({ ok: true });
+});
+
+app.post('/api/trades/:id/confirm', authMiddleware, async (req, res) => {
+  try {
+    await completeStoredTrade(req.params.id, req.user.id);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/trades/:id/decline', authMiddleware, async (req, res) => {
+  const trade = await get('SELECT * FROM trades WHERE id = ?', [req.params.id]);
+
+  if (!trade) return res.status(404).json({ error: 'Trade not found' });
+  if (![trade.fromUser, trade.toUser].includes(req.user.id)) return res.status(403).json({ error: 'You are not part of this trade' });
+  if (trade.status === 'completed') return res.status(400).json({ error: 'Completed trades cannot be declined' });
+
+  await run('UPDATE trades SET status = ? WHERE id = ?', ['declined', req.params.id]);
+
+  res.json({ ok: true });
 });
 
 app.get('/api/admin/trades', authMiddleware, requireSaltAdmin, async (req, res) => {
@@ -254,11 +398,9 @@ app.post('/api/admin/reset-password', authMiddleware, requireSaltAdmin, async (r
   if (String(newPassword).length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
 
   const target = await get('SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)', [cleanUsername]);
-
   if (!target) return res.status(404).json({ error: 'User not found' });
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
-
   await run('UPDATE users SET password = ? WHERE id = ?', [passwordHash, target.id]);
 
   res.json({ ok: true, message: `Password reset for ${target.username}` });
@@ -323,7 +465,6 @@ io.on('connection', socket => {
       const room = confirmTrade(roomId, socket.user.id);
       await finalizeTrade(room);
       io.to(room.roomId).emit('room:update', publicRoomState(room));
-
       if (room.completed) io.to(room.roomId).emit('trade:completed');
     } catch (error) {
       socket.emit('room:error', error.message);
@@ -341,4 +482,6 @@ io.on('connection', socket => {
   });
 });
 
-server.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`));
+server.listen(PORT, () => {
+  console.log(`Backend running on http://localhost:${PORT}`);
+});
