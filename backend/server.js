@@ -1,3 +1,9 @@
+/*
+Merge note:
+The critical backend change is that setOffer() is synchronous again and no longer DB-validates during live offer updates.
+Keep this full file if your backend already uses the Neon/Postgres patch.
+*/
+
 require('dotenv').config();
 
 const express = require('express');
@@ -485,12 +491,12 @@ io.on('connection', socket => {
     });
   });
 
-  socket.on('trade:offer', async ({ roomId, itemIds }) => {
+  socket.on('trade:offer', ({ roomId, itemIds }) => {
     try {
-      const room = await setOffer(roomId, socket.user.id, itemIds);
+      const room = setOffer(roomId, socket.user.id, itemIds);
       io.to(room.roomId).emit('room:update', publicRoomState(room));
     } catch (error) {
-      socket.emit('room:error', error.message);
+      socket.emit('room:error', error.message || 'Could not update offer');
     }
   });
 

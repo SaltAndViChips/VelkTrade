@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
-  MouseSensor,
   PointerSensor,
   TouchSensor,
   useSensor,
@@ -35,6 +34,10 @@ function parseDraggedItemId(active) {
   return Number.isFinite(itemId) ? itemId : null;
 }
 
+function normalizeIds(ids) {
+  return Array.from(new Set((ids || []).map(Number))).filter(Number.isFinite);
+}
+
 export default function App() {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -42,14 +45,9 @@ export default function App() {
         distance: 3
       }
     }),
-    useSensor(MouseSensor, {
-      activationConstraint: {
-        distance: 3
-      }
-    }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 120,
+        delay: 100,
         tolerance: 6
       }
     })
@@ -69,7 +67,10 @@ export default function App() {
 
   const isAdmin = String(user?.username || '').trim().toLowerCase() === 'salt';
 
-  const myOfferIds = useMemo(() => (room && user ? room.offers?.[user.id] || [] : []), [room, user]);
+  const myOfferIds = useMemo(
+    () => normalizeIds(room && user ? room.offers?.[user.id] || [] : []),
+    [room, user]
+  );
 
   const theirPlayer = useMemo(
     () => room && user ? room.players.find(player => Number(player.id) !== Number(user.id)) || null : null,
@@ -77,7 +78,7 @@ export default function App() {
   );
 
   const theirOfferIds = useMemo(
-    () => room && theirPlayer ? room.offers?.[theirPlayer.id] || [] : [],
+    () => normalizeIds(room && theirPlayer ? room.offers?.[theirPlayer.id] || [] : []),
     [room, theirPlayer]
   );
 
@@ -123,7 +124,9 @@ export default function App() {
       setView('trade');
     });
 
-    nextSocket.on('room:error', setError);
+    nextSocket.on('room:error', message => {
+      setError(message || 'Room error');
+    });
 
     nextSocket.on('room:closed', () => {
       setRoom(null);
@@ -157,15 +160,9 @@ export default function App() {
     nextSocket.on('chat:message', message => {
       setRoom(current => {
         if (!current) return current;
-
         const existing = current.messages || [];
-
         if (existing.some(item => item.id === message.id)) return current;
-
-        return {
-          ...current,
-          messages: [...existing, message]
-        };
+        return { ...current, messages: [...existing, message] };
       });
     });
 
@@ -194,7 +191,6 @@ export default function App() {
 
   async function loadViewedInventory(username = viewUsername) {
     if (!username) return;
-
     const data = await api(`/api/inventory/${username}`);
     setViewedInventory(data.items || []);
   }
@@ -251,9 +247,12 @@ export default function App() {
   }
 
   function updateOffer(nextOfferIds) {
-    if (!room) return;
+    if (!room) {
+      setError('You are not in a room.');
+      return;
+    }
 
-    const cleanOfferIds = Array.from(new Set((nextOfferIds || []).map(Number))).filter(Number.isFinite);
+    const cleanOfferIds = normalizeIds(nextOfferIds);
 
     socket?.emit('trade:offer', {
       roomId: room.roomId,
@@ -302,7 +301,6 @@ export default function App() {
     if (!over) return;
 
     const itemId = parseDraggedItemId(active);
-
     if (!itemId) return;
 
     if (over.id === 'my-offer-drop') {

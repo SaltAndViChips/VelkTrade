@@ -1,4 +1,4 @@
-const { get, run, transaction } = require('./db');
+const { run, transaction } = require('./db');
 
 const rooms = new Map();
 
@@ -25,11 +25,14 @@ function joinRoom(roomId, player) {
 
   if (!room) throw new Error('Room not found');
   if (room.completed) throw new Error('Trade already completed');
-  if (room.players.length >= 2 && !room.players.some(p => Number(p.id) === Number(player.id))) {
+
+  const alreadyInRoom = room.players.some(p => Number(p.id) === Number(player.id));
+
+  if (room.players.length >= 2 && !alreadyInRoom) {
     throw new Error('Room is full');
   }
 
-  if (room.players.some(p => Number(p.id) === Number(player.id))) return room;
+  if (alreadyInRoom) return room;
 
   room.players.push(player);
   room.offers[player.id] = [];
@@ -37,10 +40,6 @@ function joinRoom(roomId, player) {
   room.confirmed[player.id] = false;
 
   return room;
-}
-
-function getRoom(roomId) {
-  return rooms.get(roomId);
 }
 
 function assertPlayerInRoom(room, userId) {
@@ -59,28 +58,22 @@ function resetApprovals(room) {
   room.acceptedTradeId = null;
 }
 
-async function validateItemOwnership(userId, itemIds) {
-  for (const itemId of itemIds) {
-    const item = await get('SELECT id FROM items WHERE id = ? AND userId = ?', [itemId, userId]);
-
-    if (!item) {
-      throw new Error(`Item ${itemId} does not belong to you`);
-    }
-  }
+function cleanItemIds(itemIds) {
+  return Array.from(new Set((itemIds || []).map(Number))).filter(Number.isFinite);
 }
 
-async function setOffer(roomId, userId, itemIds) {
+function setOffer(roomId, userId, itemIds) {
   const room = rooms.get(roomId);
+
   if (!room) throw new Error('Room not found');
   if (room.completed) throw new Error('Trade already completed');
 
   assertPlayerInRoom(room, userId);
 
-  const cleanItemIds = Array.from(new Set((itemIds || []).map(Number))).filter(Number.isFinite);
-
-  await validateItemOwnership(userId, cleanItemIds);
-
-  room.offers[userId] = cleanItemIds;
+  // Do not block live room updates with database ownership validation.
+  // Ownership is still validated in finalizeTrade() before items transfer.
+  // This keeps live offering responsive even when DB schemas differ between SQLite/Postgres patches.
+  room.offers[userId] = cleanItemIds(itemIds);
   resetApprovals(room);
 
   return room;
@@ -88,6 +81,7 @@ async function setOffer(roomId, userId, itemIds) {
 
 function acceptTrade(roomId, userId) {
   const room = rooms.get(roomId);
+
   if (!room) throw new Error('Room not found');
   if (room.completed) throw new Error('Trade already completed');
 
@@ -99,6 +93,7 @@ function acceptTrade(roomId, userId) {
 
 function confirmTrade(roomId, userId) {
   const room = rooms.get(roomId);
+
   if (!room) throw new Error('Room not found');
   if (room.completed) throw new Error('Trade already completed');
 
@@ -174,6 +169,30 @@ async function maybeSaveAcceptedSnapshot(room) {
   return result;
 }
 
+async function getOwnedItem(tx, itemId, userId) {
+  // Postgres folds userId to userid, but older/generated code may differ.
+  // Try both query forms so final confirmation remains safe.
+  let item = await tx.get('SELECT * FROM items WHERE id = ? AND userId = ?', [itemId, userId]);
+
+  if (item) return item;
+
+  try {
+    item = await tx.get('SELECT * FROM items WHERE id = ? AND userid = ?', [itemId, userId]);
+  } catch {
+    // Ignore and let caller throw standard ownership error.
+  }
+
+  return item;
+}
+
+async function updateItemOwner(tx, itemId, userId) {
+  try {
+    await tx.run('UPDATE items SET userId = ? WHERE id = ?', [userId, itemId]);
+  } catch {
+    await tx.run('UPDATE items SET userid = ? WHERE id = ?', [userId, itemId]);
+  }
+}
+
 async function finalizeTrade(room) {
   if (!isFullyConfirmed(room)) return room;
 
@@ -183,29 +202,21 @@ async function finalizeTrade(room) {
 
   await transaction(async tx => {
     for (const itemId of playerAItems) {
-      const item = await tx.get(
-        'SELECT * FROM items WHERE id = ? AND userId = ?',
-        [itemId, playerA.id]
-      );
-
-      if (!item) throw new Error('Invalid item ownership detected');
+      const item = await getOwnedItem(tx, itemId, playerA.id);
+      if (!item) throw new Error(`Item ${itemId} is no longer owned by ${playerA.username}`);
     }
 
     for (const itemId of playerBItems) {
-      const item = await tx.get(
-        'SELECT * FROM items WHERE id = ? AND userId = ?',
-        [itemId, playerB.id]
-      );
-
-      if (!item) throw new Error('Invalid item ownership detected');
+      const item = await getOwnedItem(tx, itemId, playerB.id);
+      if (!item) throw new Error(`Item ${itemId} is no longer owned by ${playerB.username}`);
     }
 
     for (const itemId of playerAItems) {
-      await tx.run('UPDATE items SET userId = ? WHERE id = ?', [playerB.id, itemId]);
+      await updateItemOwner(tx, itemId, playerB.id);
     }
 
     for (const itemId of playerBItems) {
-      await tx.run('UPDATE items SET userId = ? WHERE id = ?', [playerA.id, itemId]);
+      await updateItemOwner(tx, itemId, playerA.id);
     }
 
     await tx.run(
@@ -261,7 +272,6 @@ function publicRoomState(room) {
 module.exports = {
   createRoom,
   joinRoom,
-  getRoom,
   setOffer,
   acceptTrade,
   confirmTrade,

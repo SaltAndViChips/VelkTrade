@@ -67,10 +67,7 @@ function ReadOnlyOfferItem({ item }) {
 }
 
 function OfferZone({ title, items, droppableId, readOnly, onDoubleClickOfferItem }) {
-  const {
-    setNodeRef,
-    isOver
-  } = useDroppable({
+  const { setNodeRef, isOver } = useDroppable({
     id: droppableId,
     data: {
       zone: droppableId

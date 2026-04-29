@@ -87,10 +87,7 @@ export default function Inventory({
 }) {
   const [imgurUrl, setImgurUrl] = useState('');
 
-  const {
-    setNodeRef,
-    isOver
-  } = useDroppable({
+  const { setNodeRef, isOver } = useDroppable({
     id: droppableId || 'readonly',
     data: {
       zone: droppableId || 'readonly'
