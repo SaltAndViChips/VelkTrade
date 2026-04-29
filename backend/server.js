@@ -45,17 +45,40 @@ const io = new Server(server, {
   }
 });
 
+function cleanBio(value) {
+  return String(value || '').trim().slice(0, 1000);
+}
+
+function cleanPrice(value) {
+  return String(value || '').trim().slice(0, 80);
+}
+
 async function hydrateAuthUser(user) {
   if (!user?.id) return user;
 
   const dbUser = await get(
-    `SELECT id, username, is_admin
+    `SELECT id, username, is_admin, bio
      FROM users
      WHERE id = ?`,
     [user.id]
   );
 
   return dbUser || user;
+}
+
+async function optionalAuth(req, res, next) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+
+  if (!token) return next();
+
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    req.user = null;
+  }
+
+  next();
 }
 
 async function requireAdmin(req, res, next) {
@@ -100,7 +123,7 @@ async function getItemsByIds(itemIds) {
 
   const placeholders = ids.map((_, index) => `$${index + 1}`).join(', ');
   const rows = await all(
-    `SELECT id, title, image, userId AS "userId"
+    `SELECT id, title, image, price, userId AS "userId"
      FROM items
      WHERE id IN (${placeholders})`,
     ids
@@ -209,6 +232,29 @@ async function completeStoredTrade(tradeId, userId) {
   });
 }
 
+async function getBuyRequestRowsForUser(userId) {
+  return all(
+    `SELECT
+      br.id,
+      br.item_id AS "itemId",
+      br.requester_id AS "requesterId",
+      br.owner_id AS "ownerId",
+      br.created_at AS "createdAt",
+      requester.username AS "requesterUsername",
+      owner.username AS "ownerUsername",
+      i.title AS "itemTitle",
+      i.image AS "itemImage",
+      i.price AS "itemPrice"
+    FROM buy_requests br
+    JOIN users requester ON requester.id = br.requester_id
+    JOIN users owner ON owner.id = br.owner_id
+    JOIN items i ON i.id = br.item_id
+    WHERE br.requester_id = ? OR br.owner_id = ?
+    ORDER BY br.created_at DESC`,
+    [userId, userId]
+  );
+}
+
 app.get('/api/health', async (req, res) => {
   res.json({
     ok: true,
@@ -231,14 +277,15 @@ app.post('/api/register', async (req, res) => {
 
   try {
     const result = await run(
-      'INSERT INTO users (username, password, is_admin) VALUES (?, ?, ?) RETURNING id',
-      [cleanUsername, passwordHash, isSaltUsername(cleanUsername)]
+      'INSERT INTO users (username, password, is_admin, bio) VALUES (?, ?, ?, ?) RETURNING id',
+      [cleanUsername, passwordHash, isSaltUsername(cleanUsername), '']
     );
 
     const user = {
       id: result.lastID,
       username: cleanUsername,
-      is_admin: isSaltUsername(cleanUsername)
+      is_admin: isSaltUsername(cleanUsername),
+      bio: ''
     };
 
     res.json({ token: createToken(publicUser(user)), user: publicUser(user) });
@@ -251,7 +298,7 @@ app.post('/api/login', async (req, res) => {
   const cleanUsername = normalizeUsername(req.body.username);
 
   const user = await get(
-    `SELECT id, username, password, is_admin
+    `SELECT id, username, password, is_admin, bio
      FROM users
      WHERE LOWER(username) = LOWER(?)`,
     [cleanUsername]
@@ -275,7 +322,7 @@ app.post('/api/login', async (req, res) => {
 
 app.get('/api/me', authMiddleware, async (req, res) => {
   const user = await get(
-    `SELECT id, username, is_admin
+    `SELECT id, username, is_admin, bio
      FROM users
      WHERE id = ?`,
     [req.user.id]
@@ -286,7 +333,72 @@ app.get('/api/me', authMiddleware, async (req, res) => {
     user.is_admin = true;
   }
 
-  res.json({ user: user ? publicUser(user) : null });
+  res.json({ user: user ? { ...publicUser(user), bio: user.bio || '' } : null });
+});
+
+app.put('/api/me/profile', authMiddleware, async (req, res) => {
+  const bio = cleanBio(req.body.bio);
+
+  await run(
+    'UPDATE users SET bio = ? WHERE id = ?',
+    [bio, req.user.id]
+  );
+
+  const user = await get(
+    `SELECT id, username, is_admin, bio
+     FROM users
+     WHERE id = ?`,
+    [req.user.id]
+  );
+
+  res.json({
+    ok: true,
+    user: { ...publicUser(user), bio: user.bio || '' }
+  });
+});
+
+app.get('/api/profile/:username', optionalAuth, async (req, res) => {
+  const profileUser = await get(
+    `SELECT id, username, is_admin, bio
+     FROM users
+     WHERE LOWER(username) = LOWER(?)`,
+    [normalizeUsername(req.params.username)]
+  );
+
+  if (!profileUser) {
+    return res.json({ user: null, items: [] });
+  }
+
+  const items = await all(
+    `SELECT
+      i.id,
+      i.title,
+      i.image,
+      i.price,
+      i.userId AS "userId",
+      EXISTS (
+        SELECT 1 FROM buy_requests br
+        WHERE br.item_id = i.id
+          AND br.requester_id = ?
+      ) AS "viewerWouldBuy",
+      (
+        SELECT COUNT(*)::int FROM buy_requests br
+        WHERE br.item_id = i.id
+      ) AS "buyRequestCount"
+    FROM items i
+    WHERE i.userId = ?
+    ORDER BY i.id DESC`,
+    [req.user?.id || 0, profileUser.id]
+  );
+
+  res.json({
+    user: {
+      id: profileUser.id,
+      username: profileUser.username,
+      bio: profileUser.bio || ''
+    },
+    items
+  });
 });
 
 app.post('/api/items', authMiddleware, async (req, res) => {
@@ -299,8 +411,8 @@ app.post('/api/items', authMiddleware, async (req, res) => {
   const imgurItem = await fetchImgurItem(image);
 
   const result = await run(
-    'INSERT INTO items (userId, title, image) VALUES (?, ?, ?) RETURNING id',
-    [req.user.id, imgurItem.title, imgurItem.image]
+    'INSERT INTO items (userId, title, image, price) VALUES (?, ?, ?, ?) RETURNING id',
+    [req.user.id, imgurItem.title, imgurItem.image, cleanPrice(req.body.price)]
   );
 
   res.json({
@@ -308,9 +420,29 @@ app.post('/api/items', authMiddleware, async (req, res) => {
       id: result.lastID,
       userId: req.user.id,
       title: imgurItem.title,
-      image: imgurItem.image
+      image: imgurItem.image,
+      price: cleanPrice(req.body.price)
     }
   });
+});
+
+app.patch('/api/items/:id', authMiddleware, async (req, res) => {
+  const item = await get('SELECT * FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
+  if (!item) return res.status(404).json({ error: 'Item not found' });
+
+  const price = cleanPrice(req.body.price);
+
+  await run(
+    'UPDATE items SET price = ? WHERE id = ? AND userId = ?',
+    [price, req.params.id, req.user.id]
+  );
+
+  const updated = await get(
+    'SELECT id, title, image, price, userId AS "userId" FROM items WHERE id = ?',
+    [req.params.id]
+  );
+
+  res.json({ ok: true, item: updated });
 });
 
 app.post('/api/items/:id/refresh-imgur', authMiddleware, async (req, res) => {
@@ -337,14 +469,79 @@ app.delete('/api/items/:id', authMiddleware, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/inventory/:username', async (req, res) => {
-  const user = await get('SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)', [normalizeUsername(req.params.username)]);
+app.post('/api/items/:id/buy-request', authMiddleware, async (req, res) => {
+  const item = await get(
+    'SELECT id, title, image, price, userId AS "userId" FROM items WHERE id = ?',
+    [req.params.id]
+  );
+
+  if (!item) return res.status(404).json({ error: 'Item not found' });
+
+  if (Number(item.userId) === Number(req.user.id)) {
+    return res.status(400).json({ error: 'You cannot mark your own item as something you would buy' });
+  }
+
+  const result = await run(
+    `INSERT INTO buy_requests (item_id, requester_id, owner_id)
+     VALUES (?, ?, ?)
+     ON CONFLICT (item_id, requester_id) DO NOTHING
+     RETURNING id`,
+    [item.id, req.user.id, item.userId]
+  );
+
+  res.json({
+    ok: true,
+    created: Boolean(result.lastID)
+  });
+});
+
+app.delete('/api/items/:id/buy-request', authMiddleware, async (req, res) => {
+  await run(
+    'DELETE FROM buy_requests WHERE item_id = ? AND requester_id = ?',
+    [req.params.id, req.user.id]
+  );
+
+  res.json({ ok: true });
+});
+
+app.get('/api/buy-requests', authMiddleware, async (req, res) => {
+  const requests = await getBuyRequestRowsForUser(req.user.id);
+  res.json({ requests });
+});
+
+app.get('/api/inventory/:username', optionalAuth, async (req, res) => {
+  const user = await get(
+    `SELECT id, username, bio
+     FROM users
+     WHERE LOWER(username) = LOWER(?)`,
+    [normalizeUsername(req.params.username)]
+  );
 
   if (!user) return res.json({ user: null, items: [] });
 
-  const items = await all('SELECT id, title, image FROM items WHERE userId = ? ORDER BY id DESC', [user.id]);
+  const items = await all(
+    `SELECT
+      i.id,
+      i.title,
+      i.image,
+      i.price,
+      i.userId AS "userId",
+      EXISTS (
+        SELECT 1 FROM buy_requests br
+        WHERE br.item_id = i.id
+          AND br.requester_id = ?
+      ) AS "viewerWouldBuy",
+      (
+        SELECT COUNT(*)::int FROM buy_requests br
+        WHERE br.item_id = i.id
+      ) AS "buyRequestCount"
+    FROM items i
+    WHERE i.userId = ?
+    ORDER BY i.id DESC`,
+    [req.user?.id || 0, user.id]
+  );
 
-  res.json({ user, items });
+  res.json({ user: { ...user, bio: user.bio || '' }, items });
 });
 
 app.get('/api/trades', authMiddleware, async (req, res) => {
@@ -369,7 +566,10 @@ app.get('/api/trades', authMiddleware, async (req, res) => {
     [req.user.id, req.user.id]
   );
 
-  res.json({ trades: await enrichTradeRows(rows) });
+  res.json({
+    trades: await enrichTradeRows(rows),
+    buyRequests: await getBuyRequestRowsForUser(req.user.id)
+  });
 });
 
 app.post('/api/trades/offers', authMiddleware, async (req, res) => {
@@ -467,13 +667,13 @@ app.post('/api/trades/:id/decline', authMiddleware, async (req, res) => {
 
 app.get('/api/admin/users', authMiddleware, requireAdmin, async (req, res) => {
   const rows = await all(
-    `SELECT id, username, is_admin
+    `SELECT id, username, is_admin, bio
      FROM users
      ORDER BY LOWER(username) ASC`
   );
 
   res.json({
-    users: rows.map(user => publicUser(user))
+    users: rows.map(user => ({ ...publicUser(user), bio: user.bio || '' }))
   });
 });
 
@@ -481,9 +681,7 @@ app.post('/api/admin/set-admin', authMiddleware, requireAdmin, async (req, res) 
   const { username, isAdmin } = req.body;
   const cleanUsername = normalizeUsername(username);
 
-  if (!cleanUsername) {
-    return res.status(400).json({ error: 'Username required' });
-  }
+  if (!cleanUsername) return res.status(400).json({ error: 'Username required' });
 
   const target = await get(
     `SELECT id, username, is_admin
@@ -492,18 +690,13 @@ app.post('/api/admin/set-admin', authMiddleware, requireAdmin, async (req, res) 
     [cleanUsername]
   );
 
-  if (!target) {
-    return res.status(404).json({ error: 'User not found' });
-  }
+  if (!target) return res.status(404).json({ error: 'User not found' });
 
   if (isSaltUsername(target.username) && isAdmin === false) {
     return res.status(400).json({ error: 'Salt cannot lose admin access' });
   }
 
-  await run(
-    'UPDATE users SET is_admin = ? WHERE id = ?',
-    [Boolean(isAdmin), target.id]
-  );
+  await run('UPDATE users SET is_admin = ? WHERE id = ?', [Boolean(isAdmin), target.id]);
 
   const updated = await get(
     `SELECT id, username, is_admin
@@ -546,13 +739,8 @@ app.post('/api/admin/reset-password', authMiddleware, requireAdmin, async (req, 
   const { username, newPassword } = req.body;
   const cleanUsername = normalizeUsername(username);
 
-  if (!cleanUsername || !newPassword) {
-    return res.status(400).json({ error: 'Username and new password required' });
-  }
-
-  if (String(newPassword).length < 4) {
-    return res.status(400).json({ error: 'Password must be at least 4 characters' });
-  }
+  if (!cleanUsername || !newPassword) return res.status(400).json({ error: 'Username and new password required' });
+  if (String(newPassword).length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
 
   const target = await get('SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)', [cleanUsername]);
   if (!target) return res.status(404).json({ error: 'User not found' });

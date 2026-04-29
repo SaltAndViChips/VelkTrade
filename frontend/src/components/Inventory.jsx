@@ -12,7 +12,10 @@ function parseBulkUrls(value) {
   );
 }
 
-function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem }) {
+function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem, onUpdatePrice }) {
+  const [editingPrice, setEditingPrice] = useState(false);
+  const [price, setPrice] = useState(item.price || '');
+
   const {
     attributes,
     listeners,
@@ -32,6 +35,14 @@ function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem }) {
     onDoubleClickItem?.(item.id);
   }
 
+  async function savePrice(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    await onUpdatePrice?.(item.id, price);
+    setEditingPrice(false);
+  }
+
   return (
     <div
       ref={setNodeRef}
@@ -43,10 +54,33 @@ function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem }) {
       <img src={item.image} alt={item.title} draggable="false" />
       <span>{item.title}</span>
 
+      {item.price ? <strong className="item-price">{item.price}</strong> : <small className="muted">No price set</small>}
+
       <div className="item-full-preview">
         <img src={item.image} alt={item.title} />
         <strong>{item.title}</strong>
+        {item.price && <em>{item.price}</em>}
       </div>
+
+      {editingPrice && (
+        <form className="price-edit-form" onSubmit={savePrice}>
+          <input
+            value={price}
+            onChange={event => setPrice(event.target.value)}
+            placeholder="$10 / 150k / Offer"
+            maxLength={80}
+            onPointerDown={event => event.stopPropagation()}
+            onClick={event => event.stopPropagation()}
+          />
+          <button
+            type="submit"
+            className="mini-action"
+            onPointerDown={event => event.stopPropagation()}
+          >
+            Save
+          </button>
+        </form>
+      )}
 
       <div className="item-card-actions">
         {onOfferItem && (
@@ -62,6 +96,21 @@ function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem }) {
             }}
           >
             Offer
+          </button>
+        )}
+
+        {onUpdatePrice && (
+          <button
+            type="button"
+            className="mini-action"
+            onPointerDown={event => event.stopPropagation()}
+            onClick={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              setEditingPrice(open => !open);
+            }}
+          >
+            Price
           </button>
         )}
 
@@ -93,6 +142,7 @@ export default function Inventory({
   onDeleteItem,
   onDoubleClickItem,
   onOfferItem,
+  onUpdatePrice,
   usernameValue,
   onUsernameChange,
   onSearch
@@ -212,10 +262,12 @@ export default function Inventory({
           <div key={item.id} className="item-card readonly">
             <img src={item.image} alt={item.title} />
             <span>{item.title}</span>
+            {item.price ? <strong className="item-price">{item.price}</strong> : <small className="muted">No price set</small>}
 
             <div className="item-full-preview">
               <img src={item.image} alt={item.title} />
               <strong>{item.title}</strong>
+              {item.price && <em>{item.price}</em>}
             </div>
           </div>
         ) : (
@@ -225,6 +277,7 @@ export default function Inventory({
             onDeleteItem={onDeleteItem}
             onDoubleClickItem={onDoubleClickItem}
             onOfferItem={onOfferItem}
+            onUpdatePrice={onUpdatePrice}
           />
         ))}
       </div>

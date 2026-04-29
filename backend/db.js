@@ -42,7 +42,10 @@ async function initDb() {
     await pool.query(`ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE`);
   }
 
-  // Backfill from the older camelCase patch. PostgreSQL stores unquoted isAdmin as isadmin.
+  if (!(await columnExists('users', 'bio'))) {
+    await pool.query(`ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''`);
+  }
+
   if (await columnExists('users', 'isadmin')) {
     await pool.query(`
       UPDATE users
@@ -60,6 +63,10 @@ async function initDb() {
     )
   `);
 
+  if (!(await columnExists('items', 'price'))) {
+    await pool.query(`ALTER TABLE items ADD COLUMN price TEXT DEFAULT ''`);
+  }
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS trades (
       id SERIAL PRIMARY KEY,
@@ -75,11 +82,21 @@ async function initDb() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS buy_requests (
+      id SERIAL PRIMARY KEY,
+      item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+      requester_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(item_id, requester_id)
+    )
+  `);
+
+  await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_unique
     ON users (LOWER(username))
   `);
 
-  // Salt is always admin, regardless of capitalization.
   await pool.query(`
     UPDATE users
     SET is_admin = TRUE

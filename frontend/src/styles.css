@@ -43,7 +43,8 @@ a {
 
 button,
 input,
-textarea {
+textarea,
+select {
   border-radius: 6px;
   border: 1px solid var(--border);
   padding: 10px 12px;
@@ -68,7 +69,8 @@ button:disabled {
 }
 
 input,
-textarea {
+textarea,
+select {
   background: #0f0d17;
   color: var(--text);
   outline: none;
@@ -80,7 +82,8 @@ textarea::placeholder {
 }
 
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
   border-color: var(--purple);
   box-shadow: 0 0 0 3px rgba(141, 99, 255, 0.18);
 }
@@ -147,7 +150,9 @@ p {
   align-items: center;
 }
 
-/* Primary page grids */
+.inline-controls input {
+  min-width: min(340px, 100%);
+}
 
 .grid.two {
   display: grid;
@@ -205,8 +210,6 @@ p {
 .offer-tile {
   background: linear-gradient(180deg, #704fce, #463184);
 }
-
-/* Charts */
 
 .charts-panel {
   display: grid;
@@ -301,18 +304,45 @@ p {
   color: var(--muted);
 }
 
+/* Profiles */
+
+.profile-editor,
+.profile-header {
+  margin-bottom: 18px;
+}
+
+.profile-header {
+  display: grid;
+  gap: 12px;
+  background: rgba(8, 7, 12, 0.34);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.profile-bio {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #ded8ff;
+  background: rgba(15, 13, 23, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+
 /* Inventory / items */
 
 .item-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
   gap: 12px;
   margin-top: 14px;
   overflow: visible;
+  align-items: start;
 }
 
 .drop-zone {
-  min-height: 150px;
+  min-height: 180px;
   border: 1px dashed var(--border-bright);
   border-radius: 8px;
   padding: 12px;
@@ -321,7 +351,12 @@ p {
 }
 
 .trade-zone {
-  min-height: 220px;
+  min-height: 260px;
+}
+
+.drop-zone-active {
+  border-color: var(--purple);
+  box-shadow: inset 0 0 0 2px rgba(141, 99, 255, 0.35), 0 0 24px rgba(141, 99, 255, 0.18);
 }
 
 .item-card {
@@ -331,13 +366,16 @@ p {
   padding: 8px;
   cursor: grab;
   display: grid;
-  gap: 6px;
+  gap: 7px;
   transition: transform 90ms ease-out, border-color 90ms ease-out, opacity 80ms ease-out, box-shadow 90ms ease-out;
   touch-action: none;
   user-select: none;
   position: relative;
   z-index: 1;
   transform-origin: center center;
+  min-width: 0;
+  height: auto;
+  align-content: start;
 }
 
 .item-card:hover {
@@ -352,7 +390,7 @@ p {
 }
 
 .item-card.drag-overlay {
-  width: 120px;
+  width: 150px;
   pointer-events: none;
   opacity: 0.95;
   transform: scale(1.04);
@@ -372,12 +410,64 @@ p {
   pointer-events: none;
 }
 
-.item-card span {
+.item-card span,
+.mini-trade-item span {
   font-size: 12px;
+  line-height: 1.25;
   color: #ded8ff;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow: visible;
+  text-overflow: clip;
+  min-height: 2.5em;
+}
+
+.item-card small {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.item-price {
+  display: inline-block;
+  color: #ffe6a1;
+  background: rgba(215, 181, 94, 0.12);
+  border: 1px solid rgba(215, 181, 94, 0.35);
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.price-edit-form {
+  display: grid;
+  gap: 6px;
+}
+
+.price-edit-form input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 8px;
+  font-size: 12px;
+}
+
+.item-card button {
+  cursor: pointer;
+}
+
+.item-card-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  gap: 6px;
+}
+
+.mini-action {
+  padding: 6px;
+  font-size: 12px;
+  background: linear-gradient(180deg, #6f5ca8, #463184);
+  border-color: var(--border-bright);
 }
 
 .item-full-preview {
@@ -414,11 +504,20 @@ p {
   border-radius: 7px;
 }
 
-.item-full-preview strong {
+.item-full-preview strong,
+.item-full-preview em {
   display: block;
   margin-top: 8px;
   color: #fff;
   font-size: 14px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.item-full-preview em {
+  color: #ffe6a1;
+  font-style: normal;
 }
 
 /* Trades */
@@ -435,6 +534,14 @@ p {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px;
+  overflow: visible;
+}
+
+.trade-history-item span,
+.trade-history-item small,
+.history-chat p {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .trade-items-grid {
@@ -448,8 +555,9 @@ p {
 
 .mini-trade-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
   gap: 10px;
+  align-items: start;
 }
 
 .mini-trade-item {
@@ -462,6 +570,9 @@ p {
   gap: 5px;
   z-index: 1;
   transition: transform 90ms ease-out, border-color 90ms ease-out, box-shadow 90ms ease-out;
+  min-width: 0;
+  height: auto;
+  align-content: start;
 }
 
 .mini-trade-item:hover {
@@ -479,14 +590,6 @@ p {
   pointer-events: none;
 }
 
-.mini-trade-item span {
-  font-size: 11px;
-  color: #ded8ff;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Chat / admin */
 
 .admin-panel,
@@ -500,6 +603,10 @@ p {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+}
+
+.panel-title-row > * {
+  min-width: 0;
 }
 
 .history-chat {
@@ -529,6 +636,8 @@ p {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .chat-message.mine {
@@ -569,6 +678,7 @@ p {
   padding: 12px;
   border-radius: 8px;
   margin-bottom: 14px;
+  overflow-wrap: anywhere;
 }
 
 .success {
@@ -578,6 +688,7 @@ p {
   padding: 12px;
   border-radius: 8px;
   margin-bottom: 14px;
+  overflow-wrap: anywhere;
 }
 
 .status-pill,
@@ -588,6 +699,7 @@ p {
   border-radius: 999px;
   padding: 4px 10px;
   font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .status-pending {
@@ -646,6 +758,10 @@ p {
   padding: 12px;
 }
 
+.room-info-card .muted {
+  word-break: break-all;
+}
+
 /* Responsive */
 
 @media (max-width: 900px) {
@@ -661,13 +777,23 @@ p {
   .topbar,
   .room-panel,
   .trade-actions,
-  .room-info-card {
+  .room-info-card,
+  .panel-title-row,
+  .admin-header {
     flex-direction: column;
     align-items: stretch;
   }
 
   .chat-form {
     grid-template-columns: 1fr;
+  }
+
+  .item-grid {
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  }
+
+  .mini-trade-grid {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   }
 
   .item-full-preview {
@@ -682,42 +808,23 @@ p {
   }
 }
 
+@media (max-width: 520px) {
+  .app-shell {
+    width: min(100vw - 18px, 1280px);
+  }
 
-.drop-zone {
-  min-height: 180px;
-}
+  .item-grid {
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  }
 
-.trade-zone {
-  min-height: 260px;
-}
+  .mini-trade-grid {
+    grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  }
 
-.drop-zone-active {
-  border-color: var(--purple);
-  box-shadow: inset 0 0 0 2px rgba(141, 99, 255, 0.35), 0 0 24px rgba(141, 99, 255, 0.18);
-}
-
-.item-card-actions {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
-  gap: 6px;
-}
-
-.mini-action {
-  padding: 6px;
-  font-size: 12px;
-  background: linear-gradient(180deg, #6f5ca8, #463184);
-  border-color: var(--border-bright);
-}
-
-.item-card {
-  touch-action: none;
-  user-select: none;
-}
-
-.item-card button {
-  cursor: pointer;
-}
-
-.room-info-card .muted {
-  word-break: break-all;
+  button,
+  input,
+  textarea,
+  select {
+    width: 100%;
+  }
 }

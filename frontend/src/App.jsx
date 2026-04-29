@@ -82,6 +82,7 @@ export default function App() {
   const [viewUsername, setViewUsername] = useState('');
   const [viewedInventory, setViewedInventory] = useState([]);
   const [trades, setTrades] = useState([]);
+  const [buyRequests, setBuyRequests] = useState([]);
   const [room, setRoom] = useState(null);
   const [error, setError] = useState('');
   const [activeDragItem, setActiveDragItem] = useState(null);
@@ -95,6 +96,9 @@ export default function App() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState('');
   const [loginRequiredMessage, setLoginRequiredMessage] = useState('');
+
+  const [bioDraft, setBioDraft] = useState('');
+  const [bioMessage, setBioMessage] = useState('');
 
   const userRef = useRef(null);
   const roomRef = useRef(null);
@@ -144,7 +148,10 @@ export default function App() {
   useEffect(() => {
     if (!getToken()) return;
     api('/api/me')
-      .then(data => setUser(data.user))
+      .then(data => {
+        setUser(data.user);
+        setBioDraft(data.user?.bio || '');
+      })
       .catch(() => clearToken());
   }, []);
 
@@ -251,7 +258,10 @@ export default function App() {
     if (!targetUser) return;
 
     const data = await api('/api/me');
-    if (data.user) setUser(data.user);
+    if (data.user) {
+      setUser(data.user);
+      setBioDraft(data.user.bio || '');
+    }
 
     await Promise.all([
       refreshInventory(targetUser.username),
@@ -288,7 +298,7 @@ export default function App() {
     setProfileError('');
 
     try {
-      const data = await api(`/api/inventory/${encodeURIComponent(cleanUsername)}`);
+      const data = await api(`/api/profile/${encodeURIComponent(cleanUsername)}`);
       if (!data.user) {
         setProfileUser(null);
         setProfileItems([]);
@@ -309,6 +319,24 @@ export default function App() {
     if (!getToken()) return;
     const data = await api('/api/trades');
     setTrades(data.trades || []);
+    setBuyRequests(data.buyRequests || []);
+  }
+
+  async function saveBio(event) {
+    event.preventDefault();
+    setBioMessage('');
+
+    const data = await api('/api/me/profile', {
+      method: 'PUT',
+      body: JSON.stringify({ bio: bioDraft })
+    });
+
+    if (data.user) {
+      setUser(data.user);
+      setBioDraft(data.user.bio || '');
+    }
+
+    setBioMessage('Bio saved.');
   }
 
   function notifyRoomInventoryUpdated() {
@@ -326,6 +354,33 @@ export default function App() {
     await api(`/api/items/${itemId}`, { method: 'DELETE' });
     await refreshInventory(user.username);
     notifyRoomInventoryUpdated();
+  }
+
+  async function updateItemPrice(itemId, price) {
+    await api(`/api/items/${itemId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ price })
+    });
+
+    await refreshInventory(user.username);
+    notifyRoomInventoryUpdated();
+  }
+
+  async function toggleBuyRequest(item) {
+    if (!user) {
+      setLoginRequiredMessage('Log in or register to mark items you would buy.');
+      setView('login');
+      return;
+    }
+
+    if (item.viewerWouldBuy) {
+      await api(`/api/items/${item.id}/buy-request`, { method: 'DELETE' });
+    } else {
+      await api(`/api/items/${item.id}/buy-request`, { method: 'POST' });
+    }
+
+    await loadUserProfile(profileUsername);
+    await loadTrades();
   }
 
   function createRoom() {
@@ -494,12 +549,13 @@ export default function App() {
             loading={profileLoading}
             error={profileError}
             isLoggedIn={Boolean(user)}
+            currentUsername={user?.username}
             loginRequiredMessage={loginRequiredMessage}
-            onUsernameChange={setProfileUsername}
             onLoad={loadUserProfile}
             onBack={() => user ? setView('dashboard') : setView('login')}
             onStartTrade={startTradeWith}
             onLoginRequired={startTradeWith}
+            onToggleBuyRequest={toggleBuyRequest}
           />
         )}
 
@@ -516,20 +572,42 @@ export default function App() {
         )}
 
         {user && view === 'inventory' && (
-          <Inventory
-            title="My Inventory"
-            items={inventory}
-            droppableId="inventory-drop"
-            onAddImgurItem={addImgurItem}
-            onDeleteItem={deleteItem}
-            onDoubleClickItem={moveToOffer}
-            onOfferItem={room ? moveToOffer : undefined}
-          />
+          <>
+            <section className="card profile-editor">
+              <h2>My Profile Bio</h2>
+              <form onSubmit={saveBio}>
+                <textarea
+                  className="trade-message-box"
+                  value={bioDraft}
+                  onChange={event => setBioDraft(event.target.value)}
+                  placeholder="Write a short bio for your public profile..."
+                  maxLength={1000}
+                />
+                <div className="inline-controls">
+                  <button type="submit">Save Bio</button>
+                  <span className="muted">{bioDraft.length}/1000</span>
+                </div>
+              </form>
+              {bioMessage && <p className="success">{bioMessage}</p>}
+            </section>
+
+            <Inventory
+              title="My Inventory"
+              items={inventory}
+              droppableId="inventory-drop"
+              onAddImgurItem={addImgurItem}
+              onDeleteItem={deleteItem}
+              onDoubleClickItem={moveToOffer}
+              onOfferItem={room ? moveToOffer : undefined}
+              onUpdatePrice={updateItemPrice}
+            />
+          </>
         )}
 
         {user && view === 'trades' && (
           <Trades
             trades={trades}
+            buyRequests={buyRequests}
             currentUser={user}
             onRefresh={() => refreshAllForUser(user)}
             onCounter={openCounter}
@@ -578,6 +656,7 @@ export default function App() {
                 onDeleteItem={deleteItem}
                 onDoubleClickItem={moveToOffer}
                 onOfferItem={moveToOffer}
+                onUpdatePrice={updateItemPrice}
               />
 
               <Inventory
@@ -619,6 +698,7 @@ export default function App() {
           <div className="item-card drag-overlay">
             <img src={activeDragItem.image} alt={activeDragItem.title} />
             <span>{activeDragItem.title}</span>
+            {activeDragItem.price && <strong className="item-price">{activeDragItem.price}</strong>}
           </div>
         ) : null}
       </DragOverlay>

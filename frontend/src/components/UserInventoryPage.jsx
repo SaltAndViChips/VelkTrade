@@ -5,27 +5,19 @@ export default function UserInventoryPage({
   loading,
   error,
   isLoggedIn,
+  currentUsername,
   loginRequiredMessage,
-  onUsernameChange,
   onLoad,
   onBack,
   onStartTrade,
-  onLoginRequired
+  onLoginRequired,
+  onToggleBuyRequest
 }) {
-  const cleanUsername = String(username || '').trim();
-
-  const profileUrl = cleanUsername
-    ? `${window.location.origin}${(import.meta.env.BASE_URL || '/').replace(/\/$/, '')}/user/${encodeURIComponent(cleanUsername)}`
-    : '';
-
   return (
     <section className="card">
       <div className="panel-title-row">
         <div>
           <h2>User Inventory</h2>
-          <p className="muted">
-            View another player inventory by username or share a direct profile link.
-          </p>
         </div>
 
         {onBack && <button className="ghost" onClick={onBack}>Back</button>}
@@ -33,43 +25,22 @@ export default function UserInventoryPage({
 
       {loginRequiredMessage && <p className="error">{loginRequiredMessage}</p>}
 
-      <form
-        className="inline-controls"
-        onSubmit={event => {
-          event.preventDefault();
-          onLoad(cleanUsername);
-        }}
-      >
-        <input
-          value={username}
-          onChange={event => onUsernameChange(event.target.value)}
-          placeholder="Username"
-        />
-        <button type="submit">View Inventory</button>
-      </form>
-
-      {profileUrl && (
-        <div className="inline-controls">
-          <input value={profileUrl} readOnly />
-          <button
-            type="button"
-            onClick={() => navigator.clipboard?.writeText(profileUrl)}
-          >
-            Copy User Link
-          </button>
-        </div>
-      )}
-
       {loading && <p className="muted">Loading inventory...</p>}
       {error && <p className="error">{error}</p>}
 
       {!loading && userRecord && (
         <>
-          <div className="panel-title-row">
+          <div className="profile-header">
             <div>
               <h3>{userRecord.username}'s Inventory</h3>
               <span className="status-pill">{items.length} item{items.length === 1 ? '' : 's'}</span>
             </div>
+
+            {userRecord.bio ? (
+              <p className="profile-bio">{userRecord.bio}</p>
+            ) : (
+              <p className="muted">No bio yet.</p>
+            )}
 
             <button
               type="button"
@@ -88,23 +59,50 @@ export default function UserInventoryPage({
           <div className="item-grid drop-zone">
             {items.length === 0 && <p className="muted">This player has no items.</p>}
 
-            {items.map(item => (
-              <div key={item.id} className="item-card readonly">
-                <img src={item.image} alt={item.title} />
-                <span>{item.title}</span>
+            {items.map(item => {
+              const isOwnProfile = String(currentUsername || '').toLowerCase() === String(userRecord.username || '').toLowerCase();
 
-                <div className="item-full-preview">
+              return (
+                <div key={item.id} className="item-card readonly">
                   <img src={item.image} alt={item.title} />
-                  <strong>{item.title}</strong>
+                  <span>{item.title}</span>
+                  {item.price ? <strong className="item-price">{item.price}</strong> : <small className="muted">No price set</small>}
+                  <small className="muted">{item.buyRequestCount || 0} buy request{Number(item.buyRequestCount || 0) === 1 ? '' : 's'}</small>
+
+                  <div className="item-full-preview">
+                    <img src={item.image} alt={item.title} />
+                    <strong>{item.title}</strong>
+                    {item.price && <em>{item.price}</em>}
+                  </div>
+
+                  {!isOwnProfile && (
+                    <button
+                      type="button"
+                      className={item.viewerWouldBuy ? 'mini-danger' : 'mini-action'}
+                      onClick={() => {
+                        if (!isLoggedIn) {
+                          onLoginRequired(userRecord.username);
+                        } else {
+                          onToggleBuyRequest(item);
+                        }
+                      }}
+                    >
+                      {item.viewerWouldBuy ? 'Remove Buy Request' : 'Would Buy'}
+                    </button>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
 
       {!loading && !userRecord && !error && (
-        <p className="muted">Enter a username to view their inventory.</p>
+        <div className="inline-controls">
+          <button type="button" onClick={() => onLoad(username)}>
+            Load Inventory
+          </button>
+        </div>
       )}
     </section>
   );
