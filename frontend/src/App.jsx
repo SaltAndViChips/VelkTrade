@@ -12,6 +12,13 @@ import AdminPanel from './components/AdminPanel';
 import Trades from './components/Trades';
 import TradeOfferPanel from './components/TradeOfferPanel';
 
+function parseDraggedItemId(value) {
+  const raw = String(value || '');
+  const cleaned = raw.replace(/^(inv|offer|own|their|selected)-/, '');
+  const itemId = Number(cleaned);
+  return Number.isFinite(itemId) ? itemId : null;
+}
+
 export default function App() {
   const [view, setView] = useState('dashboard');
   const [user, setUser] = useState(null);
@@ -28,11 +35,31 @@ export default function App() {
   const isAdmin = String(user?.username || '').trim().toLowerCase() === 'salt';
 
   const myOfferIds = useMemo(() => (room && user ? room.offers?.[user.id] || [] : []), [room, user]);
-  const theirPlayer = useMemo(() => room && user ? room.players.find(player => Number(player.id) !== Number(user.id)) || null : null, [room, user]);
-  const theirOfferIds = useMemo(() => room && theirPlayer ? room.offers?.[theirPlayer.id] || [] : [], [room, theirPlayer]);
-  const visibleInventory = useMemo(() => inventory.filter(item => !myOfferIds.includes(item.id)), [inventory, myOfferIds]);
-  const myOfferItems = useMemo(() => inventory.filter(item => myOfferIds.includes(item.id)), [inventory, myOfferIds]);
-  const theirOfferItems = useMemo(() => viewedInventory.filter(item => theirOfferIds.includes(item.id)), [viewedInventory, theirOfferIds]);
+
+  const theirPlayer = useMemo(
+    () => room && user ? room.players.find(player => Number(player.id) !== Number(user.id)) || null : null,
+    [room, user]
+  );
+
+  const theirOfferIds = useMemo(
+    () => room && theirPlayer ? room.offers?.[theirPlayer.id] || [] : [],
+    [room, theirPlayer]
+  );
+
+  const visibleInventory = useMemo(
+    () => inventory.filter(item => !myOfferIds.includes(item.id)),
+    [inventory, myOfferIds]
+  );
+
+  const myOfferItems = useMemo(
+    () => inventory.filter(item => myOfferIds.includes(item.id)),
+    [inventory, myOfferIds]
+  );
+
+  const theirOfferItems = useMemo(
+    () => viewedInventory.filter(item => theirOfferIds.includes(item.id)),
+    [viewedInventory, theirOfferIds]
+  );
 
   const myAccepted = Boolean(room && user && room.accepted?.[user.id]);
   const theirAccepted = Boolean(room && theirPlayer && room.accepted?.[theirPlayer.id]);
@@ -41,7 +68,10 @@ export default function App() {
 
   useEffect(() => {
     if (!getToken()) return;
-    api('/api/me').then(data => setUser(data.user)).catch(() => clearToken());
+
+    api('/api/me')
+      .then(data => setUser(data.user))
+      .catch(() => clearToken());
   }, []);
 
   useEffect(() => {
@@ -92,9 +122,15 @@ export default function App() {
     nextSocket.on('chat:message', message => {
       setRoom(current => {
         if (!current) return current;
+
         const existing = current.messages || [];
+
         if (existing.some(item => item.id === message.id)) return current;
-        return { ...current, messages: [...existing, message] };
+
+        return {
+          ...current,
+          messages: [...existing, message]
+        };
       });
     });
 
@@ -102,12 +138,18 @@ export default function App() {
   }, [user, theirPlayer?.username]);
 
   useEffect(() => {
-    if (theirPlayer?.username) loadViewedInventory(theirPlayer.username);
+    if (theirPlayer?.username) {
+      loadViewedInventory(theirPlayer.username);
+    }
   }, [theirPlayer?.username]);
 
   async function refreshAll() {
     if (!user) return;
-    await Promise.all([refreshInventory(user.username), loadTrades()]);
+
+    await Promise.all([
+      refreshInventory(user.username),
+      loadTrades()
+    ]);
   }
 
   async function refreshInventory(username) {
@@ -117,6 +159,7 @@ export default function App() {
 
   async function loadViewedInventory(username = viewUsername) {
     if (!username) return;
+
     const data = await api(`/api/inventory/${username}`);
     setViewedInventory(data.items || []);
   }
@@ -133,13 +176,20 @@ export default function App() {
   }
 
   async function addImgurItem(image) {
-    await api('/api/items', { method: 'POST', body: JSON.stringify({ image }) });
+    await api('/api/items', {
+      method: 'POST',
+      body: JSON.stringify({ image })
+    });
+
     await refreshInventory(user.username);
     notifyRoomInventoryUpdated();
   }
 
   async function deleteItem(itemId) {
-    await api(`/api/items/${itemId}`, { method: 'DELETE' });
+    await api(`/api/items/${itemId}`, {
+      method: 'DELETE'
+    });
+
     await refreshInventory(user.username);
     notifyRoomInventoryUpdated();
   }
@@ -153,7 +203,10 @@ export default function App() {
   }
 
   function leaveRoom() {
-    if (room) socket?.emit('room:leave', { roomId: room.roomId });
+    if (room) {
+      socket?.emit('room:leave', { roomId: room.roomId });
+    }
+
     setRoom(null);
     setView('dashboard');
   }
@@ -164,25 +217,43 @@ export default function App() {
 
   function updateOffer(nextOfferIds) {
     if (!room) return;
-    socket?.emit('trade:offer', { roomId: room.roomId, itemIds: nextOfferIds });
+
+    socket?.emit('trade:offer', {
+      roomId: room.roomId,
+      itemIds: nextOfferIds
+    });
   }
 
   function moveToOffer(itemId) {
-    if (!room || myOfferIds.includes(itemId)) return;
-    updateOffer([...myOfferIds, itemId]);
+    const id = Number(itemId);
+    if (!room || !Number.isFinite(id)) return;
+    if (myOfferIds.includes(id)) return;
+
+    updateOffer([...myOfferIds, id]);
   }
 
   function moveToInventory(itemId) {
-    if (!room) return;
-    updateOffer(myOfferIds.filter(id => id !== itemId));
+    const id = Number(itemId);
+    if (!room || !Number.isFinite(id)) return;
+
+    updateOffer(myOfferIds.filter(existingId => existingId !== id));
   }
 
   function handleDragStart(event) {
-    const itemId = Number(String(event.active.id).replace(/^(own|their|selected)-/, ''));
+    const itemId = parseDraggedItemId(event.active.id);
+
+    if (!itemId) {
+      setActiveDragItem(null);
+      return;
+    }
+
     setActiveDragItem(
-      inventory.find(item => item.id === itemId) ||
-      viewedInventory.find(item => item.id === itemId) ||
-      trades.flatMap(t => [...(t.fromItemDetails || []), ...(t.toItemDetails || [])]).find(item => item.id === itemId) ||
+      inventory.find(item => Number(item.id) === itemId) ||
+      viewedInventory.find(item => Number(item.id) === itemId) ||
+      trades.flatMap(trade => [
+        ...(trade.fromItemDetails || []),
+        ...(trade.toItemDetails || [])
+      ]).find(item => Number(item.id) === itemId) ||
       null
     );
   }
@@ -190,12 +261,21 @@ export default function App() {
   function handleDragEnd(event) {
     const { active, over } = event;
     setActiveDragItem(null);
+
     if (!over) return;
 
-    const itemId = Number(String(active.id).replace(/^(own|their|selected)-/, ''));
+    const itemId = parseDraggedItemId(active.id);
 
-    if (over.id === 'my-offer') moveToOffer(itemId);
-    if (over.id === 'inventory') moveToInventory(itemId);
+    if (!itemId) return;
+
+    if (over.id === 'my-offer') {
+      moveToOffer(itemId);
+      return;
+    }
+
+    if (over.id === 'inventory') {
+      moveToInventory(itemId);
+    }
   }
 
   function acceptTrade() {
@@ -208,7 +288,11 @@ export default function App() {
 
   function sendChatMessage(message) {
     if (!room) return;
-    socket?.emit('chat:send', { roomId: room.roomId, message });
+
+    socket?.emit('chat:send', {
+      roomId: room.roomId,
+      message
+    });
   }
 
   function logout() {
@@ -221,7 +305,9 @@ export default function App() {
     setView('offer');
   }
 
-  if (!user) return <AuthForm onLogin={setUser} />;
+  if (!user) {
+    return <AuthForm onLogin={setUser} />;
+  }
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -231,9 +317,16 @@ export default function App() {
             <h1>VelkTrade</h1>
             <p>Logged in as {user.username}</p>
           </div>
+
           <div className="inline-controls">
-            {view !== 'dashboard' && <button className="ghost" onClick={returnToDashboard}>Dashboard</button>}
-            {room && <button className="ghost danger" onClick={leaveRoom}>Exit Room</button>}
+            {view !== 'dashboard' && (
+              <button className="ghost" onClick={returnToDashboard}>Dashboard</button>
+            )}
+
+            {room && (
+              <button className="ghost danger" onClick={leaveRoom}>Exit Room</button>
+            )}
+
             <button onClick={logout}>Logout</button>
           </div>
         </header>
@@ -253,7 +346,14 @@ export default function App() {
         )}
 
         {view === 'inventory' && (
-          <Inventory title="My Inventory" items={inventory} droppableId="inventory" onAddImgurItem={addImgurItem} onDeleteItem={deleteItem} onDoubleClickItem={moveToOffer} />
+          <Inventory
+            title="My Inventory"
+            items={inventory}
+            droppableId="inventory"
+            onAddImgurItem={addImgurItem}
+            onDeleteItem={deleteItem}
+            onDoubleClickItem={moveToOffer}
+          />
         )}
 
         {view === 'trades' && (
@@ -286,14 +386,36 @@ export default function App() {
               <div>
                 <h2>Live Room</h2>
                 <p>Room ID: <strong>{room?.roomId || 'Not in a room'}</strong></p>
-                {room?.acceptedTradeId && <p className="muted">Accepted trade saved as #{room.acceptedTradeId}</p>}
+                {room?.acceptedTradeId && (
+                  <p className="muted">Accepted trade saved as #{room.acceptedTradeId}</p>
+                )}
               </div>
-              {room?.roomId && <button onClick={() => navigator.clipboard?.writeText(room.roomId)}>Copy Room ID</button>}
+
+              {room?.roomId && (
+                <button onClick={() => navigator.clipboard?.writeText(room.roomId)}>
+                  Copy Room ID
+                </button>
+              )}
             </section>
 
             <section className="grid two">
-              <Inventory title="Your Inventory" items={visibleInventory} droppableId="inventory" onAddImgurItem={addImgurItem} onDeleteItem={deleteItem} onDoubleClickItem={moveToOffer} />
-              <Inventory title="View Player Inventory" items={viewedInventory} readOnly usernameValue={viewUsername} onUsernameChange={setViewUsername} onSearch={() => loadViewedInventory()} />
+              <Inventory
+                title="Your Inventory"
+                items={visibleInventory}
+                droppableId="inventory"
+                onAddImgurItem={addImgurItem}
+                onDeleteItem={deleteItem}
+                onDoubleClickItem={moveToOffer}
+              />
+
+              <Inventory
+                title="View Player Inventory"
+                items={viewedInventory}
+                readOnly
+                usernameValue={viewUsername}
+                onUsernameChange={setViewUsername}
+                onSearch={() => loadViewedInventory()}
+              />
             </section>
 
             <TradeBoard
@@ -310,7 +432,12 @@ export default function App() {
               onDoubleClickOfferItem={moveToInventory}
             />
 
-            <TradeChat disabled={!room || !theirPlayer} messages={room?.messages || []} currentUser={user} onSend={sendChatMessage} />
+            <TradeChat
+              disabled={!room || !theirPlayer}
+              messages={room?.messages || []}
+              currentUser={user}
+              onSend={sendChatMessage}
+            />
           </>
         )}
       </main>
