@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VelkTrade Redirect</title>
+  </head>
+  <body>
+    <script>
+      (function () {
+        var path = window.location.pathname;
+        var search = window.location.search || "";
+        var hash = window.location.hash || "";
+
+        // Supports:
+        // /VelkTrade/room/abc123
+        // /room/abc123
+        var match = path.match(/(?:\/VelkTrade)?\/room\/([^\/?#]+)/i);
+        var roomId = match && match[1] ? decodeURIComponent(match[1]) : "";
+
+        // GitHub Pages project base.
+        var base = path.indexOf("/VelkTrade/") === 0 || path === "/VelkTrade"
+          ? "/VelkTrade/"
+          : "/";
+
+        var target = window.location.origin + base;
+
+        if (roomId) {
+          target += "?room=" + encodeURIComponent(roomId);
+        } else if (search) {
+          target += search.replace(/^\?/, "?");
+        }
+
+        target += hash;
+
+        window.location.replace(target);
+      })();
+    </script>
+
+    <p>Redirecting to VelkTrade...</p>
+  </body>
+</html>

@@ -47,17 +47,13 @@ function tradeCollisionDetection(args) {
 }
 
 function getInitialRoomIdFromUrl() {
-  const pathMatch = window.location.pathname.match(/\/room\/([a-zA-Z0-9_-]+)/);
+  const params = new URLSearchParams(window.location.search);
+  const queryRoom = params.get('room');
+
+  if (queryRoom) return queryRoom.trim();
+
+  const pathMatch = window.location.pathname.match(/(?:\/VelkTrade)?\/room\/([a-zA-Z0-9_-]+)/i);
   if (pathMatch?.[1]) return pathMatch[1];
-
-  const hostParts = window.location.hostname.split('.');
-  const firstPart = hostParts[0];
-
-  const blocked = new Set(['www', 'nicecock', 'saltandvichips', 'localhost', '127']);
-
-  if (hostParts.length >= 3 && firstPart && !blocked.has(firstPart.toLowerCase())) {
-    return firstPart;
-  }
 
   return '';
 }
@@ -65,19 +61,8 @@ function getInitialRoomIdFromUrl() {
 function makeRoomPath(roomId) {
   const base = import.meta.env.BASE_URL || '/';
   const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
+
   return `${window.location.origin}${cleanBase}/room/${roomId}`;
-}
-
-function makeRoomSubdomain(roomId) {
-  const host = window.location.hostname;
-
-  if (host === 'localhost' || /^\d+\.\d+\.\d+\.\d+$/.test(host)) {
-    return '';
-  }
-
-  const parts = host.split('.');
-  const rootDomain = parts.length >= 2 ? parts.slice(-2).join('.') : host;
-  return `${window.location.protocol}//${roomId}.${rootDomain}${import.meta.env.BASE_URL || '/'}`;
 }
 
 export default function App() {
@@ -453,7 +438,6 @@ export default function App() {
   }
 
   const roomUrl = room?.roomId ? makeRoomPath(room.roomId) : '';
-  const roomSubdomainUrl = room?.roomId ? makeRoomSubdomain(room.roomId) : '';
 
   if (!user) {
     return <AuthForm onLogin={setUser} />;
@@ -544,7 +528,6 @@ export default function App() {
                 <h2>Live Room</h2>
                 <p>Room ID: <strong>{room?.roomId || 'Not in a room'}</strong></p>
                 {roomUrl && <p className="muted">Room link: {roomUrl}</p>}
-                {roomSubdomainUrl && <p className="muted">Optional subdomain link: {roomSubdomainUrl}</p>}
                 {room?.acceptedTradeId && (
                   <p className="muted">Accepted trade saved as #{room.acceptedTradeId}</p>
                 )}
