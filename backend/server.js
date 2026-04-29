@@ -1,3 +1,7 @@
+// PATCH NOTE:
+// Only the item-related sections need to be merged if your server.js already contains Postgres/admin/chat code.
+// This full server.js is compatible with the Neon/Postgres patch.
+
 require('dotenv').config();
 
 const express = require('express');
@@ -48,10 +52,7 @@ function isSaltAdmin(user) {
 }
 
 function requireSaltAdmin(req, res, next) {
-  if (!isSaltAdmin(req.user)) {
-    return res.status(403).json({ error: 'Admin only' });
-  }
-
+  if (!isSaltAdmin(req.user)) return res.status(403).json({ error: 'Admin only' });
   next();
 }
 
@@ -90,62 +91,35 @@ app.post('/api/register', async (req, res) => {
   const { username, password } = req.body;
   const cleanUsername = normalizeUsername(username);
 
-  if (!cleanUsername || !password) {
-    return res.status(400).json({ error: 'Username and password required' });
-  }
+  if (!cleanUsername || !password) return res.status(400).json({ error: 'Username and password required' });
+  if (cleanUsername.length < 3) return res.status(400).json({ error: 'Username must be at least 3 characters' });
+  if (String(password).length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
 
-  if (cleanUsername.length < 3) {
-    return res.status(400).json({ error: 'Username must be at least 3 characters' });
-  }
+  const existingUser = await get('SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)', [cleanUsername]);
 
-  if (String(password).length < 4) {
-    return res.status(400).json({ error: 'Password must be at least 4 characters' });
-  }
-
-  const existingUser = await get(
-    'SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)',
-    [cleanUsername]
-  );
-
-  if (existingUser) {
-    return res.status(400).json({
-      error: `Username already exists as ${existingUser.username}`
-    });
-  }
+  if (existingUser) return res.status(400).json({ error: `Username already exists as ${existingUser.username}` });
 
   const passwordHash = await bcrypt.hash(password, 10);
 
   try {
-    const result = await run(
-      'INSERT INTO users (username, password) VALUES (?, ?) RETURNING id',
-      [cleanUsername, passwordHash]
-    );
-
+    const result = await run('INSERT INTO users (username, password) VALUES (?, ?) RETURNING id', [cleanUsername, passwordHash]);
     const user = { id: result.lastID, username: cleanUsername };
-
     res.json({ token: createToken(user), user });
-  } catch (error) {
+  } catch {
     res.status(400).json({ error: 'Username already exists' });
   }
 });
 
 app.post('/api/login', async (req, res) => {
   const cleanUsername = normalizeUsername(req.body.username);
-
-  const user = await get(
-    'SELECT * FROM users WHERE LOWER(username) = LOWER(?)',
-    [cleanUsername]
-  );
+  const user = await get('SELECT * FROM users WHERE LOWER(username) = LOWER(?)', [cleanUsername]);
 
   if (!user) return res.status(401).json({ error: 'Invalid login' });
 
   const valid = await bcrypt.compare(req.body.password, user.password);
   if (!valid) return res.status(401).json({ error: 'Invalid login' });
 
-  res.json({
-    token: createToken(user),
-    user: { id: user.id, username: user.username }
-  });
+  res.json({ token: createToken(user), user: { id: user.id, username: user.username } });
 });
 
 app.get('/api/me', authMiddleware, async (req, res) => {
@@ -177,11 +151,35 @@ app.post('/api/items', authMiddleware, async (req, res) => {
   });
 });
 
-app.delete('/api/items/:id', authMiddleware, async (req, res) => {
-  const item = await get(
-    'SELECT * FROM items WHERE id = ? AND userId = ?',
-    [req.params.id, req.user.id]
+app.post('/api/items/:id/refresh-imgur', authMiddleware, async (req, res) => {
+  const item = await get('SELECT * FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
+
+  if (!item) {
+    return res.status(404).json({ error: 'Item not found' });
+  }
+
+  if (!isImgurUrl(item.image)) {
+    return res.status(400).json({ error: 'Item image is not an Imgur URL' });
+  }
+
+  const imgurItem = await fetchImgurItem(item.image);
+
+  await run(
+    'UPDATE items SET title = ?, image = ? WHERE id = ? AND userId = ?',
+    [imgurItem.title, imgurItem.image, req.params.id, req.user.id]
   );
+
+  res.json({
+    item: {
+      ...item,
+      title: imgurItem.title,
+      image: imgurItem.image
+    }
+  });
+});
+
+app.delete('/api/items/:id', authMiddleware, async (req, res) => {
+  const item = await get('SELECT * FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
 
   if (!item) return res.status(404).json({ error: 'Item not found' });
 
@@ -191,17 +189,11 @@ app.delete('/api/items/:id', authMiddleware, async (req, res) => {
 });
 
 app.get('/api/inventory/:username', async (req, res) => {
-  const user = await get(
-    'SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)',
-    [normalizeUsername(req.params.username)]
-  );
+  const user = await get('SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)', [normalizeUsername(req.params.username)]);
 
   if (!user) return res.json({ user: null, items: [] });
 
-  const items = await all(
-    'SELECT id, title, image FROM items WHERE userId = ? ORDER BY id DESC',
-    [user.id]
-  );
+  const items = await all('SELECT id, title, image FROM items WHERE userId = ? ORDER BY id DESC', [user.id]);
 
   res.json({ user, items });
 });
@@ -258,18 +250,10 @@ app.post('/api/admin/reset-password', authMiddleware, requireSaltAdmin, async (r
   const { username, newPassword } = req.body;
   const cleanUsername = normalizeUsername(username);
 
-  if (!cleanUsername || !newPassword) {
-    return res.status(400).json({ error: 'Username and new password required' });
-  }
+  if (!cleanUsername || !newPassword) return res.status(400).json({ error: 'Username and new password required' });
+  if (String(newPassword).length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
 
-  if (String(newPassword).length < 4) {
-    return res.status(400).json({ error: 'Password must be at least 4 characters' });
-  }
-
-  const target = await get(
-    'SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)',
-    [cleanUsername]
-  );
+  const target = await get('SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)', [cleanUsername]);
 
   if (!target) return res.status(404).json({ error: 'User not found' });
 
@@ -340,9 +324,7 @@ io.on('connection', socket => {
       await finalizeTrade(room);
       io.to(room.roomId).emit('room:update', publicRoomState(room));
 
-      if (room.completed) {
-        io.to(room.roomId).emit('trade:completed');
-      }
+      if (room.completed) io.to(room.roomId).emit('trade:completed');
     } catch (error) {
       socket.emit('room:error', error.message);
     }
@@ -359,6 +341,4 @@ io.on('connection', socket => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
-});
+server.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`));
