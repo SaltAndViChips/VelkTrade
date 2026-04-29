@@ -8,15 +8,10 @@ function createRoom(owner) {
   rooms.set(roomId, {
     roomId,
     players: [owner],
-    offers: {
-      [owner.id]: []
-    },
-    accepted: {
-      [owner.id]: false
-    },
-    confirmed: {
-      [owner.id]: false
-    },
+    offers: { [owner.id]: [] },
+    accepted: { [owner.id]: false },
+    confirmed: { [owner.id]: false },
+    messages: [],
     completed: false
   });
 
@@ -74,7 +69,6 @@ function acceptTrade(roomId, userId) {
   if (room.completed) throw new Error('Trade already completed');
 
   assertPlayerInRoom(room, userId);
-
   room.accepted[userId] = true;
   return room;
 }
@@ -91,6 +85,30 @@ function confirmTrade(roomId, userId) {
 
   room.confirmed[userId] = true;
   return room;
+}
+
+function addChatMessage(roomId, user, message) {
+  const room = rooms.get(roomId);
+  if (!room) throw new Error('Room not found');
+  if (room.completed) throw new Error('Trade already completed');
+
+  assertPlayerInRoom(room, user.id);
+
+  const cleanMessage = String(message || '').trim().slice(0, 500);
+  if (!cleanMessage) throw new Error('Message cannot be empty');
+
+  const chatMessage = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    userId: user.id,
+    username: user.username,
+    message: cleanMessage,
+    createdAt: new Date().toISOString()
+  };
+
+  room.messages.push(chatMessage);
+  room.messages = room.messages.slice(-100);
+
+  return { room, chatMessage };
 }
 
 function isFullyConfirmed(room) {
@@ -128,14 +146,7 @@ async function finalizeTrade(room) {
     await run(
       `INSERT INTO trades (roomId, fromUser, toUser, fromItems, toItems, status)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        room.roomId,
-        playerA.id,
-        playerB.id,
-        JSON.stringify(playerAItems),
-        JSON.stringify(playerBItems),
-        'completed'
-      ]
+      [room.roomId, playerA.id, playerB.id, JSON.stringify(playerAItems), JSON.stringify(playerBItems), 'completed']
     );
 
     await run('COMMIT');
@@ -155,6 +166,7 @@ function publicRoomState(room) {
     offers: room.offers,
     accepted: room.accepted,
     confirmed: room.confirmed,
+    messages: room.messages || [],
     completed: Boolean(room.completed)
   };
 }
@@ -165,6 +177,7 @@ module.exports = {
   setOffer,
   acceptTrade,
   confirmTrade,
+  addChatMessage,
   finalizeTrade,
   publicRoomState
 };

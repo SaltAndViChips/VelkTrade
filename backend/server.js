@@ -16,6 +16,7 @@ const {
   setOffer,
   acceptTrade,
   confirmTrade,
+  addChatMessage,
   finalizeTrade,
   publicRoomState
 } = require('./rooms');
@@ -36,6 +37,13 @@ const io = new Server(server, {
   }
 });
 
+function requireSaltAdmin(req, res, next) {
+  if (req.user?.username !== 'Salt') {
+    return res.status(403).json({ error: 'Admin only' });
+  }
+  next();
+}
+
 app.get('/api/health', (req, res) => {
   res.json({ ok: true });
 });
@@ -43,19 +51,17 @@ app.get('/api/health', (req, res) => {
 app.post('/api/register', async (req, res) => {
   const { username, password } = req.body;
 
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password required' });
-  }
+  if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+
+  const cleanUsername = String(username).trim();
+  if (cleanUsername.length < 3) return res.status(400).json({ error: 'Username must be at least 3 characters' });
+  if (String(password).length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
 
   const passwordHash = await bcrypt.hash(password, 10);
 
   try {
-    const result = await run(
-      'INSERT INTO users (username, password) VALUES (?, ?)',
-      [username, passwordHash]
-    );
-
-    const user = { id: result.lastID, username };
+    const result = await run('INSERT INTO users (username, password) VALUES (?, ?)', [cleanUsername, passwordHash]);
+    const user = { id: result.lastID, username: cleanUsername };
     res.json({ token: createToken(user), user });
   } catch {
     res.status(400).json({ error: 'Username already exists' });
@@ -66,20 +72,12 @@ app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
   const user = await get('SELECT * FROM users WHERE username = ?', [username]);
 
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid login' });
-  }
+  if (!user) return res.status(401).json({ error: 'Invalid login' });
 
   const valid = await bcrypt.compare(password, user.password);
+  if (!valid) return res.status(401).json({ error: 'Invalid login' });
 
-  if (!valid) {
-    return res.status(401).json({ error: 'Invalid login' });
-  }
-
-  res.json({
-    token: createToken(user),
-    user: { id: user.id, username: user.username }
-  });
+  res.json({ token: createToken(user), user: { id: user.id, username: user.username } });
 });
 
 app.get('/api/me', authMiddleware, async (req, res) => {
@@ -95,40 +93,51 @@ app.post('/api/items', authMiddleware, async (req, res) => {
   }
 
   const title = await fetchImgurTitle(image);
+  const result = await run('INSERT INTO items (userId, title, image) VALUES (?, ?, ?)', [req.user.id, title, image]);
 
-  const result = await run(
-    'INSERT INTO items (userId, title, image) VALUES (?, ?, ?)',
-    [req.user.id, title, image]
-  );
-
-  res.json({
-    item: {
-      id: result.lastID,
-      userId: req.user.id,
-      title,
-      image
-    }
-  });
+  res.json({ item: { id: result.lastID, userId: req.user.id, title, image } });
 });
 
 app.get('/api/inventory/:username', async (req, res) => {
   const user = await get('SELECT id, username FROM users WHERE username = ?', [req.params.username]);
-
-  if (!user) {
-    return res.json({ user: null, items: [] });
-  }
+  if (!user) return res.json({ user: null, items: [] });
 
   const items = await all('SELECT id, title, image FROM items WHERE userId = ?', [user.id]);
   res.json({ user, items });
 });
 
 app.get('/api/trades', authMiddleware, async (req, res) => {
-  const trades = await all(
-    'SELECT * FROM trades WHERE fromUser = ? OR toUser = ? ORDER BY createdAt DESC',
-    [req.user.id, req.user.id]
-  );
-
+  const trades = await all('SELECT * FROM trades WHERE fromUser = ? OR toUser = ? ORDER BY createdAt DESC', [req.user.id, req.user.id]);
   res.json({ trades });
+});
+
+app.get('/api/admin/trades', authMiddleware, requireSaltAdmin, async (req, res) => {
+  const trades = await all(
+    `SELECT
+      trades.*,
+      fromUser.username AS fromUsername,
+      toUser.username AS toUsername
+    FROM trades
+    JOIN users AS fromUser ON fromUser.id = trades.fromUser
+    JOIN users AS toUser ON toUser.id = trades.toUser
+    ORDER BY trades.createdAt DESC`
+  );
+  res.json({ trades });
+});
+
+app.post('/api/admin/reset-password', authMiddleware, requireSaltAdmin, async (req, res) => {
+  const { username, newPassword } = req.body;
+
+  if (!username || !newPassword) return res.status(400).json({ error: 'Username and new password required' });
+  if (String(newPassword).length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
+
+  const target = await get('SELECT id, username FROM users WHERE username = ?', [username]);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await run('UPDATE users SET password = ? WHERE id = ?', [passwordHash, target.id]);
+
+  res.json({ ok: true, message: `Password reset for ${target.username}` });
 });
 
 io.use((socket, next) => {
@@ -181,10 +190,17 @@ io.on('connection', socket => {
       const room = confirmTrade(roomId, socket.user.id);
       await finalizeTrade(room);
       io.to(room.roomId).emit('room:update', publicRoomState(room));
+      if (room.completed) io.to(room.roomId).emit('trade:completed');
+    } catch (error) {
+      socket.emit('room:error', error.message);
+    }
+  });
 
-      if (room.completed) {
-        io.to(room.roomId).emit('trade:completed');
-      }
+  socket.on('chat:send', ({ roomId, message }) => {
+    try {
+      const { room, chatMessage } = addChatMessage(roomId, socket.user, message);
+      io.to(room.roomId).emit('chat:message', chatMessage);
+      io.to(room.roomId).emit('room:update', publicRoomState(room));
     } catch (error) {
       socket.emit('room:error', error.message);
     }
