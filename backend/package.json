@@ -5,10 +5,9 @@
   "engines": {
     "node": "20.x"
   },
-   "scripts": {
+  "scripts": {
     "dev": "node server.js",
-    "start": "node server.js",
-    "postinstall": "npm rebuild sqlite3 --build-from-source"
+    "start": "node server.js"
   },
   "dependencies": {
     "axios": "latest",
@@ -17,7 +16,7 @@
     "dotenv": "latest",
     "express": "latest",
     "jsonwebtoken": "latest",
-    "socket.io": "latest",
-    "sqlite3": "latest"
+    "pg": "latest",
+    "socket.io": "latest"
   }
 }

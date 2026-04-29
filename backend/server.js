@@ -7,7 +7,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
 
-const { get, all, run } = require('./db');
+const { get, all, run, getDatabaseDiagnostics } = require('./db');
 const { createToken, authMiddleware } = require('./auth');
 const { fetchImgurItem, isImgurUrl } = require('./imgur');
 const {
@@ -25,6 +25,7 @@ const {
 
 const app = express();
 const server = http.createServer(app);
+
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
 const PORT = process.env.PORT || 3001;
 
@@ -47,7 +48,10 @@ function isSaltAdmin(user) {
 }
 
 function requireSaltAdmin(req, res, next) {
-  if (!isSaltAdmin(req.user)) return res.status(403).json({ error: 'Admin only' });
+  if (!isSaltAdmin(req.user)) {
+    return res.status(403).json({ error: 'Admin only' });
+  }
+
   next();
 }
 
@@ -61,14 +65,26 @@ function safeParse(value, fallback) {
 
 function normalizeTradeRows(rows) {
   return rows.map(row => ({
-    ...row,
+    id: row.id,
+    roomId: row.roomId,
+    fromUser: row.fromUser,
+    toUser: row.toUser,
+    fromUsername: row.fromUsername,
+    toUsername: row.toUsername,
     fromItems: safeParse(row.fromItems, []),
     toItems: safeParse(row.toItems, []),
-    chatHistory: safeParse(row.chatHistory, [])
+    chatHistory: safeParse(row.chatHistory, []),
+    status: row.status,
+    createdAt: row.createdAt
   }));
 }
 
-app.get('/api/health', (req, res) => res.json({ ok: true }));
+app.get('/api/health', async (req, res) => {
+  res.json({
+    ok: true,
+    database: await getDatabaseDiagnostics()
+  });
+});
 
 app.post('/api/register', async (req, res) => {
   const { username, password } = req.body;
@@ -101,13 +117,14 @@ app.post('/api/register', async (req, res) => {
 
   try {
     const result = await run(
-      'INSERT INTO users (username, password) VALUES (?, ?)',
+      'INSERT INTO users (username, password) VALUES (?, ?) RETURNING id',
       [cleanUsername, passwordHash]
     );
 
     const user = { id: result.lastID, username: cleanUsername };
+
     res.json({ token: createToken(user), user });
-  } catch {
+  } catch (error) {
     res.status(400).json({ error: 'Username already exists' });
   }
 });
@@ -146,7 +163,7 @@ app.post('/api/items', authMiddleware, async (req, res) => {
   const imgurItem = await fetchImgurItem(image);
 
   const result = await run(
-    'INSERT INTO items (userId, title, image) VALUES (?, ?, ?)',
+    'INSERT INTO items (userId, title, image) VALUES (?, ?, ?) RETURNING id',
     [req.user.id, imgurItem.title, imgurItem.image]
   );
 
@@ -161,10 +178,15 @@ app.post('/api/items', authMiddleware, async (req, res) => {
 });
 
 app.delete('/api/items/:id', authMiddleware, async (req, res) => {
-  const item = await get('SELECT * FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
+  const item = await get(
+    'SELECT * FROM items WHERE id = ? AND userId = ?',
+    [req.params.id, req.user.id]
+  );
+
   if (!item) return res.status(404).json({ error: 'Item not found' });
 
   await run('DELETE FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
+
   res.json({ ok: true });
 });
 
@@ -176,18 +198,33 @@ app.get('/api/inventory/:username', async (req, res) => {
 
   if (!user) return res.json({ user: null, items: [] });
 
-  const items = await all('SELECT id, title, image FROM items WHERE userId = ?', [user.id]);
+  const items = await all(
+    'SELECT id, title, image FROM items WHERE userId = ? ORDER BY id DESC',
+    [user.id]
+  );
+
   res.json({ user, items });
 });
 
 app.get('/api/trades', authMiddleware, async (req, res) => {
   const rows = await all(
-    `SELECT trades.*, fromUser.username AS fromUsername, toUser.username AS toUsername
-     FROM trades
-     JOIN users AS fromUser ON fromUser.id = trades.fromUser
-     JOIN users AS toUser ON toUser.id = trades.toUser
-     WHERE fromUser = ? OR toUser = ?
-     ORDER BY createdAt DESC`,
+    `SELECT
+      t.id,
+      t.roomId AS "roomId",
+      t.fromUser AS "fromUser",
+      t.toUser AS "toUser",
+      t.fromItems AS "fromItems",
+      t.toItems AS "toItems",
+      t.chatHistory AS "chatHistory",
+      t.status,
+      t.createdAt AS "createdAt",
+      from_user.username AS "fromUsername",
+      to_user.username AS "toUsername"
+    FROM trades t
+    JOIN users AS from_user ON from_user.id = t.fromUser
+    JOIN users AS to_user ON to_user.id = t.toUser
+    WHERE t.fromUser = ? OR t.toUser = ?
+    ORDER BY t.createdAt DESC`,
     [req.user.id, req.user.id]
   );
 
@@ -196,11 +233,22 @@ app.get('/api/trades', authMiddleware, async (req, res) => {
 
 app.get('/api/admin/trades', authMiddleware, requireSaltAdmin, async (req, res) => {
   const rows = await all(
-    `SELECT trades.*, fromUser.username AS fromUsername, toUser.username AS toUsername
-     FROM trades
-     JOIN users AS fromUser ON fromUser.id = trades.fromUser
-     JOIN users AS toUser ON toUser.id = trades.toUser
-     ORDER BY trades.createdAt DESC`
+    `SELECT
+      t.id,
+      t.roomId AS "roomId",
+      t.fromUser AS "fromUser",
+      t.toUser AS "toUser",
+      t.fromItems AS "fromItems",
+      t.toItems AS "toItems",
+      t.chatHistory AS "chatHistory",
+      t.status,
+      t.createdAt AS "createdAt",
+      from_user.username AS "fromUsername",
+      to_user.username AS "toUsername"
+    FROM trades t
+    JOIN users AS from_user ON from_user.id = t.fromUser
+    JOIN users AS to_user ON to_user.id = t.toUser
+    ORDER BY t.createdAt DESC`
   );
 
   res.json({ trades: normalizeTradeRows(rows) });
@@ -226,6 +274,7 @@ app.post('/api/admin/reset-password', authMiddleware, requireSaltAdmin, async (r
   if (!target) return res.status(404).json({ error: 'User not found' });
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
+
   await run('UPDATE users SET password = ? WHERE id = ?', [passwordHash, target.id]);
 
   res.json({ ok: true, message: `Password reset for ${target.username}` });
@@ -290,7 +339,10 @@ io.on('connection', socket => {
       const room = confirmTrade(roomId, socket.user.id);
       await finalizeTrade(room);
       io.to(room.roomId).emit('room:update', publicRoomState(room));
-      if (room.completed) io.to(room.roomId).emit('trade:completed');
+
+      if (room.completed) {
+        io.to(room.roomId).emit('trade:completed');
+      }
     } catch (error) {
       socket.emit('room:error', error.message);
     }
@@ -307,4 +359,6 @@ io.on('connection', socket => {
   });
 });
 
-server.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`));
+server.listen(PORT, () => {
+  console.log(`Backend running on http://localhost:${PORT}`);
+});

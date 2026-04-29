@@ -1,79 +1,148 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-const fs = require('fs');
+const { Pool } = require('pg');
 
-// Use DATABASE_FILE on Render so SQLite survives rebuilds/redeploys.
-// Recommended Render env var: DATABASE_FILE=/var/data/db.sqlite
-const databaseFile = process.env.DATABASE_FILE || path.join(__dirname, 'db.sqlite');
-const databaseDir = path.dirname(databaseFile);
-
-if (!fs.existsSync(databaseDir)) {
-  fs.mkdirSync(databaseDir, { recursive: true });
+if (!process.env.DATABASE_URL) {
+  console.warn('DATABASE_URL is not set. Postgres connection will fail until it is configured.');
 }
 
-const db = new sqlite3.Database(databaseFile);
-
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    userId INTEGER NOT NULL,
-    title TEXT NOT NULL,
-    image TEXT NOT NULL,
-    FOREIGN KEY(userId) REFERENCES users(id)
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS trades (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    roomId TEXT NOT NULL,
-    fromUser INTEGER NOT NULL,
-    toUser INTEGER NOT NULL,
-    fromItems TEXT NOT NULL,
-    toItems TEXT NOT NULL,
-    chatHistory TEXT DEFAULT '[]',
-    status TEXT NOT NULL,
-    createdAt TEXT DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  db.all(`PRAGMA table_info(trades)`, [], (err, columns) => {
-    if (err || !Array.isArray(columns)) return;
-    const names = columns.map(column => column.name);
-    if (!names.includes('chatHistory')) {
-      db.run(`ALTER TABLE trades ADD COLUMN chatHistory TEXT DEFAULT '[]'`);
-    }
-  });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL?.includes('sslmode=require')
+    ? { rejectUnauthorized: false }
+    : undefined
 });
 
-function get(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
-  });
+function convertPlaceholders(sql) {
+  let index = 0;
+  return sql.replace(/\?/g, () => `$${++index}`);
 }
 
-function all(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
-  });
+async function initDb() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS items (
+      id SERIAL PRIMARY KEY,
+      userId INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      image TEXT NOT NULL
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS trades (
+      id SERIAL PRIMARY KEY,
+      roomId TEXT NOT NULL,
+      fromUser INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      toUser INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      fromItems TEXT NOT NULL,
+      toItems TEXT NOT NULL,
+      chatHistory TEXT DEFAULT '[]',
+      status TEXT NOT NULL,
+      createdAt TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_unique
+    ON users (LOWER(username))
+  `);
 }
 
-function run(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) reject(err);
-      else resolve(this);
-    });
+const ready = initDb()
+  .then(() => console.log('Postgres schema ready'))
+  .catch(error => {
+    console.error('Postgres schema initialization failed:', error);
+    throw error;
   });
+
+async function query(sql, params = [], client = pool) {
+  await ready;
+  return client.query(convertPlaceholders(sql), params);
 }
 
-module.exports = { db, get, all, run };
+async function get(sql, params = []) {
+  const result = await query(sql, params);
+  return result.rows[0];
+}
+
+async function all(sql, params = []) {
+  const result = await query(sql, params);
+  return result.rows;
+}
+
+async function run(sql, params = []) {
+  const result = await query(sql, params);
+  return {
+    lastID: result.rows?.[0]?.id,
+    rowCount: result.rowCount,
+    rows: result.rows
+  };
+}
+
+async function transaction(callback) {
+  await ready;
+
+  const client = await pool.connect();
+
+  const tx = {
+    get: async (sql, params = []) => {
+      const result = await client.query(convertPlaceholders(sql), params);
+      return result.rows[0];
+    },
+    all: async (sql, params = []) => {
+      const result = await client.query(convertPlaceholders(sql), params);
+      return result.rows;
+    },
+    run: async (sql, params = []) => {
+      const result = await client.query(convertPlaceholders(sql), params);
+      return {
+        lastID: result.rows?.[0]?.id,
+        rowCount: result.rowCount,
+        rows: result.rows
+      };
+    }
+  };
+
+  try {
+    await client.query('BEGIN');
+    const value = await callback(tx);
+    await client.query('COMMIT');
+    return value;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function getDatabaseDiagnostics() {
+  try {
+    await ready;
+    await pool.query('SELECT 1');
+    return {
+      type: 'postgres',
+      connected: true
+    };
+  } catch (error) {
+    return {
+      type: 'postgres',
+      connected: false,
+      error: error.message
+    };
+  }
+}
+
+module.exports = {
+  get,
+  all,
+  run,
+  transaction,
+  getDatabaseDiagnostics
+};
