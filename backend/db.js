@@ -16,14 +16,32 @@ function convertPlaceholders(sql) {
   return sql.replace(/\?/g, () => `$${++index}`);
 }
 
+async function columnExists(tableName, columnName) {
+  const result = await pool.query(
+    `SELECT 1
+     FROM information_schema.columns
+     WHERE table_name = $1
+       AND lower(column_name) = lower($2)
+     LIMIT 1`,
+    [tableName, columnName]
+  );
+
+  return result.rowCount > 0;
+}
+
 async function initDb() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL
+      password TEXT NOT NULL,
+      isAdmin BOOLEAN DEFAULT FALSE
     )
   `);
+
+  if (!(await columnExists('users', 'isAdmin'))) {
+    await pool.query(`ALTER TABLE users ADD COLUMN isAdmin BOOLEAN DEFAULT FALSE`);
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS items (
@@ -51,6 +69,12 @@ async function initDb() {
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_unique
     ON users (LOWER(username))
+  `);
+
+  await pool.query(`
+    UPDATE users
+    SET isAdmin = TRUE
+    WHERE LOWER(username) = 'salt'
   `);
 }
 

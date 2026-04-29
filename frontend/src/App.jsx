@@ -101,7 +101,7 @@ export default function App() {
     roomRef.current = room;
   }, [room]);
 
-  const isAdmin = String(user?.username || '').trim().toLowerCase() === 'salt';
+  const isAdmin = Boolean(user?.isAdmin);
 
   const myOfferIds = useMemo(
     () => normalizeIds(room && user ? room.offers?.[user.id] || [] : []),
@@ -252,6 +252,11 @@ export default function App() {
 
   async function refreshAllForUser(targetUser = user) {
     if (!targetUser) return;
+
+    const data = await api('/api/me');
+    if (data.user) {
+      setUser(data.user);
+    }
 
     await Promise.all([
       refreshInventory(targetUser.username),
@@ -455,7 +460,7 @@ export default function App() {
         <header className="topbar">
           <div>
             <h1>VelkTrade</h1>
-            <p>Logged in as {user.username}</p>
+            <p>Logged in as {user.username}{user.isAdmin ? ' · Admin' : ''}</p>
           </div>
 
           <div className="inline-controls">

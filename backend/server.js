@@ -1,9 +1,3 @@
-/*
-Backend patch:
-Only socket event behavior changed.
-If you already have routes working, merge the socket section from this file.
-*/
-
 require('dotenv').config();
 
 const express = require('express');
@@ -49,12 +43,47 @@ function normalizeUsername(username) {
   return String(username || '').trim();
 }
 
-function isSaltAdmin(user) {
-  return normalizeUsername(user?.username).toLowerCase() === 'salt';
+function isSaltUsername(username) {
+  return normalizeUsername(username).toLowerCase() === 'salt';
 }
 
-function requireSaltAdmin(req, res, next) {
-  if (!isSaltAdmin(req.user)) return res.status(403).json({ error: 'Admin only' });
+function boolFromDb(value) {
+  return value === true || value === 'true' || value === 1 || value === '1';
+}
+
+function isAdminUser(user) {
+  return isSaltUsername(user?.username) || boolFromDb(user?.isAdmin ?? user?.isadmin);
+}
+
+function publicUser(user) {
+  return {
+    id: user.id,
+    username: user.username,
+    isAdmin: isAdminUser(user)
+  };
+}
+
+async function hydrateAuthUser(user) {
+  if (!user?.id) return user;
+
+  const dbUser = await get(
+    `SELECT id, username, isAdmin AS "isAdmin"
+     FROM users
+     WHERE id = ?`,
+    [user.id]
+  );
+
+  return dbUser || user;
+}
+
+async function requireAdmin(req, res, next) {
+  const dbUser = await hydrateAuthUser(req.user);
+
+  if (!isAdminUser(dbUser)) {
+    return res.status(403).json({ error: 'Admin only' });
+  }
+
+  req.user = dbUser;
   next();
 }
 
@@ -219,9 +248,18 @@ app.post('/api/register', async (req, res) => {
   const passwordHash = await bcrypt.hash(password, 10);
 
   try {
-    const result = await run('INSERT INTO users (username, password) VALUES (?, ?) RETURNING id', [cleanUsername, passwordHash]);
-    const user = { id: result.lastID, username: cleanUsername };
-    res.json({ token: createToken(user), user });
+    const result = await run(
+      'INSERT INTO users (username, password, isAdmin) VALUES (?, ?, ?) RETURNING id',
+      [cleanUsername, passwordHash, isSaltUsername(cleanUsername)]
+    );
+
+    const user = {
+      id: result.lastID,
+      username: cleanUsername,
+      isAdmin: isSaltUsername(cleanUsername)
+    };
+
+    res.json({ token: createToken(user), user: publicUser(user) });
   } catch {
     res.status(400).json({ error: 'Username already exists' });
   }
@@ -229,19 +267,34 @@ app.post('/api/register', async (req, res) => {
 
 app.post('/api/login', async (req, res) => {
   const cleanUsername = normalizeUsername(req.body.username);
-  const user = await get('SELECT * FROM users WHERE LOWER(username) = LOWER(?)', [cleanUsername]);
+
+  const user = await get(
+    `SELECT id, username, password, isAdmin AS "isAdmin"
+     FROM users
+     WHERE LOWER(username) = LOWER(?)`,
+    [cleanUsername]
+  );
 
   if (!user) return res.status(401).json({ error: 'Invalid login' });
 
   const valid = await bcrypt.compare(req.body.password, user.password);
   if (!valid) return res.status(401).json({ error: 'Invalid login' });
 
-  res.json({ token: createToken(user), user: { id: user.id, username: user.username } });
+  res.json({
+    token: createToken(publicUser(user)),
+    user: publicUser(user)
+  });
 });
 
 app.get('/api/me', authMiddleware, async (req, res) => {
-  const user = await get('SELECT id, username FROM users WHERE id = ?', [req.user.id]);
-  res.json({ user });
+  const user = await get(
+    `SELECT id, username, isAdmin AS "isAdmin"
+     FROM users
+     WHERE id = ?`,
+    [req.user.id]
+  );
+
+  res.json({ user: user ? publicUser(user) : null });
 });
 
 app.post('/api/items', authMiddleware, async (req, res) => {
@@ -268,24 +321,39 @@ app.post('/api/items', authMiddleware, async (req, res) => {
   });
 });
 
-app.delete('/api/items/:id', authMiddleware, async (req, res) => {
+app.post('/api/items/:id/refresh-imgur', authMiddleware, async (req, res) => {
   const item = await get('SELECT * FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
 
   if (!item) return res.status(404).json({ error: 'Item not found' });
+  if (!isImgurUrl(item.image)) return res.status(400).json({ error: 'Item image is not an Imgur URL' });
+
+  const imgurItem = await fetchImgurItem(item.image);
+
+  await run(
+    'UPDATE items SET title = ?, image = ? WHERE id = ? AND userId = ?',
+    [imgurItem.title, imgurItem.image, req.params.id, req.user.id]
+  );
+
+  res.json({ item: { ...item, title: imgurItem.title, image: imgurItem.image } });
+});
+
+app.delete('/api/items/:id', authMiddleware, async (req, res) => {
+  const item = await get('SELECT * FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
+  if (!item) return res.status(404).json({ error: 'Item not found' });
 
   await run('DELETE FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
-
   res.json({ ok: true });
 });
 
 app.get('/api/inventory/:username', async (req, res) => {
-  const user = await get('SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)', [normalizeUsername(req.params.username)]);
+  const user = await get(
+    'SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)',
+    [normalizeUsername(req.params.username)]
+  );
+
   if (!user) return res.json({ user: null, items: [] });
 
-  const items = await all(
-    'SELECT id, title, image FROM items WHERE userId = ? ORDER BY id DESC',
-    [user.id]
-  );
+  const items = await all('SELECT id, title, image FROM items WHERE userId = ? ORDER BY id DESC', [user.id]);
 
   res.json({ user, items });
 });
@@ -408,7 +476,64 @@ app.post('/api/trades/:id/decline', authMiddleware, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/admin/trades', authMiddleware, requireSaltAdmin, async (req, res) => {
+app.get('/api/admin/users', authMiddleware, requireAdmin, async (req, res) => {
+  const rows = await all(
+    `SELECT
+      id,
+      username,
+      isAdmin AS "isAdmin"
+     FROM users
+     ORDER BY LOWER(username) ASC`
+  );
+
+  res.json({
+    users: rows.map(user => publicUser(user))
+  });
+});
+
+app.post('/api/admin/set-admin', authMiddleware, requireAdmin, async (req, res) => {
+  const { username, isAdmin } = req.body;
+  const cleanUsername = normalizeUsername(username);
+
+  if (!cleanUsername) {
+    return res.status(400).json({ error: 'Username required' });
+  }
+
+  const target = await get(
+    `SELECT id, username, isAdmin AS "isAdmin"
+     FROM users
+     WHERE LOWER(username) = LOWER(?)`,
+    [cleanUsername]
+  );
+
+  if (!target) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  if (isSaltUsername(target.username) && isAdmin === false) {
+    return res.status(400).json({ error: 'Salt cannot lose admin access' });
+  }
+
+  await run(
+    'UPDATE users SET isAdmin = ? WHERE id = ?',
+    [Boolean(isAdmin), target.id]
+  );
+
+  const updated = await get(
+    `SELECT id, username, isAdmin AS "isAdmin"
+     FROM users
+     WHERE id = ?`,
+    [target.id]
+  );
+
+  res.json({
+    ok: true,
+    user: publicUser(updated),
+    message: `${updated.username} is ${publicUser(updated).isAdmin ? 'now an admin' : 'no longer an admin'}`
+  });
+});
+
+app.get('/api/admin/trades', authMiddleware, requireAdmin, async (req, res) => {
   const rows = await all(
     `SELECT
       t.id,
@@ -431,17 +556,29 @@ app.get('/api/admin/trades', authMiddleware, requireSaltAdmin, async (req, res) 
   res.json({ trades: await enrichTradeRows(rows) });
 });
 
-app.post('/api/admin/reset-password', authMiddleware, requireSaltAdmin, async (req, res) => {
+app.post('/api/admin/reset-password', authMiddleware, requireAdmin, async (req, res) => {
   const { username, newPassword } = req.body;
   const cleanUsername = normalizeUsername(username);
 
-  if (!cleanUsername || !newPassword) return res.status(400).json({ error: 'Username and new password required' });
-  if (String(newPassword).length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  if (!cleanUsername || !newPassword) {
+    return res.status(400).json({ error: 'Username and new password required' });
+  }
 
-  const target = await get('SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)', [cleanUsername]);
+  if (String(newPassword).length < 4) {
+    return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  }
+
+  const target = await get(
+    `SELECT id, username
+     FROM users
+     WHERE LOWER(username) = LOWER(?)`,
+    [cleanUsername]
+  );
+
   if (!target) return res.status(404).json({ error: 'User not found' });
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
+
   await run('UPDATE users SET password = ? WHERE id = ?', [passwordHash, target.id]);
 
   res.json({ ok: true, message: `Password reset for ${target.username}` });

@@ -30,14 +30,48 @@ function ItemStrip({ label, items }) {
   );
 }
 
+function tradeSearchText(trade) {
+  const itemNames = [
+    ...(trade.fromItemDetails || []).map(item => item.title),
+    ...(trade.toItemDetails || []).map(item => item.title)
+  ];
+
+  const chatText = (trade.chatHistory || [])
+    .map(message => `${message.username || ''} ${message.message || ''}`)
+    .join(' ');
+
+  return [
+    trade.id,
+    trade.roomId,
+    trade.status,
+    trade.fromUsername,
+    trade.toUsername,
+    trade.createdAt,
+    ...(trade.fromItems || []),
+    ...(trade.toItems || []),
+    ...itemNames,
+    chatText
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
 export default function Trades({ trades, currentUser, onRefresh, onCounter }) {
   const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
   const [error, setError] = useState('');
 
   const filtered = useMemo(() => {
-    if (filter === 'all') return trades;
-    return trades.filter(trade => trade.status === filter);
-  }, [filter, trades]);
+    const cleanSearch = search.trim().toLowerCase();
+
+    return trades.filter(trade => {
+      const matchesStatus = filter === 'all' || trade.status === filter;
+      const matchesSearch = !cleanSearch || tradeSearchText(trade).includes(cleanSearch);
+
+      return matchesStatus && matchesSearch;
+    });
+  }, [filter, search, trades]);
 
   async function action(path) {
     setError('');
@@ -64,6 +98,13 @@ export default function Trades({ trades, currentUser, onRefresh, onCounter }) {
       {error && <p className="error">{error}</p>}
 
       <div className="inline-controls filter-row">
+        <input
+          value={search}
+          onChange={event => setSearch(event.target.value)}
+          placeholder="Search trades by user, item, status, room, chat..."
+          aria-label="Search trades"
+        />
+
         {FILTERS.map(item => (
           <button key={item} className={filter === item ? 'selected-filter' : 'ghost'} onClick={() => setFilter(item)}>
             {item}
@@ -71,7 +112,11 @@ export default function Trades({ trades, currentUser, onRefresh, onCounter }) {
         ))}
       </div>
 
-      {filtered.length === 0 && <p className="muted">No trades match this filter.</p>}
+      <p className="muted">
+        Showing {filtered.length} of {trades.length} trades.
+      </p>
+
+      {filtered.length === 0 && <p className="muted">No trades match this filter/search.</p>}
 
       <div className="trade-history-list">
         {filtered.map(trade => (
@@ -83,6 +128,7 @@ export default function Trades({ trades, currentUser, onRefresh, onCounter }) {
 
             <span>With: {otherName(trade)}</span>
             <small>{trade.createdAt}</small>
+            <small>Room: {trade.roomId}</small>
 
             <div className="grid two trade-items-grid">
               <ItemStrip label={`${trade.fromUsername} offers`} items={trade.fromItemDetails || []} />
