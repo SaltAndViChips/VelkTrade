@@ -14,6 +14,12 @@ function DraggableItem({ item, onDeleteItem, onDoubleClickItem }) {
     >
       <img src={item.image} alt={item.title} draggable="false" />
       <span>{item.title}</span>
+
+      <div className="item-full-preview">
+        <img src={item.image} alt={item.title} />
+        <strong>{item.title}</strong>
+      </div>
+
       {onDeleteItem && (
         <button
           type="button"
@@ -59,7 +65,7 @@ export default function Inventory({
 
       {!readOnly && onAddImgurItem && (
         <form className="inline-controls" onSubmit={submitItem}>
-          <input value={imgurUrl} onChange={e => setImgurUrl(e.target.value)} placeholder="https://i.imgur.com/4viV2RH.png" />
+          <input value={imgurUrl} onChange={e => setImgurUrl(e.target.value)} placeholder="https://imgur.com/6hUs12E" />
           <button>Add Item</button>
         </form>
       )}
@@ -77,6 +83,10 @@ export default function Inventory({
           <div key={item.id} className="item-card readonly">
             <img src={item.image} alt={item.title} />
             <span>{item.title}</span>
+            <div className="item-full-preview">
+              <img src={item.image} alt={item.title} />
+              <strong>{item.title}</strong>
+            </div>
           </div>
         ) : (
           <DraggableItem key={item.id} item={item} onDeleteItem={onDeleteItem} onDoubleClickItem={onDoubleClickItem} />

@@ -14,6 +14,25 @@ function OfferItem({ item, onDoubleClick }) {
       <img src={item.image} alt={item.title} draggable="false" />
       <span>{item.title}</span>
       <small className="muted">Double-click to remove</small>
+
+      <div className="item-full-preview">
+        <img src={item.image} alt={item.title} />
+        <strong>{item.title}</strong>
+      </div>
+    </div>
+  );
+}
+
+function ReadOnlyOfferItem({ item }) {
+  return (
+    <div className="item-card readonly">
+      <img src={item.image} alt={item.title} />
+      <span>{item.title}</span>
+
+      <div className="item-full-preview">
+        <img src={item.image} alt={item.title} />
+        <strong>{item.title}</strong>
+      </div>
     </div>
   );
 }
@@ -27,10 +46,7 @@ function OfferZone({ title, items, droppableId, readOnly, onDoubleClickOfferItem
       <div ref={setNodeRef} className="item-grid drop-zone trade-zone">
         {items.length === 0 && <p className="muted">No items offered.</p>}
         {items.map(item => readOnly ? (
-          <div key={item.id} className="item-card readonly">
-            <img src={item.image} alt={item.title} />
-            <span>{item.title}</span>
-          </div>
+          <ReadOnlyOfferItem key={item.id} item={item} />
         ) : (
           <OfferItem key={item.id} item={item} onDoubleClick={onDoubleClickOfferItem} />
         ))}

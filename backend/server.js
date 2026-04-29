@@ -38,8 +38,12 @@ const io = new Server(server, {
   }
 });
 
+function normalizeUsername(username) {
+  return String(username || '').trim();
+}
+
 function isSaltAdmin(user) {
-  return String(user?.username || '').trim().toLowerCase() === 'salt';
+  return normalizeUsername(user?.username).toLowerCase() === 'salt';
 }
 
 function requireSaltAdmin(req, res, next) {
@@ -68,7 +72,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 app.post('/api/register', async (req, res) => {
   const { username, password } = req.body;
-  const cleanUsername = String(username || '').trim();
+  const cleanUsername = normalizeUsername(username);
 
   if (!cleanUsername || !password) {
     return res.status(400).json({ error: 'Username and password required' });
@@ -82,10 +86,25 @@ app.post('/api/register', async (req, res) => {
     return res.status(400).json({ error: 'Password must be at least 4 characters' });
   }
 
+  const existingUser = await get(
+    'SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)',
+    [cleanUsername]
+  );
+
+  if (existingUser) {
+    return res.status(400).json({
+      error: `Username already exists as ${existingUser.username}`
+    });
+  }
+
   const passwordHash = await bcrypt.hash(password, 10);
 
   try {
-    const result = await run('INSERT INTO users (username, password) VALUES (?, ?)', [cleanUsername, passwordHash]);
+    const result = await run(
+      'INSERT INTO users (username, password) VALUES (?, ?)',
+      [cleanUsername, passwordHash]
+    );
+
     const user = { id: result.lastID, username: cleanUsername };
     res.json({ token: createToken(user), user });
   } catch {
@@ -94,8 +113,12 @@ app.post('/api/register', async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-  const cleanUsername = String(req.body.username || '').trim();
-  const user = await get('SELECT * FROM users WHERE username = ?', [cleanUsername]);
+  const cleanUsername = normalizeUsername(req.body.username);
+
+  const user = await get(
+    'SELECT * FROM users WHERE LOWER(username) = LOWER(?)',
+    [cleanUsername]
+  );
 
   if (!user) return res.status(401).json({ error: 'Invalid login' });
 
@@ -146,7 +169,10 @@ app.delete('/api/items/:id', authMiddleware, async (req, res) => {
 });
 
 app.get('/api/inventory/:username', async (req, res) => {
-  const user = await get('SELECT id, username FROM users WHERE username = ?', [req.params.username]);
+  const user = await get(
+    'SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)',
+    [normalizeUsername(req.params.username)]
+  );
 
   if (!user) return res.json({ user: null, items: [] });
 
@@ -182,8 +208,9 @@ app.get('/api/admin/trades', authMiddleware, requireSaltAdmin, async (req, res) 
 
 app.post('/api/admin/reset-password', authMiddleware, requireSaltAdmin, async (req, res) => {
   const { username, newPassword } = req.body;
+  const cleanUsername = normalizeUsername(username);
 
-  if (!username || !newPassword) {
+  if (!cleanUsername || !newPassword) {
     return res.status(400).json({ error: 'Username and new password required' });
   }
 
@@ -191,7 +218,11 @@ app.post('/api/admin/reset-password', authMiddleware, requireSaltAdmin, async (r
     return res.status(400).json({ error: 'Password must be at least 4 characters' });
   }
 
-  const target = await get('SELECT id, username FROM users WHERE username = ?', [String(username).trim()]);
+  const target = await get(
+    'SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)',
+    [cleanUsername]
+  );
+
   if (!target) return res.status(404).json({ error: 'User not found' });
 
   const passwordHash = await bcrypt.hash(newPassword, 10);

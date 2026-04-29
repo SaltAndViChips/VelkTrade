@@ -21,6 +21,23 @@ function isImgurUrl(url) {
   }
 }
 
+function cleanImgurTitle(title, fallback) {
+  const raw = String(title || '').trim();
+
+  if (!raw) return fallback;
+
+  // Example:
+  // "discord.gg/velkon | Apocalyptic SR-25"
+  // becomes:
+  // "Apocalyptic SR-25"
+  if (raw.includes('|')) {
+    const afterPipe = raw.split('|').pop().trim();
+    if (afterPipe) return afterPipe;
+  }
+
+  return raw;
+}
+
 async function fetchImgurItem(url) {
   const id = extractImgurId(url);
 
@@ -46,9 +63,10 @@ async function fetchImgurItem(url) {
     });
 
     const data = response.data?.data;
+    const title = cleanImgurTitle(data?.title, id);
 
     return {
-      title: data?.title || id,
+      title,
       image: data?.link || `https://i.imgur.com/${id}.png`
     };
   } catch {
@@ -59,4 +77,4 @@ async function fetchImgurItem(url) {
   }
 }
 
-module.exports = { extractImgurId, isImgurUrl, fetchImgurItem };
+module.exports = { extractImgurId, isImgurUrl, cleanImgurTitle, fetchImgurItem };
