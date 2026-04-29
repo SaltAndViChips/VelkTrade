@@ -12,13 +12,12 @@
         var search = window.location.search || "";
         var hash = window.location.hash || "";
 
-        // Supports:
-        // /VelkTrade/room/abc123
-        // /room/abc123
-        var match = path.match(/(?:\/VelkTrade)?\/room\/([^\/?#]+)/i);
-        var roomId = match && match[1] ? decodeURIComponent(match[1]) : "";
+        var roomMatch = path.match(/(?:\/VelkTrade)?\/room\/([^\/?#]+)/i);
+        var userMatch = path.match(/(?:\/VelkTrade)?\/user\/([^\/?#]+)/i);
 
-        // GitHub Pages project base.
+        var roomId = roomMatch && roomMatch[1] ? decodeURIComponent(roomMatch[1]) : "";
+        var username = userMatch && userMatch[1] ? decodeURIComponent(userMatch[1]) : "";
+
         var base = path.indexOf("/VelkTrade/") === 0 || path === "/VelkTrade"
           ? "/VelkTrade/"
           : "/";
@@ -27,6 +26,8 @@
 
         if (roomId) {
           target += "?room=" + encodeURIComponent(roomId);
+        } else if (username) {
+          target += "?user=" + encodeURIComponent(username);
         } else if (search) {
           target += search.replace(/^\?/, "?");
         }
