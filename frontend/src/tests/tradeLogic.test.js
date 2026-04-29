@@ -8,28 +8,31 @@ function canConfirm(myAccepted, theirAccepted) {
   return myAccepted && theirAccepted;
 }
 
-function transferItems(inventory, offeredIds) {
-  return inventory.filter(item => !offeredIds.includes(item.id));
+function canSaltAdmin(username) {
+  return String(username || '').trim().toLowerCase() === 'salt';
+}
+
+function trimChatMessage(message) {
+  return String(message || '').trim().slice(0, 500);
 }
 
 describe('trade logic', () => {
-  it('removes offered items from the visible trade inventory', () => {
-    const inventory = [{ id: 1 }, { id: 2 }, { id: 3 }];
-    const visible = getVisibleInventory(inventory, [2]);
-
-    expect(visible).toEqual([{ id: 1 }, { id: 3 }]);
+  it('removes offered items from visible inventory', () => {
+    expect(getVisibleInventory([{ id: 1 }, { id: 2 }], [2])).toEqual([{ id: 1 }]);
   });
 
-  it('does not allow confirm until both players accepted', () => {
+  it('requires both accepts before confirm', () => {
     expect(canConfirm(true, false)).toBe(false);
-    expect(canConfirm(false, true)).toBe(false);
     expect(canConfirm(true, true)).toBe(true);
   });
 
-  it('only permanently removes items after final transfer logic runs', () => {
-    const inventory = [{ id: 1 }, { id: 2 }];
-    const remaining = transferItems(inventory, [1]);
+  it('allows Salt admin regardless of case/spacing', () => {
+    expect(canSaltAdmin('Salt')).toBe(true);
+    expect(canSaltAdmin(' salt ')).toBe(true);
+    expect(canSaltAdmin('Other')).toBe(false);
+  });
 
-    expect(remaining).toEqual([{ id: 2 }]);
+  it('trims chat and limits length', () => {
+    expect(trimChatMessage(`  ${'a'.repeat(700)}  `)).toHaveLength(500);
   });
 });

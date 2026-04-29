@@ -24,36 +24,32 @@ db.serialize(() => {
     toUser INTEGER NOT NULL,
     fromItems TEXT NOT NULL,
     toItems TEXT NOT NULL,
+    chatHistory TEXT DEFAULT '[]',
     status TEXT NOT NULL,
     createdAt TEXT DEFAULT CURRENT_TIMESTAMP
   )`);
+
+  db.all(`PRAGMA table_info(trades)`, [], (err, columns) => {
+    if (err || !Array.isArray(columns)) return;
+    const names = columns.map(column => column.name);
+    if (!names.includes('chatHistory')) {
+      db.run(`ALTER TABLE trades ADD COLUMN chatHistory TEXT DEFAULT '[]'`);
+    }
+  });
 });
 
 function get(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
-  });
+  return new Promise((resolve, reject) => db.get(sql, params, (err, row) => err ? reject(err) : resolve(row)));
 }
 
 function all(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
-  });
+  return new Promise((resolve, reject) => db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows)));
 }
 
 function run(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) reject(err);
-      else resolve(this);
-    });
-  });
+  return new Promise((resolve, reject) => db.run(sql, params, function (err) {
+    err ? reject(err) : resolve(this);
+  }));
 }
 
 module.exports = { db, get, all, run };

@@ -1,19 +1,32 @@
 import { useState } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 
-function DraggableItem({ item }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: item.id
-  });
-
-  const style = {
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined
-  };
+function DraggableItem({ item, onDeleteItem, onDoubleClickItem }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id });
 
   return (
-    <div ref={setNodeRef} className="item-card" style={style} {...listeners} {...attributes}>
-      <img src={item.image} alt={item.title} />
+    <div
+      ref={setNodeRef}
+      className={`item-card ${isDragging ? 'is-dragging' : ''}`}
+      {...listeners}
+      {...attributes}
+      onDoubleClick={() => onDoubleClickItem?.(item.id)}
+    >
+      <img src={item.image} alt={item.title} draggable="false" />
       <span>{item.title}</span>
+      {onDeleteItem && (
+        <button
+          type="button"
+          className="mini-danger"
+          onPointerDown={event => event.stopPropagation()}
+          onClick={event => {
+            event.stopPropagation();
+            onDeleteItem(item.id);
+          }}
+        >
+          Remove
+        </button>
+      )}
     </div>
   );
 }
@@ -24,6 +37,8 @@ export default function Inventory({
   droppableId,
   readOnly = false,
   onAddImgurItem,
+  onDeleteItem,
+  onDoubleClickItem,
   usernameValue,
   onUsernameChange,
   onSearch
@@ -42,39 +57,29 @@ export default function Inventory({
     <section className="card">
       <h2>{title}</h2>
 
-      {!readOnly && (
+      {!readOnly && onAddImgurItem && (
         <form className="inline-controls" onSubmit={submitItem}>
-          <input
-            value={imgurUrl}
-            onChange={event => setImgurUrl(event.target.value)}
-            placeholder="https://i.imgur.com/4viV2RH.png"
-          />
+          <input value={imgurUrl} onChange={e => setImgurUrl(e.target.value)} placeholder="https://i.imgur.com/4viV2RH.png" />
           <button>Add Item</button>
         </form>
       )}
 
       {readOnly && (
         <div className="inline-controls">
-          <input
-            value={usernameValue}
-            onChange={event => onUsernameChange(event.target.value)}
-            placeholder="Username"
-          />
+          <input value={usernameValue} onChange={e => onUsernameChange(e.target.value)} placeholder="Username" />
           <button onClick={onSearch}>View</button>
         </div>
       )}
 
       <div ref={setNodeRef} className="item-grid drop-zone">
         {items.length === 0 && <p className="muted">No items here.</p>}
-        {items.map(item => (
-          readOnly ? (
-            <div key={item.id} className="item-card readonly">
-              <img src={item.image} alt={item.title} />
-              <span>{item.title}</span>
-            </div>
-          ) : (
-            <DraggableItem key={item.id} item={item} />
-          )
+        {items.map(item => readOnly ? (
+          <div key={item.id} className="item-card readonly">
+            <img src={item.image} alt={item.title} />
+            <span>{item.title}</span>
+          </div>
+        ) : (
+          <DraggableItem key={item.id} item={item} onDeleteItem={onDeleteItem} onDoubleClickItem={onDoubleClickItem} />
         ))}
       </div>
     </section>

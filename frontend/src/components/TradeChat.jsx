@@ -4,9 +4,7 @@ export default function TradeChat({ disabled, messages, currentUser, onSend }) {
   const [message, setMessage] = useState('');
   const bottomRef = useRef(null);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  useEffect(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), [messages]);
 
   function submit(event) {
     event.preventDefault();
@@ -26,10 +24,7 @@ export default function TradeChat({ disabled, messages, currentUser, onSend }) {
       <div className="chat-log">
         {messages.length === 0 && <p className="muted">No messages yet.</p>}
         {messages.map(item => (
-          <div
-            className={item.userId === currentUser.id ? 'chat-message mine' : 'chat-message'}
-            key={item.id}
-          >
+          <div className={item.userId === currentUser.id ? 'chat-message mine' : 'chat-message'} key={item.id}>
             <strong>{item.username}</strong>
             <p>{item.message}</p>
             <small>{new Date(item.createdAt).toLocaleTimeString()}</small>
@@ -39,13 +34,7 @@ export default function TradeChat({ disabled, messages, currentUser, onSend }) {
       </div>
 
       <form className="chat-form" onSubmit={submit}>
-        <input
-          value={message}
-          onChange={event => setMessage(event.target.value)}
-          disabled={disabled}
-          maxLength={500}
-          placeholder={disabled ? 'Join a 1v1 room to chat' : 'Send a trade message...'}
-        />
+        <input value={message} onChange={e => setMessage(e.target.value)} disabled={disabled} maxLength={500} placeholder={disabled ? 'Join a 1v1 room to chat' : 'Send a trade message...'} />
         <button disabled={disabled}>Send</button>
       </form>
     </section>
