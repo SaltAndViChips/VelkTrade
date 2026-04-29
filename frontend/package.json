@@ -8,8 +8,8 @@
     "preview": "vite preview",
     "deploy": "gh-pages -d dist",
     "test": "vitest"
-	"homepage": "https://SaltAndViChips.github.io/VelkTrade"
   },
+  "homepage": "https://SaltAndViChips.github.io/VelkTrade",
   "dependencies": {
     "@dnd-kit/core": "latest",
     "@vitejs/plugin-react": "latest",
