@@ -5,9 +5,10 @@
   "engines": {
     "node": "20.x"
   },
-  "scripts": {
+   "scripts": {
     "dev": "node server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "postinstall": "npm rebuild sqlite3 --build-from-source"
   },
   "dependencies": {
     "axios": "latest",
