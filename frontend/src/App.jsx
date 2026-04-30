@@ -194,9 +194,6 @@ export default function App() {
     setPendingRoomInvite(null);
   }
 
-  const visibleNotifications = notifications || [];
-  const tradeStatuses = {};
-  const unseenNotificationCount = 0;
 
 
 async function invitePlayerToRoom(username) {
