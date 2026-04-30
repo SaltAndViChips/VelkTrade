@@ -59,8 +59,7 @@ const io = new Server(server, {
 });
 
 
-const onlineUsers = new Map();
-const pendingRoomInvites = new Map(); // userId -> { id, username, sockets:Set<string> }
+const onlineUsers = new Map(); // userId -> { id, username, sockets:Set<string> }
 
 const DEFAULT_NOTIFICATION_PREFS = {
   offline_trades: true,
@@ -88,32 +87,59 @@ async function hydrateOnlinePresenceUser(userId, fallbackUser) {
 
     if (!row) return fallbackUser;
 
+    const isDeveloper = isProtectedDeveloperAccount(row);
+    const isAdmin = Boolean(row.is_admin || isDeveloper);
+
     return {
       id: row.id,
       username: row.username,
-      isAdmin: Boolean(row.is_admin || String(row.username || '').toLowerCase() === 'salt'),
+      isDeveloper,
+      isAdmin,
       isVerified: Boolean(row.is_verified),
       showOnline: row.show_online !== false,
-      status: fallbackUser?.status || 'online'
+      status: fallbackUser?.status || 'online',
+      highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : row.is_verified ? 'verified' : 'none'
     };
   } catch {
     return fallbackUser;
   }
 }
 
+
+function isProtectedDeveloperAccount(value) {
+  const username = typeof value === 'string' ? value : value?.username;
+  return ['salt', 'velkon'].includes(String(username || '').trim().toLowerCase());
+}
+
+function developerAwareUser(user) {
+  const isDeveloper = Boolean(user?.is_developer || user?.isDeveloper || isProtectedDeveloperAccount(user));
+  const isAdmin = Boolean(user?.is_admin || user?.isAdmin || isDeveloper);
+  const isVerified = Boolean(user?.is_verified || user?.isVerified);
+
+  return {
+    ...developerAwareUser(user),
+    isAdmin,
+    isVerified,
+    isDeveloper,
+    highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'verified' : 'none'
+  };
+}
+
 function onlineUserList() {
   return Array.from(onlineUsers.values())
     .filter(user => user.showOnline !== false)
     .map(user => {
-      const isAdmin = Boolean(user.isAdmin || user.is_admin || String(user.username || '').toLowerCase() === 'salt');
+      const isDeveloper = Boolean(user.isDeveloper || user.is_developer || isProtectedDeveloperAccount(user));
+      const isAdmin = Boolean(isDeveloper || user.isAdmin || user.is_admin);
       const isVerified = Boolean(user.isVerified || user.is_verified);
 
       return {
         id: user.id,
         username: user.username,
+        isDeveloper,
         isAdmin,
         isVerified,
-        highestBadge: isAdmin ? 'admin' : isVerified ? 'verified' : 'none',
+        highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'verified' : 'none',
         status: user.status || 'online'
       };
     });
@@ -538,7 +564,7 @@ async function hydrateAuthUser(user) {
   if (!user?.id) return user;
 
   const dbUser = await get(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online, bio
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
      FROM users
      WHERE id = ?`,
     [user.id]
@@ -826,60 +852,6 @@ async function createLoginTradeSummaryNotification(userId) {
 }
 
 
-
-function pendingRoomInviteKey(roomId, inviterId) {
-  return `${roomId}:${inviterId}`;
-}
-
-async function expirePendingRoomInvite({ roomId, inviterId, reason = 'expired' }) {
-  const key = pendingRoomInviteKey(roomId, inviterId);
-  const invite = pendingRoomInvites.get(key);
-
-  if (!invite) return null;
-
-  pendingRoomInvites.delete(key);
-
-  await createNotification({
-    userId: invite.toUserId,
-    type: 'room_invite_expired',
-    title: 'Room invite expired',
-    message: `${invite.fromUsername}'s room invite has ${reason === 'cancelled' ? 'been cancelled' : 'expired'}.`,
-    payload: {
-      roomId,
-      fromUserId: inviterId,
-      fromUsername: invite.fromUsername,
-      expired: true
-    }
-  });
-
-  return invite;
-}
-
-async function expireRoomInvitesForRoom(roomId, reason = 'expired') {
-  const invites = Array.from(pendingRoomInvites.values()).filter(invite => invite.roomId === roomId);
-
-  for (const invite of invites) {
-    await expirePendingRoomInvite({
-      roomId: invite.roomId,
-      inviterId: invite.fromUserId,
-      reason
-    });
-  }
-}
-
-async function expireRoomInvitesForUser(userId, reason = 'expired') {
-  const invites = Array.from(pendingRoomInvites.values()).filter(invite => Number(invite.fromUserId) === Number(userId));
-
-  for (const invite of invites) {
-    await expirePendingRoomInvite({
-      roomId: invite.roomId,
-      inviterId: invite.fromUserId,
-      reason
-    });
-  }
-}
-
-
 app.get('/api/health', async (req, res) => {
   res.json({
     ok: true,
@@ -913,7 +885,7 @@ app.post('/api/register', async (req, res) => {
       bio: ''
     };
 
-    res.json({ token: createToken(publicUser(user)), user: publicUser(user) });
+    res.json({ token: createToken(developerAwareUser(user)), user: developerAwareUser(user) });
   } catch {
     res.status(400).json({ error: 'Username already exists' });
   }
@@ -923,7 +895,7 @@ app.post('/api/login', async (req, res) => {
   const cleanUsername = normalizeUsername(req.body.username);
 
   const user = await get(
-    `SELECT id, username, password, is_admin, is_verified, show_bazaar_inventory, show_online, bio
+    `SELECT id, username, password, is_admin, is_verified, show_bazaar_inventory, bio
      FROM users
      WHERE LOWER(username) = LOWER(?)`,
     [cleanUsername]
@@ -943,14 +915,14 @@ app.post('/api/login', async (req, res) => {
   await createLoginTradeSummaryNotification(user.id);
 
   res.json({
-    token: createToken(publicUser(user)),
-    user: publicUser(user)
+    token: createToken(developerAwareUser(user)),
+    user: developerAwareUser(user)
   });
 });
 
 app.get('/api/me', authMiddleware, async (req, res) => {
   const user = await get(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online, bio
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
      FROM users
      WHERE id = ?`,
     [req.user.id]
@@ -961,36 +933,9 @@ app.get('/api/me', authMiddleware, async (req, res) => {
     user.is_admin = true;
   }
 
-  res.json({ user: user ? { ...publicUser(user), bio: user.bio || '' } : null });
+  res.json({ user: user ? { ...developerAwareUser(user), bio: user.bio || '' } : null });
 });
 
-
-
-app.put('/api/me/online-visibility', authMiddleware, async (req, res) => {
-  const showOnline = Boolean(req.body.showOnline);
-
-  await run(
-    'UPDATE users SET show_online = ? WHERE id = ?',
-    [showOnline, req.user.id]
-  );
-
-  const user = await get(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online, bio
-     FROM users
-     WHERE id = ?`,
-    [req.user.id]
-  );
-
-  res.json({
-    ok: true,
-    user: {
-      ...publicUser(user),
-      bio: user.bio || '',
-      showBazaarInventory: user.show_bazaar_inventory !== false,
-      showOnline: user.show_online !== false
-    }
-  });
-});
 
 app.put('/api/me/bazaar-visibility', authMiddleware, async (req, res) => {
   const showBazaarInventory = Boolean(req.body.showBazaarInventory);
@@ -1001,7 +946,7 @@ app.put('/api/me/bazaar-visibility', authMiddleware, async (req, res) => {
   );
 
   const user = await get(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online, bio
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
      FROM users
      WHERE id = ?`,
     [req.user.id]
@@ -1010,10 +955,9 @@ app.put('/api/me/bazaar-visibility', authMiddleware, async (req, res) => {
   res.json({
     ok: true,
     user: {
-      ...publicUser(user),
+      ...developerAwareUser(user),
       bio: user.bio || '',
-      showBazaarInventory: user.show_bazaar_inventory !== false,
-      showOnline: user.show_online !== false
+      showBazaarInventory: user.show_bazaar_inventory !== false
     }
   });
 });
@@ -1027,7 +971,7 @@ app.put('/api/me/profile', authMiddleware, async (req, res) => {
   );
 
   const user = await get(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online, bio
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
      FROM users
      WHERE id = ?`,
     [req.user.id]
@@ -1035,13 +979,13 @@ app.put('/api/me/profile', authMiddleware, async (req, res) => {
 
   res.json({
     ok: true,
-    user: { ...publicUser(user), bio: user.bio || '' }
+    user: { ...developerAwareUser(user), bio: user.bio || '' }
   });
 });
 
 app.get('/api/profile/:username', optionalAuth, async (req, res) => {
   const profileUser = await get(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online, bio
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
      FROM users
      WHERE LOWER(username) = LOWER(?)`,
     [normalizeUsername(req.params.username)]
@@ -1080,7 +1024,6 @@ app.get('/api/profile/:username', optionalAuth, async (req, res) => {
       bio: profileUser.bio || '',
       isVerified: Boolean(profileUser.is_verified),
       showBazaarInventory: profileUser.show_bazaar_inventory !== false,
-      showOnline: profileUser.show_online !== false,
       online: isUserOnline(profileUser.id)
     },
     items
@@ -1269,8 +1212,7 @@ app.get('/api/inventory/:username', optionalAuth, async (req, res) => {
     [req.user?.id || 0, user.id]
   );
 
-  res.json({ user: { ...user, bio: user.bio || '', isVerified: Boolean(user.is_verified), showBazaarInventory: user.show_bazaar_inventory !== false,
-      showOnline: user.show_online !== false, online: isUserOnline(user.id) }, items });
+  res.json({ user: { ...user, bio: user.bio || '', isVerified: Boolean(user.is_verified), showBazaarInventory: user.show_bazaar_inventory !== false, online: isUserOnline(user.id) }, items });
 });
 
 app.get('/api/trades', authMiddleware, async (req, res) => {
@@ -1460,13 +1402,13 @@ app.get('/api/admin/rooms', authMiddleware, requireAdmin, async (req, res) => {
 
 app.get('/api/admin/users', authMiddleware, requireAdmin, async (req, res) => {
   const rows = await all(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online, bio
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
      FROM users
      ORDER BY LOWER(username) ASC`
   );
 
   res.json({
-    users: rows.map(user => ({ ...publicUser(user), bio: user.bio || '', isVerified: Boolean(user.is_verified), online: typeof isUserOnline === 'function' ? isUserOnline(user.id) : false }))
+    users: rows.map(user => ({ ...developerAwareUser(user), bio: user.bio || '', isVerified: Boolean(user.is_verified), online: typeof isUserOnline === 'function' ? isUserOnline(user.id) : false }))
   });
 });
 
@@ -1477,13 +1419,21 @@ app.post('/api/admin/set-admin', authMiddleware, requireAdmin, async (req, res) 
   if (!cleanUsername) return res.status(400).json({ error: 'Username required' });
 
   const target = await get(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory
      FROM users
      WHERE LOWER(username) = LOWER(?)`,
     [cleanUsername]
   );
 
   if (!target) return res.status(404).json({ error: 'User not found' });
+
+
+  if (isProtectedDeveloperAccount(target)) {
+    return res.status(403).json({ error: 'Developer accounts cannot be modified by admins' });
+  }
+if (isProtectedDeveloperAccount(target)) {
+    return res.status(403).json({ error: 'Developer accounts cannot be modified by admins' });
+  }
 
   if (isSaltUsername(target.username) && isAdmin === false) {
     return res.status(400).json({ error: 'Salt cannot lose admin access' });
@@ -1492,7 +1442,7 @@ app.post('/api/admin/set-admin', authMiddleware, requireAdmin, async (req, res) 
   await run('UPDATE users SET is_admin = ? WHERE id = ?', [Boolean(isAdmin), target.id]);
 
   const updated = await get(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory
      FROM users
      WHERE id = ?`,
     [target.id]
@@ -1546,10 +1496,14 @@ app.post('/api/admin/set-verified', authMiddleware, requireAdmin, async (req, re
 
   if (!target) return res.status(404).json({ error: 'User not found' });
 
-  await run('UPDATE users SET is_verified = ? WHERE id = ?', [Boolean(isVerified), target.id]);
+
+  if (isProtectedDeveloperAccount(target)) {
+    return res.status(403).json({ error: 'Developer accounts cannot be modified by admins' });
+  }
+await run('UPDATE users SET is_verified = ? WHERE id = ?', [Boolean(isVerified), target.id]);
 
   const updated = await get(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory
      FROM users
      WHERE id = ?`,
     [target.id]
@@ -1572,7 +1526,11 @@ app.post('/api/admin/reset-password', authMiddleware, requireAdmin, async (req, 
   const target = await get('SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)', [cleanUsername]);
   if (!target) return res.status(404).json({ error: 'User not found' });
 
-  const passwordHash = await bcrypt.hash(newPassword, 10);
+
+  if (isProtectedDeveloperAccount(target)) {
+    return res.status(403).json({ error: 'Developer accounts cannot be modified by admins' });
+  }
+const passwordHash = await bcrypt.hash(newPassword, 10);
 
   await run('UPDATE users SET password = ? WHERE id = ?', [passwordHash, target.id]);
 
@@ -1724,68 +1682,44 @@ app.delete('/api/bazaar/items/:id/interest', authMiddleware, async (req, res) =>
 });
 
 
-app.post('/api/rooms/:roomId/invite', authMiddleware, async (req, res) => {
-  const roomId = req.params.roomId;
-  const targetUsername = normalizeUsername(req.body.username || req.body.targetUsername || req.body.toUsername);
-  const key = pendingRoomInviteKey(roomId, req.user.id);
+app.get('/api/online-users', authMiddleware, async (req, res) => {
+  const socketUsers = onlineUserList();
 
-  if (!targetUsername) {
-    return res.status(400).json({ error: 'Username required' });
+  if (socketUsers.length) {
+    return res.json({ users: socketUsers });
   }
 
-  if (pendingRoomInvites.has(key)) {
-    const existingInvite = pendingRoomInvites.get(key);
-    return res.status(409).json({
-      error: `You already have a pending invite to ${existingInvite.toUsername}. Cancel it or wait for them to decline.`,
-      pendingInvite: existingInvite
-    });
-  }
-
-  const target = await get(
-    `SELECT id, username
+  const rows = await all(
+    `SELECT id, username, is_admin, is_verified, show_online, last_seen_at
      FROM users
-     WHERE LOWER(username) = LOWER(?)`,
-    [targetUsername]
+     WHERE COALESCE(show_online, TRUE) = TRUE
+       AND COALESCE(last_seen_at, NOW()) >= NOW() - INTERVAL '15 minutes'
+     ORDER BY
+       CASE WHEN LOWER(username) IN ('salt', 'velkon') THEN 0
+            WHEN is_admin = TRUE THEN 1
+            WHEN is_verified = TRUE THEN 2
+            ELSE 3
+       END,
+       LOWER(username) ASC`
   );
 
-  if (!target) return res.status(404).json({ error: 'User not found' });
-  if (Number(target.id) === Number(req.user.id)) return res.status(400).json({ error: 'You cannot invite yourself' });
+  res.json({
+    users: rows.map(row => {
+      const isDeveloper = isProtectedDeveloperAccount(row);
+      const isAdmin = Boolean(row.is_admin || isDeveloper);
+      const isVerified = Boolean(row.is_verified);
 
-  const invite = {
-    roomId,
-    fromUserId: req.user.id,
-    fromUsername: req.user.username,
-    toUserId: target.id,
-    toUsername: target.username,
-    createdAt: new Date().toISOString()
-  };
-
-  pendingRoomInvites.set(key, invite);
-
-  await createNotification({
-    userId: target.id,
-    type: 'room_invite',
-    title: 'Room invite',
-    message: `${req.user.username} invited you to room ${roomId}.`,
-    payload: {
-      roomId,
-      fromUserId: req.user.id,
-      fromUsername: req.user.username,
-      toUsername: target.username
-    }
+      return {
+        id: row.id,
+        username: row.username,
+        isDeveloper,
+        isAdmin,
+        isVerified,
+        highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'verified' : 'none',
+        status: 'online'
+      };
+    })
   });
-
-  res.json({ ok: true, invite });
-});
-
-app.post('/api/rooms/:roomId/invite/cancel', authMiddleware, async (req, res) => {
-  const invite = await expirePendingRoomInvite({
-    roomId: req.params.roomId,
-    inviterId: req.user.id,
-    reason: 'cancelled'
-  });
-
-  res.json({ ok: true, invite });
 });
 
 app.get('/api/notifications', authMiddleware, async (req, res) => {
@@ -1885,10 +1819,12 @@ io.on('connection', socket => {
   const existing = onlineUsers.get(userId) || {
     id: userId,
     username: socket.user.username,
-    isAdmin: Boolean(socket.user.isAdmin || socket.user.is_admin || String(socket.user.username || '').toLowerCase() === 'salt'),
+    isDeveloper: Boolean(socket.user.isDeveloper || socket.user.is_developer || isProtectedDeveloperAccount(socket.user)),
+    isAdmin: Boolean(socket.user.isAdmin || socket.user.is_admin || isProtectedDeveloperAccount(socket.user)),
     isVerified: Boolean(socket.user.isVerified || socket.user.is_verified),
     showOnline: socket.user.showOnline !== false && socket.user.show_online !== false,
     status: 'online',
+    highestBadge: isProtectedDeveloperAccount(socket.user) ? 'developer' : (socket.user.isAdmin || socket.user.is_admin) ? 'admin' : (socket.user.isVerified || socket.user.is_verified) ? 'verified' : 'none',
     sockets: new Set()
   };
 
@@ -1896,21 +1832,6 @@ io.on('connection', socket => {
   onlineUsers.set(userId, existing);
   socket.join(socketRoomForUser(userId));
   broadcastPresence();
-
-  socket.on('presence:set-status', status => {
-    const allowedStatuses = new Set(['online', 'trade', 'bazaar', 'away']);
-    const nextStatus = allowedStatuses.has(status) ? status : 'online';
-    const current = onlineUsers.get(userId);
-
-    if (!current) return;
-
-    onlineUsers.set(userId, {
-      ...current,
-      status: nextStatus
-    });
-
-    broadcastPresence();
-  });
 
   socket.on('disconnect', () => {
     const current = onlineUsers.get(userId);
@@ -1921,7 +1842,6 @@ io.on('connection', socket => {
 
     if (current.sockets.size === 0) {
       onlineUsers.delete(userId);
-      expireRoomInvitesForUser(userId, 'expired');
     } else {
       onlineUsers.set(userId, current);
     }
@@ -2017,15 +1937,6 @@ io.on('connection', socket => {
   socket.on('room:join', ({ roomId }) => {
     try {
       const room = joinRoom(roomId, socket.user);
-    if (room?.messages && !room.messages.some(message => message.type === 'system' && message.message === `${socket.user.username} joined the room.`)) {
-      room.messages.push({
-        id: Date.now() + Math.random(),
-        type: 'system',
-        username: 'System',
-        message: `${socket.user.username} joined the room.`,
-        createdAt: new Date().toISOString()
-      });
-    }
       socket.join(room.roomId);
       io.to(room.roomId).emit('room:update', publicRoomState(room));
       io.to(room.roomId).emit('inventory:refresh', { reason: 'room-join' });

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { api } from '../api';
 
 function getProfileUrl(username) {
   const base = import.meta.env.BASE_URL || '/';
@@ -6,21 +7,16 @@ function getProfileUrl(username) {
   return `${window.location.origin}${cleanBase}/user/${encodeURIComponent(username)}`;
 }
 
+function isDeveloperPlayer(player) {
+  return Boolean(player?.isDeveloper || player?.is_developer || player?.highestBadge === 'developer' || ['salt', 'velkon'].includes(String(player?.username || '').toLowerCase()));
+}
+
 function isAdminPlayer(player) {
-  return Boolean(
-    player?.isAdmin ||
-    player?.is_admin ||
-    player?.highestBadge === 'admin' ||
-    String(player?.username || '').toLowerCase() === 'salt'
-  );
+  return Boolean(isDeveloperPlayer(player) || player?.isAdmin || player?.is_admin || player?.highestBadge === 'admin');
 }
 
 function isVerifiedPlayer(player) {
-  return Boolean(
-    player?.isVerified ||
-    player?.is_verified ||
-    player?.highestBadge === 'verified'
-  );
+  return Boolean(player?.isVerified || player?.is_verified || player?.highestBadge === 'verified');
 }
 
 function statusLabel(player) {
@@ -37,11 +33,38 @@ export default function SafeOnlinePlayersDropdown({
   onInvitePlayer = () => {}
 }) {
   const [open, setOpen] = useState(false);
+  const [fallbackUsers, setFallbackUsers] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadFallbackUsers() {
+      try {
+        const data = await api('/api/online-users');
+        if (!cancelled) setFallbackUsers(data.users || []);
+      } catch {
+        if (!cancelled) setFallbackUsers([]);
+      }
+    }
+
+    loadFallbackUsers();
+    const interval = window.setInterval(loadFallbackUsers, 15000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  const sourceUsers = Array.isArray(onlineUsers) && onlineUsers.length ? onlineUsers : fallbackUsers;
 
   const sortedUsers = useMemo(() => {
-    return (Array.isArray(onlineUsers) ? onlineUsers : [])
+    return (Array.isArray(sourceUsers) ? sourceUsers : [])
       .filter(player => Number(player?.id) !== Number(currentUser?.id))
       .sort((a, b) => {
+        const devDiff = Number(isDeveloperPlayer(b)) - Number(isDeveloperPlayer(a));
+        if (devDiff) return devDiff;
+
         const adminDiff = Number(isAdminPlayer(b)) - Number(isAdminPlayer(a));
         if (adminDiff) return adminDiff;
 
@@ -50,7 +73,7 @@ export default function SafeOnlinePlayersDropdown({
 
         return String(a?.username || '').localeCompare(String(b?.username || ''));
       });
-  }, [onlineUsers, currentUser]);
+  }, [sourceUsers, currentUser]);
 
   function openProfile(username) {
     if (!username) return;
@@ -61,13 +84,7 @@ export default function SafeOnlinePlayersDropdown({
 
   return (
     <div className="safe-online-dropdown">
-      <button
-        type="button"
-        className="safe-online-toggle"
-        onClick={() => setOpen(value => !value)}
-        title="Online players"
-        aria-label="Online players"
-      >
+      <button type="button" className="safe-online-toggle" onClick={() => setOpen(value => !value)} title="Online players" aria-label="Online players">
         ≡
       </button>
 
@@ -78,18 +95,12 @@ export default function SafeOnlinePlayersDropdown({
             <span>{sortedUsers.length}</span>
           </div>
 
-          {!currentRoomId && (
-            <p className="muted safe-online-hint">
-              Join or create a room to invite online players.
-            </p>
-          )}
-
-          {sortedUsers.length === 0 && (
-            <p className="muted tidy-empty">No other players online.</p>
-          )}
+          {!currentRoomId && <p className="muted safe-online-hint">Join or create a room to invite online players.</p>}
+          {sortedUsers.length === 0 && <p className="muted tidy-empty">No other players online.</p>}
 
           <div className="safe-online-list">
             {sortedUsers.map(player => {
+              const developer = isDeveloperPlayer(player);
               const admin = isAdminPlayer(player);
               const verified = isVerifiedPlayer(player);
               const away = player?.status === 'away';
@@ -100,7 +111,9 @@ export default function SafeOnlinePlayersDropdown({
                     <span className={`online-dot ${away ? 'away' : ''}`} />
                     <strong>{player.username}</strong>
 
-                    {admin ? (
+                    {developer ? (
+                      <span className="developer-badge">Developer</span>
+                    ) : admin ? (
                       <span className="admin-badge">Admin</span>
                     ) : verified ? (
                       <span className="verified-badge mini" title="Verified user">✓</span>
@@ -110,12 +123,8 @@ export default function SafeOnlinePlayersDropdown({
                   </div>
 
                   <div className="safe-online-actions">
-                    <button type="button" className="ghost" onClick={() => openProfile(player.username)}>
-                      Profile
-                    </button>
-                    <button type="button" disabled={!currentRoomId} onClick={() => onInvitePlayer(player.username)}>
-                      Invite
-                    </button>
+                    <button type="button" className="ghost" onClick={() => openProfile(player.username)}>Profile</button>
+                    <button type="button" disabled={!currentRoomId} onClick={() => onInvitePlayer(player.username)}>Invite</button>
                   </div>
                 </article>
               );
