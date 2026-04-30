@@ -2285,3 +2285,49 @@ svg .chart-hover-target {
     transform: translateX(-50%) scale(1);
   }
 }
+
+
+/* Bazaar hover preview: keep full image inside viewport */
+
+.bazaar-full-preview {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  bottom: auto !important;
+  right: auto !important;
+  width: min(520px, calc(100vw - 32px)) !important;
+  max-height: calc(100vh - 32px) !important;
+  overflow: hidden !important;
+  transform: translate(-50%, -50%) scale(0.96) !important;
+  transform-origin: center center !important;
+}
+
+.bazaar-full-preview img {
+  width: 100% !important;
+  max-height: min(620px, calc(100vh - 170px)) !important;
+  object-fit: contain !important;
+}
+
+.bazaar-item-card:hover > .bazaar-full-preview,
+.bazaar-item-card:focus-within > .bazaar-full-preview {
+  transform: translate(-50%, -50%) scale(1) !important;
+}
+
+@media (max-width: 720px) {
+  .bazaar-full-preview {
+    top: 50% !important;
+    left: 50% !important;
+    width: min(440px, calc(100vw - 24px)) !important;
+    max-height: calc(100vh - 24px) !important;
+    transform: translate(-50%, -50%) scale(0.96) !important;
+  }
+
+  .bazaar-full-preview img {
+    max-height: calc(100vh - 165px) !important;
+  }
+
+  .bazaar-item-card:hover > .bazaar-full-preview,
+  .bazaar-item-card:focus-within > .bazaar-full-preview {
+    transform: translate(-50%, -50%) scale(1) !important;
+  }
+}
