@@ -3,6 +3,21 @@ import { api } from '../api';
 
 const FILTERS = ['all', 'pending', 'countered', 'accepted', 'completed', 'declined'];
 
+function formatPriceDisplay(price) {
+  const clean = String(price || '').trim();
+  if (!clean) return '';
+
+  if (/^\d+(\.\d+)?\s*([kmb])?$/i.test(clean)) {
+    return `${clean} IC`;
+  }
+
+  if (/\bic\b/i.test(clean)) {
+    return clean.replace(/\bic\b/i, 'IC');
+  }
+
+  return clean.replace(/^\$\s*/, '');
+}
+
 function getTradeMeta(trade) {
   const metaMessage = (trade.chatHistory || []).find(message => message.type === 'trade-meta');
 
@@ -18,32 +33,6 @@ function getTradeMeta(trade) {
 function getIcForUser(trade, userId) {
   const meta = getTradeMeta(trade);
   return meta.icOffers?.[userId] || '';
-}
-
-function IcTradeItem({ amount }) {
-  if (!amount) return null;
-
-  return (
-    <div className="mini-trade-item ic-offer-card">
-      <div className="ic-token">IC</div>
-      <span>{amount}</span>
-    </div>
-  );
-}
-
-function formatPriceDisplay(price) {
-  const clean = String(price || '').trim();
-  if (!clean) return '';
-
-  if (/^\d+(\.\d+)?\s*([kmb])?$/i.test(clean)) {
-    return `${clean} IC`;
-  }
-
-  if (/\bic\b/i.test(clean)) {
-    return clean.replace(/\bic\b/i, 'IC');
-  }
-
-  return clean.replace(/^\$\s*/, '');
 }
 
 function MiniTradeItem({ item }) {
@@ -64,16 +53,32 @@ function MiniTradeItem({ item }) {
   );
 }
 
-function ItemStrip({ label, items, icAmount }) {
+function IcTradeItem({ amount }) {
+  if (!amount) return null;
+
   return (
-    <div className="trade-item-strip">
+    <div className="mini-trade-item ic-offer-card">
+      <div className="ic-token">IC</div>
+      <span>{amount}</span>
+    </div>
+  );
+}
+
+function ItemStrip({ label, items, icAmount }) {
+  const hasContent = Boolean(icAmount) || Boolean(items?.length);
+
+  return (
+    <div className="trade-item-strip tidy-item-strip">
       <strong>{label}</strong>
+
       <div className="mini-trade-grid">
         {icAmount && <IcTradeItem amount={icAmount} />}
         {items?.length ? items.map(item => (
           <MiniTradeItem key={item.id} item={item} />
         )) : !icAmount ? <span className="muted">No items</span> : null}
       </div>
+
+      {!hasContent && <span className="muted">No items</span>}
     </div>
   );
 }
@@ -85,6 +90,7 @@ function tradeSearchText(trade) {
   ];
 
   const chatText = (trade.chatHistory || [])
+    .filter(message => message.type !== 'trade-meta')
     .map(message => `${message.username || ''} ${message.message || ''}`)
     .join(' ');
 
@@ -144,38 +150,45 @@ function BuyRequestsTab({ requests, currentUser, onRefresh }) {
   }, [requests, search, scope, currentUser]);
 
   return (
-    <section>
-      <div className="inline-controls filter-row">
+    <section className="tidy-tab-panel">
+      <div className="tidy-toolbar">
         <input
           value={search}
           onChange={event => setSearch(event.target.value)}
           placeholder="Search buy requests by item, user, IC price..."
         />
 
-        <button className={scope === 'all' ? 'selected-filter' : 'ghost'} onClick={() => setScope('all')}>All</button>
-        <button className={scope === 'on-my-items' ? 'selected-filter' : 'ghost'} onClick={() => setScope('on-my-items')}>On My Items</button>
-        <button className={scope === 'made-by-me' ? 'selected-filter' : 'ghost'} onClick={() => setScope('made-by-me')}>Made By Me</button>
+        <div className="segmented-control compact">
+          <button className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>All</button>
+          <button className={scope === 'on-my-items' ? 'active' : ''} onClick={() => setScope('on-my-items')}>On My Items</button>
+          <button className={scope === 'made-by-me' ? 'active' : ''} onClick={() => setScope('made-by-me')}>Made By Me</button>
+        </div>
+
         <button onClick={onRefresh}>Refresh</button>
       </div>
 
-      <p className="muted">Showing {filtered.length} of {requests.length} buy requests.</p>
+      <p className="muted tidy-count">Showing {filtered.length} of {requests.length} buy requests.</p>
 
-      {filtered.length === 0 && <p className="muted">No buy requests match this filter/search.</p>}
+      {filtered.length === 0 && <p className="muted tidy-empty">No buy requests match this filter/search.</p>}
 
-      <div className="trade-history-list">
+      <div className="tidy-list">
         {filtered.map(request => {
           const displayPrice = formatPriceDisplay(request.itemPrice);
 
           return (
-            <article className="trade-history-item" key={request.id}>
-              <div className="panel-title-row">
-                <strong>Buy Request #{request.id}</strong>
+            <article className="tidy-trade-card" key={request.id}>
+              <div className="tidy-card-header">
+                <div>
+                  <strong>Buy Request #{request.id}</strong>
+                  <small>{request.createdAt}</small>
+                </div>
+
                 <span className="status-pill">
                   {Number(request.ownerId) === Number(currentUser.id) ? 'On your item' : 'Made by you'}
                 </span>
               </div>
 
-              <div className="grid two trade-items-grid">
+              <div className="tidy-buy-request-body">
                 <div className="mini-trade-grid">
                   <div className="mini-trade-item">
                     <img src={request.itemImage} alt={request.itemTitle} />
@@ -189,10 +202,9 @@ function BuyRequestsTab({ requests, currentUser, onRefresh }) {
                   </div>
                 </div>
 
-                <div>
-                  <p><strong>Requester:</strong> {request.requesterUsername}</p>
-                  <p><strong>Owner:</strong> {request.ownerUsername}</p>
-                  <p><strong>Created:</strong> {request.createdAt}</p>
+                <div className="tidy-meta-grid">
+                  <span><strong>Requester</strong>{request.requesterUsername}</span>
+                  <span><strong>Owner</strong>{request.ownerUsername}</span>
                 </div>
               </div>
             </article>
@@ -236,19 +248,22 @@ export default function Trades({ trades, buyRequests = [], currentUser, onRefres
   }
 
   return (
-    <section className="card">
+    <section className="card tidy-trades-page">
       <div className="panel-title-row">
-        <h2>Trades</h2>
+        <div>
+          <h2>Trades</h2>
+          <p className="muted">Review trade offers, completed trades, counters, and buy requests.</p>
+        </div>
         <button onClick={onRefresh}>Refresh</button>
       </div>
 
       {error && <p className="error">{error}</p>}
 
-      <div className="inline-controls filter-row">
-        <button className={activeTab === 'trades' ? 'selected-filter' : 'ghost'} onClick={() => setActiveTab('trades')}>
+      <div className="segmented-control trades-tabs">
+        <button className={activeTab === 'trades' ? 'active' : ''} onClick={() => setActiveTab('trades')}>
           Trade Offers
         </button>
-        <button className={activeTab === 'buy-requests' ? 'selected-filter' : 'ghost'} onClick={() => setActiveTab('buy-requests')}>
+        <button className={activeTab === 'buy-requests' ? 'active' : ''} onClick={() => setActiveTab('buy-requests')}>
           Buy Requests
         </button>
       </div>
@@ -258,55 +273,69 @@ export default function Trades({ trades, buyRequests = [], currentUser, onRefres
       )}
 
       {activeTab === 'trades' && (
-        <>
-          <div className="inline-controls filter-row">
+        <section className="tidy-tab-panel">
+          <div className="tidy-toolbar">
             <input
               value={search}
               onChange={event => setSearch(event.target.value)}
-              placeholder="Search trades by user, item, IC price, status, room, chat..."
+              placeholder="Search trades by user, item, IC, status, room, chat..."
               aria-label="Search trades"
             />
 
-            {FILTERS.map(item => (
-              <button key={item} className={filter === item ? 'selected-filter' : 'ghost'} onClick={() => setFilter(item)}>
-                {item}
-              </button>
-            ))}
+            <div className="segmented-control compact status-filter">
+              {FILTERS.map(item => (
+                <button key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)}>
+                  {item}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <p className="muted">
+          <p className="muted tidy-count">
             Showing {filtered.length} of {trades.length} trades.
           </p>
 
-          {filtered.length === 0 && <p className="muted">No trades match this filter/search.</p>}
+          {filtered.length === 0 && <p className="muted tidy-empty">No trades match this filter/search.</p>}
 
-          <div className="trade-history-list">
+          <div className="tidy-list">
             {filtered.map(trade => (
-              <article className="trade-history-item" key={trade.id}>
-                <div className="panel-title-row">
-                  <strong>Trade #{trade.id}</strong>
+              <article className="tidy-trade-card" key={trade.id}>
+                <div className="tidy-card-header">
+                  <div>
+                    <strong>Trade #{trade.id}</strong>
+                    <small>With {otherName(trade)} · Room {trade.roomId}</small>
+                  </div>
+
                   <span className={`status-pill status-${trade.status}`}>{trade.status}</span>
                 </div>
 
-                <span>With: {otherName(trade)}</span>
-                <small>{trade.createdAt}</small>
-                <small>Room: {trade.roomId}</small>
+                <small className="muted">{trade.createdAt}</small>
 
-                <div className="grid two trade-items-grid">
-                  <ItemStrip label={`${trade.fromUsername} offers`} items={trade.fromItemDetails || []} icAmount={getIcForUser(trade, trade.fromUser)} />
-                  <ItemStrip label={`${trade.toUsername} offers/requested`} items={trade.toItemDetails || []} icAmount={getIcForUser(trade, trade.toUser)} />
+                <div className="tidy-trade-grid">
+                  <ItemStrip
+                    label={`${trade.fromUsername} offers`}
+                    items={trade.fromItemDetails || []}
+                    icAmount={getIcForUser(trade, trade.fromUser)}
+                  />
+                  <ItemStrip
+                    label={`${trade.toUsername} offers/requested`}
+                    items={trade.toItemDetails || []}
+                    icAmount={getIcForUser(trade, trade.toUser)}
+                  />
                 </div>
 
-                <details>
-                  <summary>Chat / message history ({trade.chatHistory?.length || 0})</summary>
+                <details className="tidy-details">
+                  <summary>Chat / message history ({(trade.chatHistory || []).filter(message => message.type !== 'trade-meta').length})</summary>
                   <div className="history-chat">
-                    {(trade.chatHistory || []).map(message => (
-                      <p key={message.id}><strong>{message.username}:</strong> {message.message}</p>
-                    ))}
+                    {(trade.chatHistory || [])
+                      .filter(message => message.type !== 'trade-meta')
+                      .map(message => (
+                        <p key={message.id}><strong>{message.username}:</strong> {message.message}</p>
+                      ))}
                   </div>
                 </details>
 
-                <div className="inline-controls">
+                <div className="tidy-card-actions">
                   {['pending', 'countered'].includes(trade.status) && (
                     <>
                       <button onClick={() => action(`/api/trades/${trade.id}/accept`)}>Accept</button>
@@ -325,7 +354,7 @@ export default function Trades({ trades, buyRequests = [], currentUser, onRefres
               </article>
             ))}
           </div>
-        </>
+        </section>
       )}
     </section>
   );

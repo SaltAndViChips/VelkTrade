@@ -25,6 +25,54 @@ function normalizeIcInput(value) {
   return `${raw} IC`;
 }
 
+function IcEditor({ label, value, onSave, onClear }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  useEffect(() => {
+    setDraft(String(value || '').replace(/\s*IC$/i, ''));
+  }, [value]);
+
+  function submit(event) {
+    event.preventDefault();
+    const normalized = normalizeIcInput(draft);
+    if (!normalized) return;
+    onSave(normalized);
+    setOpen(false);
+  }
+
+  if (!open) {
+    return (
+      <div className="inline-controls ic-editor-closed">
+        <button type="button" className="ghost" onClick={() => setOpen(true)}>
+          {value ? `Edit ${label}` : `Add ${label}`}
+        </button>
+        {value && <button type="button" className="mini-danger" onClick={onClear}>Remove IC</button>}
+      </div>
+    );
+  }
+
+  return (
+    <form className="ic-input-panel compact" onSubmit={submit}>
+      <label>{label}</label>
+      <div className="ic-input-row">
+        <input
+          value={draft}
+          onChange={event => setDraft(event.target.value)}
+          placeholder="1,000"
+          autoFocus
+        />
+        <span className="ic-suffix">IC</span>
+      </div>
+
+      <div className="inline-controls">
+        <button type="submit">Save IC</button>
+        <button type="button" className="ghost" onClick={() => setOpen(false)}>Cancel</button>
+      </div>
+    </form>
+  );
+}
+
 function DropZone({ id, title, items, icAmount, onDoubleClickItem, onAddIc, onRemoveIc }) {
   const { setNodeRef } = useDroppable({ id });
 
@@ -32,8 +80,14 @@ function DropZone({ id, title, items, icAmount, onDoubleClickItem, onAddIc, onRe
     <section className="card">
       <div className="panel-title-row">
         <h2>{title}</h2>
-        <button type="button" className="ghost" onClick={onAddIc}>Add IC</button>
       </div>
+
+      <IcEditor
+        label="IC"
+        value={icAmount}
+        onSave={onAddIc}
+        onClear={onRemoveIc}
+      />
 
       <div ref={setNodeRef} className="item-grid drop-zone trade-zone">
         {!icAmount && items.length === 0 && <p className="muted">No items selected.</p>}
@@ -42,7 +96,6 @@ function DropZone({ id, title, items, icAmount, onDoubleClickItem, onAddIc, onRe
           <div className="item-card ic-offer-card">
             <div className="ic-token">IC</div>
             <span>{icAmount}</span>
-            <button type="button" className="mini-danger" onClick={onRemoveIc}>Remove IC</button>
           </div>
         )}
 
@@ -171,24 +224,6 @@ export default function TradeOfferPanel({ currentUser, inventory, counterTrade, 
 
     setError('');
     setTargetInventory(data.items || []);
-  }
-
-  function promptIc(currentValue = '') {
-    const amount = window.prompt('Enter IC amount:', currentValue.replace(/\s*IC$/i, ''));
-
-    if (amount === null) return currentValue;
-
-    return normalizeIcInput(amount);
-  }
-
-  function addOfferIc() {
-    const next = promptIc(offerIc);
-    setOfferIc(next);
-  }
-
-  function addRequestIc() {
-    const next = promptIc(requestIc);
-    setRequestIc(next);
   }
 
   function addOfferItem(itemId) {
@@ -329,7 +364,7 @@ export default function TradeOfferPanel({ currentUser, inventory, counterTrade, 
             items={offerItems}
             icAmount={offerIc}
             onDoubleClickItem={removeOfferItem}
-            onAddIc={addOfferIc}
+            onAddIc={setOfferIc}
             onRemoveIc={() => setOfferIc('')}
           />
           <DropZone
@@ -338,7 +373,7 @@ export default function TradeOfferPanel({ currentUser, inventory, counterTrade, 
             items={requestedItems}
             icAmount={requestIc}
             onDoubleClickItem={removeRequestItem}
-            onAddIc={addRequestIc}
+            onAddIc={setRequestIc}
             onRemoveIc={() => setRequestIc('')}
           />
         </div>

@@ -940,3 +940,272 @@ p {
   display: grid;
   gap: 18px;
 }
+
+
+/* Themed in-page IC input */
+
+.ic-input-panel {
+  background:
+    radial-gradient(circle at top left, rgba(215, 181, 94, 0.16), transparent 34%),
+    linear-gradient(180deg, #211c31, #11101a);
+  border: 1px solid rgba(215, 181, 94, 0.45);
+  border-radius: 12px;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+  box-shadow: 0 16px 40px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.05);
+}
+
+.ic-input-panel.compact {
+  margin: 10px 0 12px;
+  padding: 12px;
+}
+
+.ic-input-panel label {
+  color: #ffe6a1;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+
+.ic-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  background: #0f0d17;
+  border: 1px solid rgba(215, 181, 94, 0.45);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ic-input-row input {
+  border: 0;
+  border-radius: 0;
+  min-width: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ic-input-row input:focus {
+  box-shadow: none;
+}
+
+.ic-suffix {
+  padding: 0 14px;
+  color: #ffe6a1;
+  font-weight: 900;
+}
+
+.ic-editor-closed {
+  margin-bottom: 12px;
+}
+
+/* Tidier Trades page */
+
+.tidy-trades-page {
+  display: grid;
+  gap: 16px;
+}
+
+.segmented-control {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: rgba(8, 7, 12, 0.62);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px;
+}
+
+.segmented-control button {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  border-radius: 999px;
+  color: var(--muted);
+  padding: 8px 12px;
+  text-transform: capitalize;
+}
+
+.segmented-control button:hover:not(:disabled) {
+  background: rgba(141, 99, 255, 0.12);
+  color: var(--text);
+  filter: none;
+}
+
+.segmented-control button.active {
+  background: linear-gradient(180deg, var(--purple), var(--purple-dark));
+  color: white;
+  border-color: var(--border-bright);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 8px 18px rgba(0,0,0,.28);
+}
+
+.segmented-control.compact {
+  border-radius: 12px;
+  justify-content: flex-start;
+}
+
+.segmented-control.compact button {
+  font-size: 13px;
+  padding: 7px 10px;
+}
+
+.trades-tabs {
+  justify-self: start;
+}
+
+.tidy-tab-panel {
+  display: grid;
+  gap: 12px;
+  background: rgba(8, 7, 12, 0.32);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.tidy-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.tidy-toolbar input {
+  width: 100%;
+  min-width: 0;
+}
+
+.tidy-count {
+  margin-bottom: 0;
+}
+
+.tidy-empty {
+  background: rgba(15, 13, 23, 0.7);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin: 0;
+}
+
+.tidy-list {
+  display: grid;
+  gap: 12px;
+}
+
+.tidy-trade-card {
+  display: grid;
+  gap: 12px;
+  background:
+    radial-gradient(circle at top left, rgba(141, 99, 255, 0.08), transparent 34%),
+    linear-gradient(180deg, #171522, #100f18);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  overflow: visible;
+}
+
+.tidy-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+
+.tidy-card-header > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tidy-card-header strong,
+.tidy-card-header small {
+  overflow-wrap: anywhere;
+}
+
+.tidy-trade-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tidy-item-strip {
+  background: rgba(8, 7, 12, 0.38);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.tidy-item-strip > strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #ded8ff;
+  overflow-wrap: anywhere;
+}
+
+.tidy-details {
+  background: rgba(8, 7, 12, 0.35);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.tidy-details summary {
+  cursor: pointer;
+  color: #ded8ff;
+}
+
+.tidy-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tidy-buy-request-body {
+  display: grid;
+  grid-template-columns: minmax(110px, 190px) 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.tidy-meta-grid {
+  display: grid;
+  gap: 8px;
+  background: rgba(8, 7, 12, 0.35);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.tidy-meta-grid span {
+  display: grid;
+  gap: 3px;
+  overflow-wrap: anywhere;
+}
+
+.tidy-meta-grid strong {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+/* Keep older filter buttons from clashing if they appear elsewhere */
+.filter-row .selected-filter {
+  background: linear-gradient(180deg, var(--purple), var(--purple-dark));
+  color: white;
+}
+
+@media (max-width: 960px) {
+  .tidy-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .tidy-trade-grid,
+  .tidy-buy-request-body {
+    grid-template-columns: 1fr;
+  }
+
+  .segmented-control,
+  .segmented-control.compact {
+    border-radius: 14px;
+  }
+}

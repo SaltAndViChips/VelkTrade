@@ -592,7 +592,7 @@ export default function App() {
     updateOffer(myOfferIds.filter(existingId => Number(existingId) !== id));
   }
 
-  function offerIc() {
+  function offerIc(amount) {
     const activeRoom = roomRef.current;
 
     if (!activeRoom) {
@@ -600,14 +600,12 @@ export default function App() {
       return;
     }
 
-    const current = activeRoom.icOffers?.[userRef.current?.id] || '';
-    const amount = window.prompt('Enter IC amount:', current.replace(/\s*IC$/i, ''));
-
-    if (amount === null) return;
-
     const cleanAmount = normalizeIcInput(amount);
 
-    if (!cleanAmount) return;
+    if (!cleanAmount) {
+      setError('Enter a valid IC amount.');
+      return;
+    }
 
     socketRef.current?.emit('trade:ic-offer', {
       roomId: activeRoom.roomId,
