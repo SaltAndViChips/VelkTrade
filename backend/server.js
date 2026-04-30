@@ -34,6 +34,28 @@ const server = http.createServer(app);
 
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
 const PORT = process.env.PORT || 3001;
+const PUBLIC_FRONTEND_URL = (process.env.PUBLIC_FRONTEND_URL || FRONTEND_ORIGIN || 'https://nicecock.ca/VelkTrade').replace(/\/$/, '');
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function profileUrl(username) {
+  return `${PUBLIC_FRONTEND_URL}/user/${encodeURIComponent(username)}`;
+}
+
+function socialPreviewImageUrl() {
+  if (PUBLIC_FRONTEND_URL.includes('nicecock.ca')) {
+    return `${PUBLIC_FRONTEND_URL}/social-preview.png`;
+  }
+
+  return 'https://nicecock.ca/VelkTrade/social-preview.png';
+}
 
 app.use(express.json());
 app.use(cors({ origin: FRONTEND_ORIGIN }));
@@ -278,6 +300,88 @@ async function getBuyRequestRowsForUser(userId) {
     [userId, userId]
   );
 }
+
+
+app.get('/u/:username', async (req, res) => {
+  const username = normalizeUsername(req.params.username);
+
+  const profileUser = await get(
+    `SELECT id, username, bio
+     FROM users
+     WHERE LOWER(username) = LOWER(?)`,
+    [username]
+  );
+
+  if (!profileUser) {
+    const fallbackUrl = `${PUBLIC_FRONTEND_URL}/`;
+    return res.status(404).send(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Player not found - Salts Trading Board</title>
+  <meta property="og:title" content="Player not found - Salts Trading Board">
+  <meta property="og:description" content="This VelkTrade profile could not be found.">
+  <meta property="og:image" content="${escapeHtml(socialPreviewImageUrl())}">
+  <meta name="theme-color" content="#8d63ff">
+</head>
+<body>
+  <p>Player not found. <a href="${escapeHtml(fallbackUrl)}">Open Salts Trading Board</a></p>
+</body>
+</html>`);
+  }
+
+  const itemCountRow = await get(
+    `SELECT COUNT(*)::int AS count
+     FROM items
+     WHERE userId = ?`,
+    [profileUser.id]
+  );
+
+  const sellingCount = Number(itemCountRow?.count || 0);
+  const itemWord = sellingCount === 1 ? 'item' : 'items';
+  const bio = cleanBio(profileUser.bio || '');
+  const title = `${profileUser.username}'s Trading Board`;
+  const description = bio
+    ? `${bio} • Selling ${sellingCount} ${itemWord} on Salts Trading Board.`
+    : `Selling ${sellingCount} ${itemWord} on Salts Trading Board.`;
+  const destination = profileUrl(profileUser.username);
+  const image = socialPreviewImageUrl();
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  <meta name="theme-color" content="#8d63ff">
+
+  <meta property="og:type" content="profile">
+  <meta property="og:site_name" content="Salts Trading Board">
+  <meta property="og:title" content="${escapeHtml(title)}">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:url" content="${escapeHtml(req.protocol)}://${escapeHtml(req.get('host'))}${escapeHtml(req.originalUrl)}">
+  <meta property="og:image" content="${escapeHtml(image)}">
+  <meta property="og:image:secure_url" content="${escapeHtml(image)}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="1200">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${escapeHtml(title)}">
+  <meta name="twitter:description" content="${escapeHtml(description)}">
+  <meta name="twitter:image" content="${escapeHtml(image)}">
+
+  <meta http-equiv="refresh" content="0; url=${escapeHtml(destination)}">
+  <link rel="canonical" href="${escapeHtml(destination)}">
+</head>
+<body>
+  <p>Opening <a href="${escapeHtml(destination)}">${escapeHtml(title)}</a>...</p>
+  <script>
+    window.location.replace(${JSON.stringify(destination)});
+  </script>
+</body>
+</html>`);
+});
 
 app.get('/api/health', async (req, res) => {
   res.json({

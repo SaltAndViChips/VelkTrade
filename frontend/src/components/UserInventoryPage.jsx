@@ -13,6 +13,10 @@ function formatPriceDisplay(price) {
   return clean.replace(/^\$\s*/, '');
 }
 
+function getBackendShareBase() {
+  return import.meta.env.VITE_API_URL || 'https://velktrade.onrender.com';
+}
+
 export default function UserInventoryPage({
   username,
   userRecord,
@@ -27,6 +31,10 @@ export default function UserInventoryPage({
   onLoginRequired,
   onToggleBuyRequest
 }) {
+  const discordShareUrl = userRecord
+    ? `${getBackendShareBase().replace(/\/$/, '')}/u/${encodeURIComponent(userRecord.username)}`
+    : '';
+
   return (
     <section className="card">
       <div className="panel-title-row">
@@ -54,18 +62,29 @@ export default function UserInventoryPage({
               <p className="muted">No bio yet.</p>
             )}
 
-            <button
-              type="button"
-              onClick={() => {
-                if (isLoggedIn) {
-                  onStartTrade(userRecord.username);
-                } else {
-                  onLoginRequired(userRecord.username);
-                }
-              }}
-            >
-              Start Trade with {userRecord.username}
-            </button>
+            <div className="inline-controls">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isLoggedIn) {
+                    onStartTrade(userRecord.username);
+                  } else {
+                    onLoginRequired(userRecord.username);
+                  }
+                }}
+              >
+                Start Trade with {userRecord.username}
+              </button>
+
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => navigator.clipboard?.writeText(discordShareUrl)}
+                title="Copy Discord/social preview link"
+              >
+                Copy Discord Share Link
+              </button>
+            </div>
           </div>
 
           <div className="item-grid drop-zone">
