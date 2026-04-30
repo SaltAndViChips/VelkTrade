@@ -25,6 +25,7 @@ import Bazaar from './components/Bazaar';
 import Notifications from './components/Notifications';
 import PresenceNotificationsDropdown from './components/PresenceNotificationsDropdown';
 import AppUpdateNotice from './components/AppUpdateNotice';
+import SafeOverlayBoundary from './components/SafeOverlayBoundary';
 
 function parseDraggedItemId(active) {
   const dataItemId = active?.data?.current?.itemId;
@@ -144,6 +145,7 @@ export default function App() {
   });
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [pendingRoomInvite, setPendingRoomInvite] = useState(null);
+  const [pendingRoomInvite, setPendingRoomInvite] = useState(null);
   const [tradeStatuses, setTradeStatuses] = useState({});
   const [focusedTradeId, setFocusedTradeId] = useState(null);
   const [room, setRoom] = useState(null);
@@ -190,7 +192,16 @@ export default function App() {
   }, [room]);
 
   useEffect(() => {
-    return () => {
+
+  async function cancelPendingRoomInvite() {
+    setPendingRoomInvite(null);
+  }
+
+  const visibleNotifications = notifications || [];
+  const tradeStatuses = {};
+  const unseenNotificationCount = 0;
+
+  return () => {
       if (undoTimerRef.current) {
         window.clearTimeout(undoTimerRef.current);
       }
@@ -1110,29 +1121,33 @@ export default function App() {
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveDragItem(null)}
     >
-      {user && (
-        <PresenceNotificationsDropdown
-          currentUser={user}
-          onlineUsers={onlineUsers}
-          currentRoomId={room?.roomId}
-          pendingRoomInvite={pendingRoomInvite}
-          notifications={visibleNotifications}
-          preferences={notificationPrefs}
-          tradeStatuses={tradeStatuses}
-          unseenCount={unseenNotificationCount}
-          onRefreshNotifications={loadNotifications}
-          onMarkRead={markNotificationRead}
-          onMarkAllRead={markAllNotificationsRead}
-          onSavePreferences={saveNotificationPreferences}
-          onCheckTrade={checkTradeNotification}
-          onAcceptRoomInvite={acceptRoomInvite}
-          onDeclineRoomInvite={declineRoomInvite}
-          onInvitePlayer={invitePlayerToRoom}
-          onCancelInvite={cancelPendingRoomInvite}
-        />
-      )}
+      <SafeOverlayBoundary>
+        {user && (
+          <PresenceNotificationsDropdown
+            currentUser={user}
+            onlineUsers={Array.isArray(onlineUsers) ? onlineUsers : []}
+            currentRoomId={room?.roomId || ''}
+            pendingRoomInvite={pendingRoomInvite || null}
+            notifications={Array.isArray(visibleNotifications) ? visibleNotifications : []}
+            preferences={notificationPrefs || {}}
+            tradeStatuses={tradeStatuses || {}}
+            unseenCount={Number(unseenNotificationCount || 0)}
+            onRefreshNotifications={loadNotifications || (() => {})}
+            onMarkRead={markNotificationRead || (() => {})}
+            onMarkAllRead={markAllNotificationsRead || (() => {})}
+            onSavePreferences={saveNotificationPreferences || (() => {})}
+            onCheckTrade={checkTradeNotification || (() => {})}
+            onAcceptRoomInvite={acceptRoomInvite || (() => {})}
+            onDeclineRoomInvite={declineRoomInvite || (() => {})}
+            onInvitePlayer={invitePlayerToRoom || (() => {})}
+            onCancelInvite={cancelPendingRoomInvite || (() => {})}
+          />
+        )}
 
-      <AppUpdateNotice />
+        <AppUpdateNotice />
+      </SafeOverlayBoundary>
+
+
 
 
       <main className="app-shell">

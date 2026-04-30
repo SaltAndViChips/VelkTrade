@@ -2862,3 +2862,29 @@ svg .chart-hover-target {
     justify-content: flex-start;
   }
 }
+
+
+/* Safe overlay fallback */
+
+.overlay-fallback {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 4000;
+  display: grid;
+  gap: 6px;
+  max-width: 240px;
+  padding: 10px;
+  border-radius: 12px;
+  background: #171522;
+  border: 1px solid var(--border-bright);
+  box-shadow: 0 18px 50px rgba(0,0,0,.55);
+}
+
+.overlay-fallback small {
+  color: var(--muted);
+}
+
+.overlay-fallback button {
+  min-height: 30px;
+}
