@@ -1,16 +1,55 @@
+function addThousandsCommas(numberText) {
+  const [whole, decimal] = String(numberText).replace(/,/g, '').split('.');
+  const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return decimal !== undefined ? `${withCommas}.${decimal}` : withCommas;
+}
+
 function formatPriceDisplay(price) {
   const clean = String(price || '').trim();
   if (!clean) return '';
 
-  if (/^\d+(\.\d+)?\s*([kmb])?$/i.test(clean)) {
-    return `${clean} IC`;
+  const withoutDollar = clean.replace(/^\$\s*/, '').trim();
+  const withoutIc = withoutDollar.replace(/\bic\b/ig, '').trim();
+
+  if (/^\d+(\.\d+)?$/.test(withoutIc.replace(/,/g, ''))) {
+    return `${addThousandsCommas(withoutIc)} IC`;
   }
 
-  if (/\bic\b/i.test(clean)) {
-    return clean.replace(/\bic\b/i, 'IC');
+  if (/^\d+(\.\d+)?\s*[kmb]$/i.test(withoutIc)) {
+    return `${withoutIc} IC`;
   }
 
-  return clean.replace(/^\$\s*/, '');
+  if (/\bic\b/i.test(withoutDollar)) {
+    return withoutDollar.replace(/\bic\b/i, 'IC');
+  }
+
+  return withoutDollar;
+}
+
+function getBackendShareBase() {
+  return (import.meta.env.VITE_API_URL || 'https://velktrade.onrender.com').replace(/\/$/, '');
+}
+
+function getFrontendProfileUrl(username) {
+  const base = import.meta.env.BASE_URL || '/';
+  const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
+  return `${window.location.origin}${cleanBase}/user/${encodeURIComponent(username)}`;
+}
+
+async function copyText(value) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const input = document.createElement('textarea');
+  input.value = value;
+  input.style.position = 'fixed';
+  input.style.opacity = '0';
+  document.body.appendChild(input);
+  input.select();
+  document.execCommand('copy');
+  document.body.removeChild(input);
 }
 
 export default function UserInventoryPage({
@@ -27,6 +66,11 @@ export default function UserInventoryPage({
   onLoginRequired,
   onToggleBuyRequest
 }) {
+  const profileUrl = userRecord ? getFrontendProfileUrl(userRecord.username) : '';
+  const discordShareUrl = userRecord
+    ? `${getBackendShareBase()}/u/${encodeURIComponent(userRecord.username)}?v=${Date.now()}`
+    : '';
+
   return (
     <section className="card">
       <div className="panel-title-row">
@@ -44,8 +88,15 @@ export default function UserInventoryPage({
         <>
           <div className="profile-header">
             <div>
-              <h3>{userRecord.username}'s Inventory {userRecord.online ? <span className="online-status">Online</span> : <span className="offline-status">Offline</span>}</h3>
-              <span className="status-pill">{items.length} item{items.length === 1 ? '' : 's'}</span>
+              <h3>
+                {userRecord.username}'s Inventory{' '}
+                {userRecord.online ? (
+                  <span className="online-status">Online</span>
+                ) : (
+                  <span className="offline-status">Offline</span>
+                )}
+              </h3>
+              <span className="status-pill">{items.length} item{items.length === 1 ? '' : 's'} listed</span>
             </div>
 
             {userRecord.bio ? (
@@ -53,6 +104,27 @@ export default function UserInventoryPage({
             ) : (
               <p className="muted">No bio yet.</p>
             )}
+
+            <div className="profile-share-box">
+              <div>
+                <strong>Share Profile</strong>
+                <p className="muted">Use the Discord link for rich previews with bio and item count.</p>
+              </div>
+
+              <div className="share-link-row">
+                <input value={profileUrl} readOnly aria-label="Profile link" />
+                <button type="button" className="ghost" onClick={() => copyText(profileUrl)}>
+                  Copy Profile Link
+                </button>
+              </div>
+
+              <div className="share-link-row">
+                <input value={discordShareUrl} readOnly aria-label="Discord share link" />
+                <button type="button" onClick={() => copyText(discordShareUrl)}>
+                  Copy Discord Share Link
+                </button>
+              </div>
+            </div>
 
             <button
               type="button"

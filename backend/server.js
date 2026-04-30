@@ -37,6 +37,95 @@ const server = http.createServer(app);
 
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
 const PORT = process.env.PORT || 3001;
+const PUBLIC_FRONTEND_URL = (process.env.PUBLIC_FRONTEND_URL || FRONTEND_ORIGIN || 'https://nicecock.ca/VelkTrade').replace(/\/$/, '');
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function profileUrl(username) {
+  return `${PUBLIC_FRONTEND_URL}/user/${encodeURIComponent(username)}`;
+}
+
+function socialPreviewImageUrl() {
+  if (PUBLIC_FRONTEND_URL.includes('nicecock.ca')) {
+    return `${PUBLIC_FRONTEND_URL}/social-preview.png`;
+  }
+
+  return 'https://nicecock.ca/VelkTrade/social-preview.png';
+}
+
+function isCrawlerRequest(req) {
+  const userAgent = String(req.get('user-agent') || '').toLowerCase();
+
+  return [
+    'discordbot',
+    'twitterbot',
+    'facebookexternalhit',
+    'facebot',
+    'slackbot',
+    'linkedinbot',
+    'telegrambot',
+    'whatsapp',
+    'embedly',
+    'quora link preview',
+    'pinterest',
+    'vkshare'
+  ].some(bot => userAgent.includes(bot));
+}
+
+function sharePageHtml({
+  req,
+  title,
+  description,
+  image,
+  destination,
+  shouldRedirect
+}) {
+  const canonicalShareUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  <meta name="theme-color" content="#8d63ff">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Salts Trading Board">
+  <meta property="og:title" content="${escapeHtml(title)}">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:url" content="${escapeHtml(canonicalShareUrl)}">
+  <meta property="og:image" content="${escapeHtml(image)}">
+  <meta property="og:image:secure_url" content="${escapeHtml(image)}">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="1200">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${escapeHtml(title)}">
+  <meta name="twitter:description" content="${escapeHtml(description)}">
+  <meta name="twitter:image" content="${escapeHtml(image)}">
+
+  <link rel="canonical" href="${escapeHtml(destination)}">
+  ${shouldRedirect ? `<meta http-equiv="refresh" content="0; url=${escapeHtml(destination)}">` : ''}
+</head>
+<body style="background:#09070f;color:#f2efff;font-family:Arial,sans-serif">
+  <main style="max-width:720px;margin:40px auto;padding:24px;border:1px solid #6f5ca8;border-radius:16px;background:#171522">
+    <h1>${escapeHtml(title)}</h1>
+    <p>${escapeHtml(description)}</p>
+    <p><a style="color:#b99dff" href="${escapeHtml(destination)}">Open profile</a></p>
+  </main>
+  ${shouldRedirect ? `<script>window.location.replace(${JSON.stringify(destination)});</script>` : ''}
+</body>
+</html>`;
+}
 
 app.use(express.json());
 app.use(cors({ origin: FRONTEND_ORIGIN }));
@@ -517,6 +606,135 @@ async function getBuyRequestRowsForUser(userId) {
   );
 }
 
+
+async function createLoginTradeSummaryNotification(userId) {
+  const rows = await all(
+    `SELECT id, status, createdAt AS "createdAt"
+     FROM trades
+     WHERE toUser = ?
+       AND status IN ('pending', 'countered', 'accepted')
+     ORDER BY createdAt DESC`,
+    [userId]
+  );
+
+  if (!rows.length) return null;
+
+  const tradeIds = rows.map(row => Number(row.id));
+
+  const notificationRows = await all(
+    `SELECT id, payload, seen, created_at
+     FROM notifications
+     WHERE user_id = ?
+       AND type IN ('offline_trade', 'counter_offer')`,
+    [userId]
+  );
+
+  const viewedTradeIds = new Set();
+
+  notificationRows.forEach(notification => {
+    const payload = parsePayload(notification.payload);
+    if (payload.tradeId && notification.seen) {
+      viewedTradeIds.add(Number(payload.tradeId));
+    }
+  });
+
+  const unviewed = rows.filter(row => !viewedTradeIds.has(Number(row.id)));
+
+  if (!unviewed.length) return null;
+
+  const newestTrade = unviewed[0];
+  const existingSummaryRows = await all(
+    `SELECT id, payload, created_at
+     FROM notifications
+     WHERE user_id = ?
+       AND type = 'trade_summary'
+     ORDER BY created_at DESC
+     LIMIT 5`,
+    [userId]
+  );
+
+  const newestSetKey = tradeIds.slice(0, 20).join(',');
+  const alreadySummarized = existingSummaryRows.some(row => {
+    const payload = parsePayload(row.payload);
+    return payload.tradeSetKey === newestSetKey && Number(payload.count || 0) === Number(unviewed.length);
+  });
+
+  if (alreadySummarized) return null;
+
+  return createNotification({
+    userId,
+    type: 'trade_summary',
+    title: 'Unviewed trade requests',
+    message: `You have ${unviewed.length} unviewed trade request${unviewed.length === 1 ? '' : 's'}.`,
+    payload: {
+      tradeId: newestTrade.id,
+      count: unviewed.length,
+      tradeIds: unviewed.map(row => Number(row.id)),
+      tradeSetKey: newestSetKey
+    }
+  });
+}
+
+
+
+app.get('/u/:username', async (req, res) => {
+  const username = normalizeUsername(req.params.username);
+  const image = socialPreviewImageUrl();
+
+  const profileUser = await get(
+    `SELECT id, username, bio
+     FROM users
+     WHERE LOWER(username) = LOWER(?)`,
+    [username]
+  );
+
+  if (!profileUser) {
+    const fallbackUrl = `${PUBLIC_FRONTEND_URL}/`;
+    const title = 'Player not found - Salts Trading Board';
+    const description = 'This VelkTrade profile could not be found.';
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
+
+    return res.status(404).send(sharePageHtml({
+      req,
+      title,
+      description,
+      image,
+      destination: fallbackUrl,
+      shouldRedirect: !isCrawlerRequest(req)
+    }));
+  }
+
+  const itemCountRow = await get(
+    `SELECT COUNT(*)::int AS count
+     FROM items
+     WHERE userId = ?`,
+    [profileUser.id]
+  );
+
+  const sellingCount = Number(itemCountRow?.count || 0);
+  const itemWord = sellingCount === 1 ? 'item' : 'items';
+  const bio = cleanBio(profileUser.bio || '');
+  const title = `${profileUser.username}'s Trading Board`;
+  const description = bio
+    ? `${bio} • Selling ${sellingCount} ${itemWord} on Salts Trading Board.`
+    : `Selling ${sellingCount} ${itemWord} on Salts Trading Board.`;
+  const destination = profileUrl(profileUser.username);
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+
+  res.send(sharePageHtml({
+    req,
+    title,
+    description,
+    image,
+    destination,
+    shouldRedirect: !isCrawlerRequest(req)
+  }));
+});
+
 app.get('/api/health', async (req, res) => {
   res.json({
     ok: true,
@@ -575,6 +793,8 @@ app.post('/api/login', async (req, res) => {
 
   const valid = await bcrypt.compare(req.body.password, user.password);
   if (!valid) return res.status(401).json({ error: 'Invalid login' });
+
+  await createLoginTradeSummaryNotification(user.id);
 
   res.json({
     token: createToken(publicUser(user)),
@@ -977,6 +1197,21 @@ app.post('/api/trades/:id/decline', authMiddleware, async (req, res) => {
   if (trade.status === 'completed') return res.status(400).json({ error: 'Completed trades cannot be declined' });
 
   await run('UPDATE trades SET status = ? WHERE id = ?', ['declined', req.params.id]);
+
+  const otherUserId = Number(trade.fromUser) === Number(req.user.id)
+    ? trade.toUser
+    : trade.fromUser;
+
+  await createNotification({
+    userId: otherUserId,
+    type: 'trade_declined',
+    title: 'Trade request declined',
+    message: `${req.user.username} declined your trade request.`,
+    payload: {
+      tradeId: Number(req.params.id),
+      fromUsername: req.user.username
+    }
+  });
 
   res.json({ ok: true });
 });
