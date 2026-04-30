@@ -23,7 +23,7 @@ import TradeOfferPanel from './components/TradeOfferPanel';
 import UserInventoryPage from './components/UserInventoryPage';
 import Bazaar from './components/Bazaar';
 import Notifications from './components/Notifications';
-import SafeOnlinePlayersDropdown from './components/SafeOnlinePlayersDropdown.jsx';
+import PresenceHub from './components/PresenceHub.jsx';
 
 function parseDraggedItemId(active) {
   const dataItemId = active?.data?.current?.itemId;
@@ -1050,21 +1050,10 @@ previousRoomPlayerIdsRef.current = nextIds;
       onDragCancel={() => setActiveDragItem(null)}
     >
       {user && (
-        <SafeOnlinePlayersDropdown
+        <PresenceHub
           currentUser={user}
           onlineUsers={Array.isArray(onlineUsers) ? onlineUsers : []}
           currentRoomId={room?.roomId || ''}
-          notifications={[]}
-          preferences={{}}
-          tradeStatuses={{}}
-          unseenCount={0}
-          onRefreshNotifications={() => {}}
-          onMarkRead={() => {}}
-          onMarkAllRead={() => {}}
-          onSavePreferences={() => {}}
-          onCheckTrade={() => {}}
-          onAcceptRoomInvite={() => {}}
-          onDeclineRoomInvite={() => {}}
           onInvitePlayer={typeof invitePlayerToRoom !== 'undefined' ? invitePlayerToRoom : (() => {})}
         />
       )}

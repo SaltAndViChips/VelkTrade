@@ -19,6 +19,8 @@ function isProtectedDeveloperUser(userOrUsername) {
   return Boolean(
     userOrUsername?.is_developer ||
     userOrUsername?.isDeveloper ||
+    userOrUsername?.role === 'developer' ||
+    userOrUsername?.highestBadge === 'developer' ||
     isDeveloperUsername(userOrUsername?.username)
   );
 }
@@ -27,6 +29,7 @@ function isAdminUser(user) {
   return Boolean(
     user?.is_admin ||
     user?.isAdmin ||
+    user?.role === 'admin' ||
     isProtectedDeveloperUser(user)
   );
 }
@@ -35,15 +38,9 @@ function publicUser(user) {
   if (!user) return null;
 
   const isDeveloper = isProtectedDeveloperUser(user);
-  const isAdmin = Boolean(user.is_admin || user.isAdmin || isDeveloper);
-  const isVerified = Boolean(user.is_verified || user.isVerified);
-  const highestBadge = isDeveloper
-    ? 'developer'
-    : isAdmin
-      ? 'admin'
-      : isVerified
-        ? 'trusted'
-        : 'none';
+  const isAdmin = Boolean(user.is_admin || user.isAdmin || user.role === 'admin' || isDeveloper);
+  const isVerified = Boolean(user.is_verified || user.isVerified || user.isTrusted || user.role === 'verified');
+  const highestBadge = isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'verified' : 'none';
 
   return {
     id: user.id,
@@ -52,6 +49,7 @@ function publicUser(user) {
     isVerified,
     isTrusted: isVerified,
     isDeveloper,
+    role: highestBadge,
     highestBadge,
     bio: user.bio || '',
     showBazaarInventory: user.show_bazaar_inventory !== false && user.showBazaarInventory !== false,

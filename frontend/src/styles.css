@@ -3647,3 +3647,258 @@ svg .chart-hover-target {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* PresenceHub rewrite - replaces old safe-online dropdown */
+
+.presence-hub {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 3600;
+}
+
+.presence-hub-trigger {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 12px;
+  color: #f2efff;
+  font-size: 23px;
+  line-height: 1;
+  background:
+    radial-gradient(circle at top left, rgba(141, 99, 255, 0.28), transparent 38%),
+    linear-gradient(180deg, #241e35, #11101a);
+  border: 1px solid var(--border-bright);
+  box-shadow: 0 16px 44px rgba(0,0,0,.42);
+}
+
+.presence-hub-trigger > span,
+.presence-mini-count {
+  min-width: 19px;
+  height: 19px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  padding: 0 5px;
+  background: #e15d71;
+  color: white;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.presence-hub-trigger > span {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  border: 1px solid rgba(255,255,255,.55);
+}
+
+.presence-hub-panel {
+  position: absolute;
+  top: 52px;
+  right: 0;
+  width: min(390px, calc(100vw - 28px));
+  max-height: min(680px, calc(100vh - 72px));
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(141, 99, 255, 0.18), transparent 34%),
+    linear-gradient(180deg, #171522, #100f18);
+  border: 1px solid var(--border-bright);
+  box-shadow: 0 24px 70px rgba(0,0,0,.64);
+}
+
+.presence-hub-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.presence-hub-tabs button {
+  min-height: 36px;
+  box-shadow: none;
+  background: rgba(8, 7, 12, 0.42);
+  border: 1px solid var(--border);
+}
+
+.presence-hub-tabs button.active {
+  background: var(--purple-soft);
+  border-color: var(--border-bright);
+}
+
+.presence-status-line {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.presence-hub-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  color: #ded8ff;
+}
+
+.presence-player-list,
+.presence-notification-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 10px;
+}
+
+.presence-player-row,
+.presence-notification-row {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 13px;
+  background: rgba(8, 7, 12, 0.44);
+  border: 1px solid var(--border);
+}
+
+.presence-player-info {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.presence-player-info strong {
+  overflow-wrap: anywhere;
+}
+
+.presence-player-info small {
+  width: 100%;
+  margin-left: 17px;
+  color: var(--muted);
+}
+
+.presence-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #62d18a;
+  box-shadow: 0 0 14px rgba(98, 209, 138, 0.58);
+}
+
+.presence-dot.away {
+  background: #d7b55e;
+  box-shadow: 0 0 14px rgba(215, 181, 94, 0.58);
+}
+
+.presence-role-icon {
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 900;
+  border: 1px solid rgba(222, 216, 255, 0.35);
+  background: rgba(8, 7, 12, 0.52);
+}
+
+.presence-role-icon.developer {
+  color: #e7ddff;
+  background: rgba(141, 99, 255, 0.26);
+  border-color: rgba(177, 151, 255, 0.62);
+}
+
+.presence-role-icon.admin {
+  color: #fff3c2;
+  background: rgba(95, 74, 28, 0.30);
+  border-color: rgba(215, 181, 94, 0.48);
+}
+
+.presence-role-icon.verified {
+  color: #d9ffe5;
+  background: rgba(32, 94, 59, 0.28);
+  border-color: rgba(98, 209, 138, 0.48);
+}
+
+.presence-player-actions,
+.presence-notification-buttons,
+.presence-notification-actions,
+.presence-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.presence-player-actions button {
+  flex: 1 1 120px;
+}
+
+.presence-settings-card {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 13px;
+  background: rgba(8, 7, 12, 0.34);
+  border: 1px solid var(--border);
+}
+
+.presence-settings-card label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.presence-volume-row {
+  grid-template-columns: 1fr !important;
+}
+
+.presence-volume-row input {
+  width: 100%;
+}
+
+.presence-notification-row.read {
+  opacity: 0.72;
+}
+
+.presence-notification-row p {
+  margin: 4px 0;
+  color: var(--muted);
+}
+
+@media (max-width: 520px) {
+  .presence-hub {
+    top: 10px;
+    right: 10px;
+  }
+
+  .presence-hub-panel {
+    width: calc(100vw - 20px);
+  }
+}
+
+
+/* Presence/Admin fixups */
+
+.presence-role-icon {
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+}
+
+.admin-raw-json {
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(0,0,0,.28);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+}

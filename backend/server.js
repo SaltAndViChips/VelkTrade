@@ -17,18 +17,57 @@ function isProtectedDeveloperAccount(value) {
   return isProtectedDeveloperUser(value);
 }
 
-function isRequesterDeveloper(user) {
-  return isProtectedDeveloperUser(user);
+function isSameUser(left, right) {
+  if (!left || !right) return false;
+  if (left.id && right.id && Number(left.id) === Number(right.id)) return true;
+  return String(left.username || '').trim().toLowerCase() === String(right.username || '').trim().toLowerCase();
 }
 
-function canModifyDeveloperTarget(requester, target) {
+function canModifyDeveloperTarget(requester, target, { allowSelf = false } = {}) {
   if (!isProtectedDeveloperUser(target)) return true;
-  return isRequesterDeveloper(requester);
+  if (allowSelf && isSameUser(requester, target)) return true;
+  return isProtectedDeveloperUser(requester);
 }
 
 function developerAwareUser(user) {
   return publicUser(user);
 }
+
+function presenceStatusForUser(user) {
+  const raw = user?.status || user?.presence || user?.activity || user?.currentView || user?.view || user?.location || 'online';
+  const normalized = String(raw || 'online').toLowerCase();
+
+  if (normalized.includes('trade') || user?.roomId || user?.currentRoomId) return 'trade';
+  if (normalized.includes('bazaar')) return 'bazaar';
+  if (normalized.includes('away')) return 'away';
+  return 'online';
+}
+
+function onlineUserPayload(user) {
+  const base = developerAwareUser(user);
+  const status = presenceStatusForUser(user);
+  const now = Date.now();
+  const statusSince = user?.statusSince || user?.status_since || user?.awaySince || user?.away_since || user?.last_seen_at || now;
+  const sinceMs = typeof statusSince === 'number' ? statusSince : new Date(statusSince).getTime();
+
+  return {
+    ...base,
+    status,
+    presence: status,
+    statusSince: Number.isFinite(sinceMs) ? sinceMs : now,
+    awayForMs: status === 'away' ? Math.max(0, now - (Number.isFinite(sinceMs) ? sinceMs : now)) : 0,
+    roomId: user?.roomId || user?.currentRoomId || null
+  };
+}
+
+
+
+
+function isRequesterDeveloper(user) {
+  return isProtectedDeveloperUser(user);
+}
+
+
 
 
 
@@ -137,26 +176,7 @@ async function hydrateOnlinePresenceUser(userId, fallbackUser) {
 function onlineUserList() {
   return Array.from(onlineUsers.values())
     .filter(user => user.showOnline !== false)
-    .map(user => {
-      const isDeveloper = isProtectedDeveloperUser(user);
-      const isAdmin = Boolean(isDeveloper || user.isAdmin || user.is_admin);
-      const isVerified = Boolean(user.isVerified || user.is_verified);
-      const now = Date.now();
-      const since = user.statusSince || now;
-
-      return {
-        id: user.id,
-        username: user.username,
-        isDeveloper,
-        isAdmin,
-        isVerified,
-        isTrusted: isVerified,
-        highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'trusted' : 'none',
-        status: user.status || 'online',
-        statusSince: since,
-        awayForMs: (user.status || 'online') === 'away' ? Math.max(0, now - since) : 0
-      };
-    });
+    .map(user => onlineUserPayload(user));
 }
 
 function socketRoomForUser(userId) {
@@ -1709,6 +1729,7 @@ app.delete('/api/bazaar/items/:id/interest', authMiddleware, async (req, res) =>
 
 
 
+
 app.get('/api/online-users', authMiddleware, async (req, res) => {
   const socketUsers = onlineUserList();
 
@@ -1731,25 +1752,11 @@ app.get('/api/online-users', authMiddleware, async (req, res) => {
   );
 
   res.json({
-    users: rows.map(row => {
-      const isDeveloper = isProtectedDeveloperUser(row);
-      const isAdmin = Boolean(row.is_admin || isDeveloper);
-      const isVerified = Boolean(row.is_verified);
-      const since = row.last_seen_at ? new Date(row.last_seen_at).getTime() : Date.now();
-
-      return {
-        id: row.id,
-        username: row.username,
-        isDeveloper,
-        isAdmin,
-        isVerified,
-        isTrusted: isVerified,
-        highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'trusted' : 'none',
-        status: 'online',
-        statusSince: since,
-        awayForMs: 0
-      };
-    })
+    users: rows.map(row => onlineUserPayload({
+      ...row,
+      status: 'online',
+      statusSince: row.last_seen_at || Date.now()
+    }))
   });
 });
 

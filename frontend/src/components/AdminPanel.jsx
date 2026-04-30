@@ -32,7 +32,11 @@ function isVerifiedUser(user) {
 
 function canModifyUser(currentUser, targetUser) {
   if (!isDeveloperUser(targetUser)) return true;
-  return isDeveloperUser(currentUser);
+
+  const sameId = currentUser?.id && targetUser?.id && Number(currentUser.id) === Number(targetUser.id);
+  const sameName = String(currentUser?.username || '').trim().toLowerCase() === String(targetUser?.username || '').trim().toLowerCase();
+
+  return Boolean(isDeveloperUser(currentUser) || sameId || sameName);
 }
 
 function normalizeUser(user) {
@@ -58,6 +62,52 @@ function UserBadge({ user }) {
   if (isVerifiedUser(user)) return <span className="verified-label-badge">✓ Verified</span>;
   return <span className="user-badge">User</span>;
 }
+
+
+function normalizeTradeItems(trade) {
+  const directItems = [
+    ...(Array.isArray(trade?.items) ? trade.items : []),
+    ...(Array.isArray(trade?.offeredItems) ? trade.offeredItems : []),
+    ...(Array.isArray(trade?.requestedItems) ? trade.requestedItems : []),
+    ...(Array.isArray(trade?.offer_items) ? trade.offer_items : []),
+    ...(Array.isArray(trade?.request_items) ? trade.request_items : [])
+  ];
+
+  if (directItems.length) return directItems;
+
+  for (const key of ['itemSummary', 'itemsSummary', 'summary', 'details']) {
+    if (typeof trade?.[key] === 'string' && trade[key].trim()) {
+      return [{ name: trade[key] }];
+    }
+  }
+
+  return [];
+}
+
+function normalizeTradeChat(trade) {
+  const directChat = trade?.chat || trade?.messages || trade?.chatLog || trade?.chat_log || trade?.logs || trade?.log;
+  if (Array.isArray(directChat)) return directChat;
+
+  if (typeof directChat === 'string' && directChat.trim()) {
+    try {
+      const parsed = JSON.parse(directChat);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      return [{ username: 'Log', message: directChat }];
+    }
+  }
+
+  return [];
+}
+
+function renderUnknownTradeShape(trade) {
+  return (
+    <pre className="admin-raw-json">
+      {JSON.stringify(trade, null, 2)}
+    </pre>
+  );
+}
+
 
 function getTradeSummary(trade) {
   const items = [...(trade?.items || []), ...(trade?.offeredItems || []), ...(trade?.requestedItems || [])];
@@ -362,8 +412,8 @@ export default function AdminPanel({ currentUser, user }) {
             {trades.map((trade, index) => {
               const tradeId = trade.id || trade.tradeId || index;
               const expanded = expandedTradeIds.has(tradeId);
-              const chat = trade.chat || trade.messages || trade.chatLog || [];
-              const items = [...(trade.items || []), ...(trade.offeredItems || []), ...(trade.requestedItems || [])];
+              const chat = normalizeTradeChat(trade);
+              const items = normalizeTradeItems(trade);
               return (
                 <article className="admin-trade-card" key={tradeId}>
                   <button type="button" className="admin-trade-summary" onClick={() => toggleTrade(tradeId)}>
@@ -381,7 +431,7 @@ export default function AdminPanel({ currentUser, user }) {
                       </div>
                       <div>
                         <h3>Chat Log</h3>
-                        {chat.length === 0 ? <p className="muted">No chat messages.</p> : (
+                        {chat.length === 0 ? <><p className="muted">No chat messages.</p>{renderUnknownTradeShape(trade)}</> : (
                           <ul>{chat.map((messageItem, chatIndex) => <li key={`${tradeId}-chat-${chatIndex}`}><strong>{messageItem.username || messageItem.author || 'System'}:</strong> {messageItem.message || messageItem.text || ''}</li>)}</ul>
                         )}
                       </div>
