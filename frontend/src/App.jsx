@@ -23,7 +23,7 @@ import TradeOfferPanel from './components/TradeOfferPanel';
 import UserInventoryPage from './components/UserInventoryPage';
 import Bazaar from './components/Bazaar';
 import Notifications from './components/Notifications';
-import PresenceHub from './components/PresenceHub.jsx';
+import UnifiedPlayerMenu from './components/UnifiedPlayerMenu.jsx';
 
 function parseDraggedItemId(active) {
   const dataItemId = active?.data?.current?.itemId;
@@ -1050,7 +1050,7 @@ previousRoomPlayerIdsRef.current = nextIds;
       onDragCancel={() => setActiveDragItem(null)}
     >
       {user && (
-        <PresenceHub
+        <UnifiedPlayerMenu
           currentUser={user}
           onlineUsers={Array.isArray(onlineUsers) ? onlineUsers : []}
           currentRoomId={room?.roomId || ''}

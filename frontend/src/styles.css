@@ -4187,3 +4187,335 @@ svg .chart-hover-target {
   overflow-wrap: anywhere;
   color: var(--muted);
 }
+
+
+/* Hide obsolete player menus completely. The only active one should be UnifiedPlayerMenu. */
+.safe-online-dropdown,
+.presence-hub {
+  display: none !important;
+}
+
+/* UnifiedPlayerMenu */
+
+.unified-player-menu {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 3900;
+}
+
+.unified-player-trigger {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 13px;
+  color: #f2efff;
+  font-size: 24px;
+  line-height: 1;
+  background:
+    radial-gradient(circle at top left, rgba(141, 99, 255, 0.32), transparent 38%),
+    linear-gradient(180deg, #241e35, #11101a);
+  border: 1px solid var(--border-bright);
+  box-shadow: 0 16px 44px rgba(0,0,0,.42);
+}
+
+.unified-player-trigger > span,
+.unified-mini-count {
+  min-width: 19px;
+  height: 19px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  padding: 0 5px;
+  background: #e15d71;
+  color: white;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.unified-player-trigger > span {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  border: 1px solid rgba(255,255,255,.55);
+}
+
+.unified-player-panel {
+  position: absolute;
+  top: 54px;
+  right: 0;
+  width: min(430px, calc(100vw - 28px));
+  max-height: min(720px, calc(100vh - 76px));
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(141, 99, 255, 0.18), transparent 34%),
+    linear-gradient(180deg, #171522, #100f18);
+  border: 1px solid var(--border-bright);
+  box-shadow: 0 24px 70px rgba(0,0,0,.64);
+}
+
+.unified-player-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.unified-player-tabs button {
+  min-height: 38px;
+  box-shadow: none;
+  background: rgba(8, 7, 12, 0.42);
+  border: 1px solid var(--border);
+}
+
+.unified-player-tabs button.active {
+  background: var(--purple-soft);
+  border-color: var(--border-bright);
+}
+
+.unified-menu-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  color: #ded8ff;
+}
+
+.unified-player-list,
+.unified-notification-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.unified-player-card,
+.unified-notification-card {
+  display: grid;
+  gap: 10px;
+  padding: 11px;
+  border-radius: 14px;
+  background: rgba(8, 7, 12, 0.44);
+  border: 1px solid var(--border);
+}
+
+.unified-player-main {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.unified-player-main small {
+  width: 100%;
+  margin-left: 18px;
+  color: var(--muted);
+}
+
+.unified-presence-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #62d18a;
+  box-shadow: 0 0 14px rgba(98, 209, 138, 0.58);
+}
+
+.unified-presence-dot.away {
+  background: #d7b55e;
+  box-shadow: 0 0 14px rgba(215, 181, 94, 0.58);
+}
+
+.unified-role-icon {
+  width: 23px;
+  height: 23px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 900;
+  border: 1px solid rgba(222, 216, 255, 0.35);
+  background: rgba(8, 7, 12, 0.52);
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+}
+
+.unified-role-icon.developer {
+  color: #e7ddff;
+  background: rgba(141, 99, 255, 0.26);
+  border-color: rgba(177, 151, 255, 0.62);
+}
+
+.unified-role-icon.admin {
+  color: #fff3c2;
+  background: rgba(95, 74, 28, 0.30);
+  border-color: rgba(215, 181, 94, 0.48);
+}
+
+.unified-role-icon.verified {
+  color: #d9ffe5;
+  background: rgba(32, 94, 59, 0.28);
+  border-color: rgba(98, 209, 138, 0.48);
+}
+
+.unified-player-actions,
+.unified-notification-buttons,
+.unified-notification-actions,
+.unified-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.unified-player-actions button {
+  flex: 1 1 130px;
+}
+
+.unified-settings-card {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 13px;
+  background: rgba(8, 7, 12, 0.34);
+  border: 1px solid var(--border);
+}
+
+.unified-settings-card label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.unified-volume-row {
+  grid-template-columns: 1fr !important;
+}
+
+.unified-volume-row input {
+  width: 100%;
+}
+
+/* Legible admin trade logs */
+
+.admin-trade-details {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(320px, 1fr) minmax(320px, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding: 14px;
+}
+
+.admin-trade-meta,
+.admin-trade-side,
+.admin-trade-chat,
+.admin-raw-trade-details {
+  min-width: 0;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(8, 7, 12, 0.36);
+  border: 1px solid var(--border);
+}
+
+.admin-trade-chat,
+.admin-raw-trade-details {
+  grid-column: 1 / -1;
+}
+
+.admin-trade-side ul,
+.admin-chat-log {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-trade-side li {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 84px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(8, 7, 12, 0.42);
+  border: 1px solid var(--border);
+}
+
+.admin-trade-item-thumb {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border-bright);
+}
+
+.admin-trade-side li span {
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+  font-weight: 800;
+}
+
+.admin-ic-line {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 5px 11px;
+  color: #fff3c2;
+  background: rgba(95, 74, 28, 0.30);
+  border: 1px solid rgba(215, 181, 94, 0.48);
+  font-weight: 900;
+}
+
+.admin-chat-log li {
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(8, 7, 12, 0.42);
+  border: 1px solid var(--border);
+}
+
+.admin-chat-log small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.admin-raw-trade-details summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.admin-raw-trade-details pre {
+  max-height: 300px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+
+@media (max-width: 1000px) {
+  .admin-trade-details {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-trade-chat,
+  .admin-raw-trade-details {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 520px) {
+  .unified-player-menu {
+    top: 10px;
+    right: 10px;
+  }
+
+  .unified-player-panel {
+    width: calc(100vw - 20px);
+  }
+}
