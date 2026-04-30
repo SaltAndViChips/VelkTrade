@@ -142,6 +142,9 @@ async function markUserSeen(userId) {
 
 
 
+
+
+
 function parseValidIcPrice(value) {
   const clean = String(value || '').trim();
 
@@ -178,93 +181,6 @@ function normalizeBazaarItem(row, viewerId) {
   };
 }
 
-async function getExistingColumns(tableName) {
-  try {
-    const rows = await all(
-      `SELECT column_name AS "columnName"
-       FROM information_schema.columns
-       WHERE table_schema = 'public'
-         AND table_name = ?`,
-      [tableName]
-    );
-
-    return rows.map(row => row.columnName || row.columnname);
-  } catch {
-    return [];
-  }
-}
-
-async function getBazaarInterestSchema() {
-  const buyRequestColumns = await getExistingColumns('buy_requests');
-
-  if (buyRequestColumns.length) {
-    if (
-      buyRequestColumns.includes('item_id') &&
-      buyRequestColumns.includes('requester_id') &&
-      buyRequestColumns.includes('owner_id')
-    ) {
-      return {
-        table: 'buy_requests',
-        itemColumn: 'item_id',
-        requesterColumn: 'requester_id',
-        ownerColumn: 'owner_id',
-        quoted: false
-      };
-    }
-
-    if (
-      buyRequestColumns.includes('itemId') &&
-      buyRequestColumns.includes('requesterId') &&
-      buyRequestColumns.includes('ownerId')
-    ) {
-      return {
-        table: 'buy_requests',
-        itemColumn: 'itemId',
-        requesterColumn: 'requesterId',
-        ownerColumn: 'ownerId',
-        quoted: true
-      };
-    }
-  }
-
-  const itemBuyRequestColumns = await getExistingColumns('item_buy_requests');
-
-  if (itemBuyRequestColumns.length) {
-    if (
-      itemBuyRequestColumns.includes('itemId') &&
-      itemBuyRequestColumns.includes('userId')
-    ) {
-      return {
-        table: 'item_buy_requests',
-        itemColumn: 'itemId',
-        requesterColumn: 'userId',
-        ownerColumn: null,
-        quoted: true
-      };
-    }
-
-    if (
-      itemBuyRequestColumns.includes('item_id') &&
-      itemBuyRequestColumns.includes('user_id')
-    ) {
-      return {
-        table: 'item_buy_requests',
-        itemColumn: 'item_id',
-        requesterColumn: 'user_id',
-        ownerColumn: null,
-        quoted: false
-      };
-    }
-  }
-
-  return null;
-}
-
-function quoteIdentifier(identifier) {
-  return `"${String(identifier).replace(/"/g, '""')}"`;
-}
-
-
 async function isCurrentUserAdminForBazaar(user) {
   if (user?.isAdmin || user?.is_admin) return true;
 
@@ -285,9 +201,81 @@ async function isCurrentUserAdminForBazaar(user) {
   }
 }
 
-function schemaColumn(schema, column) {
-  if (!schema || !column) return null;
-  return schema.quoted ? quoteIdentifier(column) : column;
+async function getBazaarItemForInterest(itemId, userId) {
+  const item = await get(
+    `SELECT id, userId
+     FROM items
+     WHERE id = ?`,
+    [itemId]
+  );
+
+  if (!item) {
+    const error = new Error('Item not found');
+    error.status = 404;
+    throw error;
+  }
+
+  if (Number(item.userId) === Number(userId)) {
+    const error = new Error('You cannot mark interest in your own item');
+    error.status = 400;
+    throw error;
+  }
+
+  return item;
+}
+
+async function bazaarInterestExists(itemId, userId) {
+  return get(
+    `SELECT 1
+     FROM buy_requests
+     WHERE item_id = ? AND requester_id = ?
+     LIMIT 1`,
+    [itemId, userId]
+  );
+}
+
+async function addBazaarInterest(itemId, user) {
+  const item = await getBazaarItemForInterest(itemId, user.id);
+  const existing = await bazaarInterestExists(itemId, user.id);
+
+  if (!existing) {
+    await run(
+      `INSERT INTO buy_requests (item_id, requester_id, owner_id)
+       VALUES (?, ?, ?)
+       ON CONFLICT (item_id, requester_id) DO NOTHING`,
+      [itemId, user.id, item.userId]
+    );
+  }
+
+  return { ok: true, interested: true };
+}
+
+async function removeBazaarInterest(itemId, user) {
+  await run(
+    `DELETE FROM buy_requests
+     WHERE item_id = ? AND requester_id = ?`,
+    [itemId, user.id]
+  );
+
+  return { ok: true, interested: false };
+}
+
+async function toggleBazaarInterest(itemId, user) {
+  await getBazaarItemForInterest(itemId, user.id);
+
+  const existing = await bazaarInterestExists(itemId, user.id);
+
+  if (existing) {
+    return removeBazaarInterest(itemId, user);
+  }
+
+  return addBazaarInterest(itemId, user);
+}
+
+async function handleBazaarInterestError(res, error) {
+  res.status(error.status || 500).json({
+    error: error.message || 'Could not update Bazaar interest'
+  });
 }
 
 function normalizeNotification(row) {
@@ -1507,123 +1495,7 @@ app.post('/api/admin/reset-password', authMiddleware, requireAdmin, async (req, 
 
 
 
-async function getBazaarItemForInterest(itemId, userId) {
-  const item = await get(
-    `SELECT id, userId
-     FROM items
-     WHERE id = ?`,
-    [itemId]
-  );
 
-  if (!item) {
-    const error = new Error('Item not found');
-    error.status = 404;
-    throw error;
-  }
-
-  if (Number(item.userId) === Number(userId)) {
-    const error = new Error('You cannot mark interest in your own item');
-    error.status = 400;
-    throw error;
-  }
-
-  return item;
-}
-
-async function bazaarInterestExists(schema, itemId, userId) {
-  const itemColumn = schemaColumn(schema, schema.itemColumn);
-  const requesterColumn = schemaColumn(schema, schema.requesterColumn);
-
-  return get(
-    `SELECT 1
-     FROM ${schema.table}
-     WHERE ${itemColumn} = ? AND ${requesterColumn} = ?
-     LIMIT 1`,
-    [itemId, userId]
-  );
-}
-
-async function addBazaarInterest(itemId, user) {
-  const interestSchema = await getBazaarInterestSchema();
-
-  if (!interestSchema) {
-    const error = new Error('Buy request table is not available yet. Redeploy backend to run migrations.');
-    error.status = 500;
-    throw error;
-  }
-
-  const item = await getBazaarItemForInterest(itemId, user.id);
-  const existing = await bazaarInterestExists(interestSchema, itemId, user.id);
-
-  if (existing) {
-    return { ok: true, interested: true };
-  }
-
-  const itemColumn = schemaColumn(interestSchema, interestSchema.itemColumn);
-  const requesterColumn = schemaColumn(interestSchema, interestSchema.requesterColumn);
-  const ownerColumn = schemaColumn(interestSchema, interestSchema.ownerColumn);
-
-  if (ownerColumn) {
-    await run(
-      `INSERT INTO ${interestSchema.table} (${itemColumn}, ${requesterColumn}, ${ownerColumn})
-       VALUES (?, ?, ?)`,
-      [itemId, user.id, item.userId]
-    );
-  } else {
-    await run(
-      `INSERT INTO ${interestSchema.table} (${itemColumn}, ${requesterColumn})
-       VALUES (?, ?)`,
-      [itemId, user.id]
-    );
-  }
-
-  return { ok: true, interested: true };
-}
-
-async function removeBazaarInterest(itemId, user) {
-  const interestSchema = await getBazaarInterestSchema();
-
-  if (!interestSchema) {
-    return { ok: true, interested: false };
-  }
-
-  const itemColumn = schemaColumn(interestSchema, interestSchema.itemColumn);
-  const requesterColumn = schemaColumn(interestSchema, interestSchema.requesterColumn);
-
-  await run(
-    `DELETE FROM ${interestSchema.table}
-     WHERE ${itemColumn} = ? AND ${requesterColumn} = ?`,
-    [itemId, user.id]
-  );
-
-  return { ok: true, interested: false };
-}
-
-async function toggleBazaarInterest(itemId, user) {
-  const interestSchema = await getBazaarInterestSchema();
-
-  if (!interestSchema) {
-    const error = new Error('Buy request table is not available yet. Redeploy backend to run migrations.');
-    error.status = 500;
-    throw error;
-  }
-
-  await getBazaarItemForInterest(itemId, user.id);
-
-  const existing = await bazaarInterestExists(interestSchema, itemId, user.id);
-
-  if (existing) {
-    return removeBazaarInterest(itemId, user);
-  }
-
-  return addBazaarInterest(itemId, user);
-}
-
-async function handleBazaarInterestError(res, error) {
-  res.status(error.status || 500).json({
-    error: error.message || 'Could not update Bazaar interest'
-  });
-}
 
 
 app.get('/api/bazaar', authMiddleware, async (req, res) => {
@@ -1633,24 +1505,7 @@ app.get('/api/bazaar', authMiddleware, async (req, res) => {
   const min = req.query.min !== undefined && req.query.min !== '' ? Number(req.query.min) : null;
   const max = req.query.max !== undefined && req.query.max !== '' ? Number(req.query.max) : null;
   const minInterest = req.query.minInterest !== undefined && req.query.minInterest !== '' ? Number(req.query.minInterest) : null;
-  const interestSchema = await getBazaarInterestSchema();
   const viewerIsAdmin = await isCurrentUserAdminForBazaar(req.user);
-
-  let interestSelect = `0::int AS "interestCount", 0::int AS "viewerInterested"`;
-  let interestJoin = '';
-
-  if (interestSchema) {
-    const itemColumn = schemaColumn(interestSchema, interestSchema.itemColumn);
-    const requesterColumn = schemaColumn(interestSchema, interestSchema.requesterColumn);
-
-    interestJoin = `
-     LEFT JOIN ${interestSchema.table} AS br ON br.${itemColumn} = items.id
-     LEFT JOIN users AS interested_users ON interested_users.id = br.${requesterColumn}`;
-
-    interestSelect = `
-      COALESCE(COUNT(CASE WHEN interested_users.is_verified = TRUE THEN br.id END), 0)::int AS "interestCount",
-      COALESCE(MAX(CASE WHEN br.${requesterColumn} = ? THEN 1 ELSE 0 END), 0)::int AS "viewerInterested"`;
-  }
 
   const rows = await all(
     `SELECT
@@ -1662,15 +1517,17 @@ app.get('/api/bazaar', authMiddleware, async (req, res) => {
       items.userId AS "ownerId",
       users.username AS "ownerUsername",
       COALESCE(users.is_verified, FALSE) AS "ownerVerified",
-      ${interestSelect}
+      COALESCE(COUNT(CASE WHEN interested_users.is_verified = TRUE THEN buy_requests.id END), 0)::int AS "interestCount",
+      COALESCE(MAX(CASE WHEN buy_requests.requester_id = ? THEN 1 ELSE 0 END), 0)::int AS "viewerInterested"
      FROM items
      JOIN users ON users.id = items.userId
-     ${interestJoin}
+     LEFT JOIN buy_requests ON buy_requests.item_id = items.id
+     LEFT JOIN users AS interested_users ON interested_users.id = buy_requests.requester_id
      WHERE COALESCE(users.show_bazaar_inventory, TRUE) = TRUE
        AND COALESCE(users.last_seen_at, NOW()) >= NOW() - INTERVAL '7 days'
      GROUP BY items.id, items.title, items.image, items.price, items.createdAt, items.userId, users.username, users.is_verified
      ORDER BY COALESCE(items.createdAt, NOW()) DESC`,
-    interestSchema ? [req.user.id] : []
+    [req.user.id]
   );
 
   let items = rows
@@ -1743,7 +1600,6 @@ app.get('/api/bazaar', authMiddleware, async (req, res) => {
     })
   });
 });
-
 
 app.get('/api/bazaar/items/:id/interest', authMiddleware, async (req, res) => {
   try {

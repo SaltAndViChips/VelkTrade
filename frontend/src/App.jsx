@@ -970,7 +970,7 @@ export default function App() {
 
   if (!user && view === 'login') {
     return (
-      <AppUpdateNotice />
+    <>
       {user && (
         <OnlinePlayersSidebar
           currentUser={user}
@@ -980,6 +980,7 @@ export default function App() {
         />
       )}
 
+      <AppUpdateNotice />
       <main className="app-shell">
         {loginRequiredMessage && <p className="error">{loginRequiredMessage}</p>}
         <AuthForm onLogin={setUser} />

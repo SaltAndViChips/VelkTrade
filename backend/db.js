@@ -154,6 +154,105 @@ async function initDb() {
     ADD COLUMN IF NOT EXISTS non_verified_notifications BOOLEAN DEFAULT FALSE
   `);
 
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS buy_requests (
+      id SERIAL PRIMARY KEY,
+      item_id INTEGER,
+      requester_id INTEGER,
+      owner_id INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    ALTER TABLE buy_requests
+    ADD COLUMN IF NOT EXISTS item_id INTEGER
+  `);
+
+  await pool.query(`
+    ALTER TABLE buy_requests
+    ADD COLUMN IF NOT EXISTS requester_id INTEGER
+  `);
+
+  await pool.query(`
+    ALTER TABLE buy_requests
+    ADD COLUMN IF NOT EXISTS owner_id INTEGER
+  `);
+
+  await pool.query(`
+    ALTER TABLE buy_requests
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()
+  `);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'buy_requests'
+          AND column_name = 'itemId'
+      ) THEN
+        EXECUTE 'UPDATE buy_requests SET item_id = COALESCE(item_id, "itemId") WHERE item_id IS NULL';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'buy_requests'
+          AND column_name = 'requesterId'
+      ) THEN
+        EXECUTE 'UPDATE buy_requests SET requester_id = COALESCE(requester_id, "requesterId") WHERE requester_id IS NULL';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'buy_requests'
+          AND column_name = 'ownerId'
+      ) THEN
+        EXECUTE 'UPDATE buy_requests SET owner_id = COALESCE(owner_id, "ownerId") WHERE owner_id IS NULL';
+      END IF;
+    END
+    $$;
+  `);
+
+  await pool.query(`
+    UPDATE buy_requests
+    SET owner_id = items.userId
+    FROM items
+    WHERE buy_requests.owner_id IS NULL
+      AND buy_requests.item_id = items.id
+  `);
+
+  await pool.query(`
+    DELETE FROM buy_requests
+    WHERE item_id IS NULL
+       OR requester_id IS NULL
+       OR owner_id IS NULL
+  `);
+
+  await pool.query(`
+    ALTER TABLE buy_requests
+    ALTER COLUMN item_id SET NOT NULL
+  `);
+
+  await pool.query(`
+    ALTER TABLE buy_requests
+    ALTER COLUMN requester_id SET NOT NULL
+  `);
+
+  await pool.query(`
+    ALTER TABLE buy_requests
+    ALTER COLUMN owner_id SET NOT NULL
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS buy_requests_item_requester_unique
+    ON buy_requests (item_id, requester_id)
+  `);
+
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_unique
     ON users (LOWER(username))
