@@ -112,6 +112,9 @@ async function markUserSeen(userId) {
   }
 }
 
+
+
+
 function parseValidIcPrice(value) {
   const clean = String(value || '').trim();
 
@@ -119,8 +122,7 @@ function parseValidIcPrice(value) {
     return null;
   }
 
-  const numberText = clean.replace(/\s*IC$/i, '').replace(/,/g, '');
-  const amount = Number(numberText);
+  const amount = Number(clean.replace(/\s*IC$/i, '').replace(/,/g, ''));
 
   if (!Number.isFinite(amount) || amount < 0) {
     return null;
@@ -141,13 +143,13 @@ function normalizeBazaarItem(row, viewerId) {
     priceAmount,
     createdAt: row.createdAt ?? row.createdat,
     ownerId: row.ownerId ?? row.ownerid,
+    ownerUsername: row.ownerUsername ?? row.ownerusername,
+    ownerVerified: Boolean(row.ownerVerified ?? row.ownerverified),
     interestCount: Number(row.interestCount ?? row.interestcount ?? 0),
     viewerInterested: Boolean(row.viewerInterested ?? row.viewerinterested),
-    isOwnItem: Number(row.ownerId ?? row.ownerid) === Number(viewerId),
-    showBazaar: row.showBazaar ?? row.showbazaar ?? true
+    isOwnItem: Number(row.ownerId ?? row.ownerid) === Number(viewerId)
   };
 }
-
 
 function normalizeNotification(row) {
   return {
@@ -1360,6 +1362,7 @@ app.post('/api/admin/reset-password', authMiddleware, requireAdmin, async (req, 
 
 
 
+
 app.get('/api/bazaar', authMiddleware, async (req, res) => {
   const search = String(req.query.search || '').trim().toLowerCase();
   const sort = String(req.query.sort || 'newest');
@@ -1378,11 +1381,11 @@ app.get('/api/bazaar', authMiddleware, async (req, res) => {
       items.userId AS "ownerId",
       users.username AS "ownerUsername",
       COALESCE(users.is_verified, FALSE) AS "ownerVerified",
-      COALESCE(COUNT(item_buy_requests.id), 0)::int AS "interestCount",
-      COALESCE(MAX(CASE WHEN item_buy_requests.userId = ? THEN 1 ELSE 0 END), 0)::int AS "viewerInterested"
+      COALESCE(COUNT(buy_requests.id), 0)::int AS "interestCount",
+      COALESCE(MAX(CASE WHEN buy_requests.requester_id = ? THEN 1 ELSE 0 END), 0)::int AS "viewerInterested"
      FROM items
      JOIN users ON users.id = items.userId
-     LEFT JOIN item_buy_requests ON item_buy_requests.itemId = items.id
+     LEFT JOIN buy_requests ON buy_requests.item_id = items.id
      WHERE COALESCE(users.show_bazaar_inventory, TRUE) = TRUE
        AND COALESCE(users.last_seen_at, NOW()) >= NOW() - INTERVAL '7 days'
      GROUP BY items.id, items.title, items.image, items.price, items.createdAt, items.userId, users.username, users.is_verified
@@ -1391,14 +1394,7 @@ app.get('/api/bazaar', authMiddleware, async (req, res) => {
   );
 
   let items = rows
-    .map(row => {
-      const item = normalizeBazaarItem(row, req.user.id);
-      return {
-        ...item,
-        ownerUsername: row.ownerUsername ?? row.ownerusername,
-        ownerVerified: Boolean(row.ownerVerified ?? row.ownerverified)
-      };
-    })
+    .map(row => normalizeBazaarItem(row, req.user.id))
     .filter(item => item.priceAmount !== null);
 
   if (verifiedFilter === 'verified') {
@@ -1485,10 +1481,10 @@ app.post('/api/bazaar/items/:id/interest', authMiddleware, async (req, res) => {
   }
 
   await run(
-    `INSERT INTO item_buy_requests (itemId, userId)
-     VALUES (?, ?)
-     ON CONFLICT (itemId, userId) DO NOTHING`,
-    [req.params.id, req.user.id]
+    `INSERT INTO buy_requests (item_id, requester_id, owner_id)
+     VALUES (?, ?, ?)
+     ON CONFLICT (item_id, requester_id) DO NOTHING`,
+    [req.params.id, req.user.id, item.userId]
   );
 
   res.json({ ok: true });
@@ -1496,8 +1492,8 @@ app.post('/api/bazaar/items/:id/interest', authMiddleware, async (req, res) => {
 
 app.delete('/api/bazaar/items/:id/interest', authMiddleware, async (req, res) => {
   await run(
-    `DELETE FROM item_buy_requests
-     WHERE itemId = ? AND userId = ?`,
+    `DELETE FROM buy_requests
+     WHERE item_id = ? AND requester_id = ?`,
     [req.params.id, req.user.id]
   );
 

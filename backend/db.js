@@ -88,6 +88,16 @@ async function initDb() {
   `);
 
   await pool.query(`
+    ALTER TABLE items
+    ADD COLUMN IF NOT EXISTS createdAt TIMESTAMPTZ DEFAULT NOW()
+  `);
+
+  await pool.query(`
+    ALTER TABLE items
+    ADD COLUMN IF NOT EXISTS price TEXT DEFAULT ''
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS trades (
       id SERIAL PRIMARY KEY,
       roomId TEXT NOT NULL,
