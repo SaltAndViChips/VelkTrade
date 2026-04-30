@@ -1655,3 +1655,54 @@ svg .chart-hover-target {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Compact profile action row */
+
+.profile-action-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: start;
+}
+
+.profile-action-row > button:first-child {
+  min-width: 110px;
+}
+
+.profile-share-icon-button {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 800;
+  color: #e7dcff;
+  border-color: var(--border-bright);
+  background:
+    radial-gradient(circle at top left, rgba(141, 99, 255, 0.2), transparent 40%),
+    rgba(8, 7, 12, 0.42);
+}
+
+.profile-share-icon-button:hover {
+  color: white;
+  border-color: var(--purple);
+  background:
+    radial-gradient(circle at top left, rgba(141, 99, 255, 0.34), transparent 42%),
+    rgba(47, 35, 77, 0.86);
+}
+
+@media (max-width: 520px) {
+  .profile-action-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr auto;
+  }
+
+  .profile-share-icon-button {
+    width: 42px;
+  }
+}

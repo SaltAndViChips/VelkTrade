@@ -66,7 +66,6 @@ export default function UserInventoryPage({
   onLoginRequired,
   onToggleBuyRequest
 }) {
-  const profileUrl = userRecord ? getFrontendProfileUrl(userRecord.username) : '';
   const discordShareUrl = userRecord
     ? `${getBackendShareBase()}/u/${encodeURIComponent(userRecord.username)}?v=${Date.now()}`
     : '';
@@ -105,39 +104,30 @@ export default function UserInventoryPage({
               <p className="muted">No bio yet.</p>
             )}
 
-            <div className="profile-share-box">
-              <div>
-                <strong>Share Profile</strong>
-                <p className="muted">Use the Discord link for rich previews with bio and item count.</p>
-              </div>
+            <div className="profile-action-row">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isLoggedIn) {
+                    onStartTrade(userRecord.username);
+                  } else {
+                    onLoginRequired(userRecord.username);
+                  }
+                }}
+              >
+                Trade
+              </button>
 
-              <div className="share-link-row">
-                <input value={profileUrl} readOnly aria-label="Profile link" />
-                <button type="button" className="ghost" onClick={() => copyText(profileUrl)}>
-                  Copy Profile Link
-                </button>
-              </div>
-
-              <div className="share-link-row">
-                <input value={discordShareUrl} readOnly aria-label="Discord share link" />
-                <button type="button" onClick={() => copyText(discordShareUrl)}>
-                  Copy Discord Share Link
-                </button>
-              </div>
+              <button
+                type="button"
+                className="profile-share-icon-button ghost"
+                onClick={() => copyText(discordShareUrl)}
+                title="Copy Discord/social share link"
+                aria-label="Copy profile share link"
+              >
+                ↗
+              </button>
             </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                if (isLoggedIn) {
-                  onStartTrade(userRecord.username);
-                } else {
-                  onLoginRequired(userRecord.username);
-                }
-              }}
-            >
-              Start Trade with {userRecord.username}
-            </button>
           </div>
 
           <div className="item-grid drop-zone">
