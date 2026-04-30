@@ -233,6 +233,10 @@ async function invitePlayerToRoom(username) {
     setView('trade');
   }
 
+  const visibleNotifications = notifications || [];
+  const tradeStatuses = {};
+  const unseenNotificationCount = 0;
+
   return () => {
       if (undoTimerRef.current) {
         window.clearTimeout(undoTimerRef.current);

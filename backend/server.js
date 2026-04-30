@@ -11,7 +11,7 @@ const { get, all, run, transaction, getDatabaseDiagnostics } = require('./db');
 const { registerProfileShareRoute } = require('./profileShareRoute');
 const { createToken, authMiddleware } = require('./auth');
 const { fetchImgurItem, isImgurUrl } = require('./imgur');
-const { normalizeUsername, isSaltUsername, isDeveloperUsername, isProtectedDeveloperUser, isAdminUser, roleForUser, publicUser } = require('./admin');
+const { normalizeUsername, isSaltUsername, isDeveloperUsername, isProtectedDeveloperUser, isAdminUser, publicUser } = require('./admin');
 
 function isProtectedDeveloperAccount(value) {
   return isProtectedDeveloperUser(value);
@@ -27,31 +27,7 @@ function canModifyDeveloperTarget(requester, target) {
 }
 
 function developerAwareUser(user) {
-  if (!user) return null;
-
-  const roles = roleForUser(user);
-
-  return {
-    ...publicUser(user),
-    ...roles,
-    bio: user.bio || '',
-    showBazaarInventory: user.show_bazaar_inventory !== false && user.showBazaarInventory !== false,
-    showOnline: user.show_online !== false && user.showOnline !== false
-  };
-}
-
-function normalizeOnlinePresenceUser(user, fallback = {}) {
-  const roles = roleForUser(user);
-  const statusSince = fallback.statusSince || user.statusSince || Date.now();
-
-  return {
-    id: user.id,
-    username: user.username,
-    ...roles,
-    showOnline: user.show_online !== false && user.showOnline !== false,
-    status: fallback.status || user.status || 'online',
-    statusSince
-  };
+  return publicUser(user);
 }
 
 
@@ -134,7 +110,22 @@ async function hydrateOnlinePresenceUser(userId, fallbackUser) {
 
     if (!row) return fallbackUser;
 
-    return normalizeOnlinePresenceUser(row, fallbackUser);
+    const isDeveloper = isProtectedDeveloperUser(row);
+    const isAdmin = Boolean(row.is_admin || isDeveloper);
+    const isVerified = Boolean(row.is_verified);
+
+    return {
+      id: row.id,
+      username: row.username,
+      isDeveloper,
+      isAdmin,
+      isVerified,
+      isTrusted: isVerified,
+      showOnline: row.show_online !== false,
+      status: fallbackUser?.status || 'online',
+      statusSince: fallbackUser?.statusSince || Date.now(),
+      highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'trusted' : 'none'
+    };
   } catch {
     return fallbackUser;
   }
@@ -147,12 +138,23 @@ function onlineUserList() {
   return Array.from(onlineUsers.values())
     .filter(user => user.showOnline !== false)
     .map(user => {
-      const normalized = normalizeOnlinePresenceUser(user, user);
+      const isDeveloper = isProtectedDeveloperUser(user);
+      const isAdmin = Boolean(isDeveloper || user.isAdmin || user.is_admin);
+      const isVerified = Boolean(user.isVerified || user.is_verified);
       const now = Date.now();
+      const since = user.statusSince || now;
 
       return {
-        ...normalized,
-        awayForMs: normalized.status === 'away' ? Math.max(0, now - Number(normalized.statusSince || now)) : 0
+        id: user.id,
+        username: user.username,
+        isDeveloper,
+        isAdmin,
+        isVerified,
+        isTrusted: isVerified,
+        highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'trusted' : 'none',
+        status: user.status || 'online',
+        statusSince: since,
+        awayForMs: (user.status || 'online') === 'away' ? Math.max(0, now - since) : 0
       };
     });
 }
@@ -907,7 +909,7 @@ app.post('/api/login', async (req, res) => {
   const cleanUsername = normalizeUsername(req.body.username);
 
   const user = await get(
-    `SELECT id, username, password, is_admin, is_verified, show_bazaar_inventory, show_online, bio, show_bazaar_inventory, bio
+    `SELECT id, username, password, is_admin, is_verified, show_bazaar_inventory, show_online, bio, show_bazaar_inventory, show_online, show_bazaar_inventory, bio
      FROM users
      WHERE LOWER(username) = LOWER(?)`,
     [cleanUsername]
@@ -1706,6 +1708,7 @@ app.delete('/api/bazaar/items/:id/interest', authMiddleware, async (req, res) =>
 });
 
 
+
 app.get('/api/online-users', authMiddleware, async (req, res) => {
   const socketUsers = onlineUserList();
 
@@ -1729,9 +1732,10 @@ app.get('/api/online-users', authMiddleware, async (req, res) => {
 
   res.json({
     users: rows.map(row => {
-      const isDeveloper = isProtectedDeveloperAccount(row);
+      const isDeveloper = isProtectedDeveloperUser(row);
       const isAdmin = Boolean(row.is_admin || isDeveloper);
       const isVerified = Boolean(row.is_verified);
+      const since = row.last_seen_at ? new Date(row.last_seen_at).getTime() : Date.now();
 
       return {
         id: row.id,
@@ -1739,10 +1743,11 @@ app.get('/api/online-users', authMiddleware, async (req, res) => {
         isDeveloper,
         isAdmin,
         isVerified,
-        highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'trusted' : 'none',
         isTrusted: isVerified,
+        highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'trusted' : 'none',
         status: 'online',
-        statusSince: row.last_seen_at ? new Date(row.last_seen_at).getTime() : Date.now()
+        statusSince: since,
+        awayForMs: 0
       };
     })
   });
@@ -1843,7 +1848,14 @@ io.on('connection', socket => {
   const userId = Number(socket.user.id);
   markUserSeen(userId);
   const existing = onlineUsers.get(userId) || {
-    ...normalizeOnlinePresenceUser(socket.user),
+    id: userId,
+    username: socket.user.username,
+    isDeveloper: Boolean(socket.user.isDeveloper || socket.user.is_developer || isProtectedDeveloperAccount(socket.user)),
+    isAdmin: Boolean(socket.user.isAdmin || socket.user.is_admin || isProtectedDeveloperAccount(socket.user)),
+    isVerified: Boolean(socket.user.isVerified || socket.user.is_verified),
+    showOnline: socket.user.showOnline !== false && socket.user.show_online !== false,
+    status: 'online',
+    highestBadge: isProtectedDeveloperAccount(socket.user) ? 'developer' : (socket.user.isAdmin || socket.user.is_admin) ? 'admin' : (socket.user.isVerified || socket.user.is_verified) ? 'verified' : 'none',
     sockets: new Set()
   };
 
@@ -1851,6 +1863,22 @@ io.on('connection', socket => {
   onlineUsers.set(userId, existing);
   socket.join(socketRoomForUser(userId));
   broadcastPresence();
+
+  socket.on('presence:set-status', status => {
+    const allowedStatuses = new Set(['online', 'trade', 'bazaar', 'away']);
+    const nextStatus = allowedStatuses.has(status) ? status : 'online';
+    const current = onlineUsers.get(userId);
+
+    if (!current) return;
+
+    onlineUsers.set(userId, {
+      ...current,
+      status: nextStatus,
+      statusSince: Date.now()
+    });
+
+    broadcastPresence();
+  });
 
   socket.on('disconnect', () => {
     const current = onlineUsers.get(userId);

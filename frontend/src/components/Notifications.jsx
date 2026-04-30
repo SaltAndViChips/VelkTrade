@@ -1,26 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const DEFAULT_PREFS = {
   counters: true,
   offlineTrades: true,
   roomInvites: true,
-  tradeDeclines: true,
-  soundVolume: 0.45,
-  flashWindow: true,
-  allowUnverifiedNotifications: false
+  declines: true,
+  allowUnverifiedNotifications: false,
+  soundVolume: 0.55,
+  flashTab: true
 };
 
 function getNotificationId(notification) {
-  return notification?.id || notification?.notificationId || `${notification?.type || 'notification'}-${notification?.createdAt || Math.random()}`;
+  return notification?.id || notification?.notificationId || `${notification?.type || 'notification'}-${notification?.createdAt || ''}`;
 }
 
-function notificationNeedsTradeAction(notification, tradeStatuses = {}) {
-  const payload = notification?.payload || {};
-  const tradeId = payload.tradeId || notification.tradeId;
-  if (!tradeId) return false;
-
-  const status = tradeStatuses[tradeId];
-  return status && status !== 'completed' && status !== 'declined';
+function getPayload(notification) {
+  if (!notification?.payload) return {};
+  if (typeof notification.payload === 'string') {
+    try {
+      return JSON.parse(notification.payload);
+    } catch {
+      return {};
+    }
+  }
+  return notification.payload;
 }
 
 export default function Notifications({
@@ -49,9 +52,14 @@ export default function Notifications({
     });
   }, [preferences]);
 
-  function savePrefs(event) {
-    event?.preventDefault?.();
+  const sortedNotifications = useMemo(() => {
+    return [...(Array.isArray(notifications) ? notifications : [])]
+      .sort((a, b) => new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0));
+  }, [notifications]);
+
+  function saveSettings() {
     onSavePreferences(localPrefs);
+    setSettingsOpen(false);
   }
 
   return (
@@ -59,25 +67,25 @@ export default function Notifications({
       <div className="panel-title-row">
         <div>
           <h2>Notifications</h2>
-          <p className="muted">{notifications.length} notification{notifications.length === 1 ? '' : 's'}.</p>
+          <p className="muted">{sortedNotifications.length} notification{sortedNotifications.length === 1 ? '' : 's'}.</p>
         </div>
 
-        <div className="inline-controls">
+        <div className="inline-controls notification-top-actions">
           <button type="button" className="ghost" onClick={onRefresh}>Refresh</button>
-          <button type="button" className="ghost" onClick={() => setSettingsOpen(value => !value)}>⚙ Settings</button>
+          <button type="button" className="ghost" onClick={() => setSettingsOpen(value => !value)}>⚙</button>
           <button type="button" onClick={onMarkAllRead}>Mark all read</button>
         </div>
       </div>
 
       {settingsOpen && (
-        <form className="notification-settings" onSubmit={savePrefs}>
+        <section className="notification-settings">
           <label className="toggle-row">
             <input
               type="checkbox"
               checked={Boolean(localPrefs.counters)}
               onChange={event => setLocalPrefs({ ...localPrefs, counters: event.target.checked })}
             />
-            <span>Counter notifications</span>
+            <span>Counter-offer notifications</span>
           </label>
 
           <label className="toggle-row">
@@ -101,10 +109,10 @@ export default function Notifications({
           <label className="toggle-row">
             <input
               type="checkbox"
-              checked={Boolean(localPrefs.tradeDeclines)}
-              onChange={event => setLocalPrefs({ ...localPrefs, tradeDeclines: event.target.checked })}
+              checked={Boolean(localPrefs.declines)}
+              onChange={event => setLocalPrefs({ ...localPrefs, declines: event.target.checked })}
             />
-            <span>Trade declined notifications</span>
+            <span>Decline notifications</span>
           </label>
 
           <label className="toggle-row">
@@ -116,74 +124,83 @@ export default function Notifications({
             <span>Notifications from unverified users</span>
           </label>
 
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={Boolean(localPrefs.flashTab)}
+              onChange={event => setLocalPrefs({ ...localPrefs, flashTab: event.target.checked })}
+            />
+            <span>Flash browser tab/window</span>
+          </label>
+
           <label className="range-row">
-            <span>Notification volume: {Math.round(Number(localPrefs.soundVolume || 0) * 100)}%</span>
+            <span>Notification volume</span>
             <input
               type="range"
               min="0"
               max="1"
               step="0.05"
-              value={Number(localPrefs.soundVolume ?? 0.45)}
+              value={Number(localPrefs.soundVolume ?? 0.55)}
               onChange={event => setLocalPrefs({ ...localPrefs, soundVolume: Number(event.target.value) })}
             />
           </label>
 
-          <label className="toggle-row">
-            <input
-              type="checkbox"
-              checked={Boolean(localPrefs.flashWindow)}
-              onChange={event => setLocalPrefs({ ...localPrefs, flashWindow: event.target.checked })}
-            />
-            <span>Flash tab/window on notification</span>
-          </label>
-
-          <div className="inline-controls">
-            <button type="submit">Save Settings</button>
+          <div className="inline-controls notification-settings-actions">
+            <button type="button" onClick={saveSettings}>Save Settings</button>
+            <button type="button" className="ghost" onClick={() => setSettingsOpen(false)}>Cancel</button>
           </div>
-        </form>
+        </section>
       )}
 
       <div className="notification-list">
-        {notifications.length === 0 && <p className="muted tidy-empty">No notifications.</p>}
+        {sortedNotifications.length === 0 && (
+          <p className="muted tidy-empty">No notifications yet.</p>
+        )}
 
-        {notifications.map(notification => {
+        {sortedNotifications.map(notification => {
           const id = getNotificationId(notification);
-          const payload = notification.payload || {};
-          const isRoomInvite = notification.type === 'room_invite';
-          const showTradeCheck = notificationNeedsTradeAction(notification, tradeStatuses);
+          const payload = getPayload(notification);
+          const type = notification.type || '';
+          const title = notification.title || 'Notification';
+          const message = notification.message || notification.body || '';
+          const read = Boolean(notification.read || notification.isRead || notification.seen);
+          const tradeId = payload.tradeId || notification.tradeId;
+          const roomId = payload.roomId || notification.roomId;
+          const canCheckTrade = tradeId && tradeStatuses?.[tradeId] !== 'complete';
 
           return (
-            <article className={`notification-card ${notification.read ? 'read' : 'unread'}`} key={id}>
+            <article className={`notification-card ${read ? 'read' : 'unread'}`} key={id}>
               <div className="notification-dot" />
-              <div>
-                <strong>{notification.title || 'Notification'}</strong>
-                <p>{notification.message || notification.body || ''}</p>
+
+              <div className="notification-body">
+                <strong>{title}</strong>
+                {message && <p>{message}</p>}
                 {notification.createdAt && <small>{new Date(notification.createdAt).toLocaleString()}</small>}
-              </div>
 
-              <div className="notification-card-actions">
-                {!notification.read && (
-                  <button type="button" className="ghost" onClick={() => onMarkRead(id)}>
-                    Mark read
-                  </button>
-                )}
-
-                {showTradeCheck && (
-                  <button type="button" onClick={() => onCheckTrade(notification)}>
-                    Check Trade
-                  </button>
-                )}
-
-                {isRoomInvite && !payload.expired && (
-                  <>
-                    <button type="button" onClick={() => onAcceptRoomInvite(notification)}>
-                      Join
+                <div className="notification-card-actions">
+                  {!read && (
+                    <button type="button" className="ghost" onClick={() => onMarkRead(id)}>
+                      Mark read
                     </button>
-                    <button type="button" className="mini-danger" onClick={() => onDeclineRoomInvite(notification)}>
-                      Decline
+                  )}
+
+                  {canCheckTrade && (
+                    <button type="button" onClick={() => onCheckTrade(notification)}>
+                      Check
                     </button>
-                  </>
-                )}
+                  )}
+
+                  {type === 'room_invite' && roomId && (
+                    <>
+                      <button type="button" onClick={() => onAcceptRoomInvite(notification)}>
+                        Join
+                      </button>
+                      <button type="button" className="ghost" onClick={() => onDeclineRoomInvite(notification)}>
+                        Decline
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </article>
           );

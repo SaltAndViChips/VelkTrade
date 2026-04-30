@@ -3292,67 +3292,7 @@ svg .chart-hover-target {
 }
 
 
-/* Stabilized role icons, notifications, and protected admin controls */
-
-.role-icon-badge {
-  width: 22px;
-  height: 22px;
-  display: inline-grid;
-  place-items: center;
-  flex: 0 0 auto;
-  border-radius: 999px;
-  font-size: 13px;
-  line-height: 1;
-  font-weight: 900;
-  border: 1px solid rgba(222, 216, 255, 0.35);
-  background: rgba(8, 7, 12, 0.52);
-  margin-left: 2px;
-}
-
-.role-icon-badge.developer-icon {
-  color: #e7ddff;
-  background: rgba(141, 99, 255, 0.26);
-  border-color: rgba(177, 151, 255, 0.62);
-  box-shadow: 0 0 14px rgba(141, 99, 255, 0.22);
-}
-
-.role-icon-badge.admin-icon {
-  color: #fff3c2;
-  background: rgba(95, 74, 28, 0.30);
-  border-color: rgba(215, 181, 94, 0.48);
-}
-
-.role-icon-badge.trusted-icon {
-  color: #d9ffe5;
-  background: rgba(32, 94, 59, 0.28);
-  border-color: rgba(98, 209, 138, 0.48);
-}
-
-.developer-badge,
-.trusted-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border-radius: 999px;
-  padding: 3px 9px;
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-}
-
-.developer-badge {
-  color: #e7ddff;
-  background: rgba(141, 99, 255, 0.30);
-  border: 1px solid rgba(177, 151, 255, 0.62);
-  box-shadow: 0 0 16px rgba(141, 99, 255, 0.24);
-}
-
-.trusted-badge {
-  color: #d9ffe5;
-  background: rgba(32, 94, 59, 0.28);
-  border: 1px solid rgba(98, 209, 138, 0.48);
-}
+/* Full stabilizer: online, notification, role, admin protection styles */
 
 .safe-online-toggle {
   position: relative;
@@ -3393,11 +3333,84 @@ svg .chart-hover-target {
   border-color: var(--border-bright);
 }
 
+.role-icon-badge {
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 900;
+  border: 1px solid rgba(222, 216, 255, 0.35);
+  background: rgba(8, 7, 12, 0.52);
+  margin-left: 2px;
+}
+
+.role-icon-badge.developer-icon {
+  color: #e7ddff;
+  background: rgba(141, 99, 255, 0.26);
+  border-color: rgba(177, 151, 255, 0.62);
+  box-shadow: 0 0 14px rgba(141, 99, 255, 0.22);
+}
+
+.role-icon-badge.admin-icon {
+  color: #fff3c2;
+  background: rgba(95, 74, 28, 0.30);
+  border-color: rgba(215, 181, 94, 0.48);
+}
+
+.role-icon-badge.trusted-icon {
+  color: #d9ffe5;
+  background: rgba(32, 94, 59, 0.28);
+  border-color: rgba(98, 209, 138, 0.48);
+}
+
+.online-dot.away {
+  background: #d7b55e;
+  box-shadow: 0 0 14px rgba(215, 181, 94, 0.58);
+}
+
+.developer-badge,
+.trusted-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.developer-badge {
+  color: #e7ddff;
+  background: rgba(141, 99, 255, 0.30);
+  border: 1px solid rgba(177, 151, 255, 0.62);
+  box-shadow: 0 0 16px rgba(141, 99, 255, 0.24);
+}
+
+.trusted-badge {
+  color: #d9ffe5;
+  background: rgba(32, 94, 59, 0.28);
+  border: 1px solid rgba(98, 209, 138, 0.48);
+}
+
 .safe-notifications-tab .notifications-page {
   padding: 0;
   border: 0;
   background: transparent;
   box-shadow: none;
+}
+
+.notification-top-actions,
+.notification-card-actions,
+.notification-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .notification-settings {
@@ -3425,14 +3438,7 @@ svg .chart-hover-target {
   width: 100%;
 }
 
-.notification-card-actions,
-.safe-notifications-tab .inline-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 .protected-dev-control:disabled {
-  opacity: .42;
+  opacity: 0.42;
   cursor: not-allowed;
 }
