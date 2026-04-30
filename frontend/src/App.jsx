@@ -21,6 +21,7 @@ import AdminPanel from './components/AdminPanel';
 import Trades from './components/Trades';
 import TradeOfferPanel from './components/TradeOfferPanel';
 import UserInventoryPage from './components/UserInventoryPage';
+import Bazaar from './components/Bazaar';
 import Notifications from './components/Notifications';
 
 function parseDraggedItemId(active) {
@@ -611,6 +612,19 @@ export default function App() {
     setBioMessage('Bio saved.');
   }
 
+
+  async function updateBazaarInventoryVisibility(showBazaarInventory) {
+    const data = await api('/api/me/bazaar-visibility', {
+      method: 'PUT',
+      body: JSON.stringify({ showBazaarInventory })
+    });
+
+    if (data.user) {
+      setUser(data.user);
+      setBioDraft(data.user.bio || '');
+    }
+  }
+
   function notifyRoomInventoryUpdated() {
     const activeRoom = roomRef.current;
 
@@ -689,6 +703,7 @@ export default function App() {
     await refreshInventory(user.username);
     notifyRoomInventoryUpdated();
   }
+
 
   async function toggleBuyRequest(item) {
     if (!user) {
@@ -1054,6 +1069,27 @@ export default function App() {
               {bioMessage && <p className="success">{bioMessage}</p>}
             </section>
 
+            <section className="card bazaar-visibility-card">
+              <div>
+                <h2>Bazaar Visibility</h2>
+                <p className="muted">
+                  Control whether your entire inventory can appear on the Bazaar.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className={user.showBazaarInventory === false ? 'ghost' : ''}
+                onClick={() => updateBazaarInventoryVisibility(user.showBazaarInventory === false)}
+              >
+                {user.showBazaarInventory === false ? 'Show My Inventory on Bazaar' : 'Hide My Inventory from Bazaar'}
+              </button>
+
+              <span className={user.showBazaarInventory === false ? 'bazaar-visibility-off' : 'bazaar-visibility-on'}>
+                Bazaar: {user.showBazaarInventory === false ? 'Off' : 'On'}
+              </span>
+            </section>
+
             <Inventory
               title="My Inventory"
               items={inventory}
@@ -1065,6 +1101,10 @@ export default function App() {
               onUpdatePrice={updateItemPrice}
             />
           </>
+        )}
+
+        {user && view === 'bazaar' && (
+          <Bazaar currentUser={user} />
         )}
 
         {user && view === 'trades' && (
@@ -1111,7 +1151,7 @@ export default function App() {
           />
         )}
 
-        {user && view === 'admin' && isAdmin && <AdminPanel onJoinRoom={joinRoom} />}
+        {user && view === 'admin' && isAdmin && <AdminPanel />}
 
         {user && view === 'trade' && (
           <>

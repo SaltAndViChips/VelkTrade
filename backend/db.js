@@ -60,6 +60,16 @@ async function initDb() {
   `);
 
   await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ DEFAULT NOW()
+  `);
+
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS show_bazaar_inventory BOOLEAN DEFAULT TRUE
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS items (
       id SERIAL PRIMARY KEY,
       userId INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -71,6 +81,11 @@ async function initDb() {
   if (!(await columnExists('items', 'price'))) {
     await pool.query(`ALTER TABLE items ADD COLUMN price TEXT DEFAULT ''`);
   }
+
+  await pool.query(`
+    ALTER TABLE items
+    ADD COLUMN IF NOT EXISTS show_bazaar BOOLEAN DEFAULT TRUE
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS trades (

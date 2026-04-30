@@ -96,6 +96,59 @@ function parsePayload(value) {
   }
 }
 
+
+async function markUserSeen(userId) {
+  if (!userId) return;
+
+  try {
+    await run(
+      `UPDATE users
+       SET last_seen_at = NOW()
+       WHERE id = ?`,
+      [userId]
+    );
+  } catch {
+    // Migration may not have finished on first boot.
+  }
+}
+
+function parseValidIcPrice(value) {
+  const clean = String(value || '').trim();
+
+  if (!/^\d[\d,]*(\.\d+)?\s*IC$/i.test(clean)) {
+    return null;
+  }
+
+  const numberText = clean.replace(/\s*IC$/i, '').replace(/,/g, '');
+  const amount = Number(numberText);
+
+  if (!Number.isFinite(amount) || amount < 0) {
+    return null;
+  }
+
+  return amount;
+}
+
+function normalizeBazaarItem(row, viewerId) {
+  const price = String(row.price || '').trim();
+  const priceAmount = parseValidIcPrice(price);
+
+  return {
+    id: row.id,
+    title: row.title,
+    image: row.image,
+    price,
+    priceAmount,
+    createdAt: row.createdAt ?? row.createdat,
+    ownerId: row.ownerId ?? row.ownerid,
+    interestCount: Number(row.interestCount ?? row.interestcount ?? 0),
+    viewerInterested: Boolean(row.viewerInterested ?? row.viewerinterested),
+    isOwnItem: Number(row.ownerId ?? row.ownerid) === Number(viewerId),
+    showBazaar: row.showBazaar ?? row.showbazaar ?? true
+  };
+}
+
+
 function normalizeNotification(row) {
   return {
     id: row.id,
@@ -346,7 +399,7 @@ async function hydrateAuthUser(user) {
   if (!user?.id) return user;
 
   const dbUser = await get(
-    `SELECT id, username, is_admin, is_verified, bio
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
      FROM users
      WHERE id = ?`,
     [user.id]
@@ -677,7 +730,7 @@ app.post('/api/login', async (req, res) => {
   const cleanUsername = normalizeUsername(req.body.username);
 
   const user = await get(
-    `SELECT id, username, password, is_admin, is_verified, bio
+    `SELECT id, username, password, is_admin, is_verified, show_bazaar_inventory, bio
      FROM users
      WHERE LOWER(username) = LOWER(?)`,
     [cleanUsername]
@@ -693,6 +746,7 @@ app.post('/api/login', async (req, res) => {
   const valid = await bcrypt.compare(req.body.password, user.password);
   if (!valid) return res.status(401).json({ error: 'Invalid login' });
 
+  await markUserSeen(user.id);
   await createLoginTradeSummaryNotification(user.id);
 
   res.json({
@@ -703,7 +757,7 @@ app.post('/api/login', async (req, res) => {
 
 app.get('/api/me', authMiddleware, async (req, res) => {
   const user = await get(
-    `SELECT id, username, is_admin, is_verified, bio
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
      FROM users
      WHERE id = ?`,
     [req.user.id]
@@ -717,6 +771,32 @@ app.get('/api/me', authMiddleware, async (req, res) => {
   res.json({ user: user ? { ...publicUser(user), bio: user.bio || '' } : null });
 });
 
+
+app.put('/api/me/bazaar-visibility', authMiddleware, async (req, res) => {
+  const showBazaarInventory = Boolean(req.body.showBazaarInventory);
+
+  await run(
+    'UPDATE users SET show_bazaar_inventory = ? WHERE id = ?',
+    [showBazaarInventory, req.user.id]
+  );
+
+  const user = await get(
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
+     FROM users
+     WHERE id = ?`,
+    [req.user.id]
+  );
+
+  res.json({
+    ok: true,
+    user: {
+      ...publicUser(user),
+      bio: user.bio || '',
+      showBazaarInventory: user.show_bazaar_inventory !== false
+    }
+  });
+});
+
 app.put('/api/me/profile', authMiddleware, async (req, res) => {
   const bio = cleanBio(req.body.bio);
 
@@ -726,7 +806,7 @@ app.put('/api/me/profile', authMiddleware, async (req, res) => {
   );
 
   const user = await get(
-    `SELECT id, username, is_admin, is_verified, bio
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
      FROM users
      WHERE id = ?`,
     [req.user.id]
@@ -740,7 +820,7 @@ app.put('/api/me/profile', authMiddleware, async (req, res) => {
 
 app.get('/api/profile/:username', optionalAuth, async (req, res) => {
   const profileUser = await get(
-    `SELECT id, username, is_admin, is_verified, bio
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
      FROM users
      WHERE LOWER(username) = LOWER(?)`,
     [normalizeUsername(req.params.username)]
@@ -778,6 +858,7 @@ app.get('/api/profile/:username', optionalAuth, async (req, res) => {
       username: profileUser.username,
       bio: profileUser.bio || '',
       isVerified: Boolean(profileUser.is_verified),
+      showBazaarInventory: profileUser.show_bazaar_inventory !== false,
       online: isUserOnline(profileUser.id)
     },
     items
@@ -831,28 +912,43 @@ app.post('/api/items/restore', authMiddleware, async (req, res) => {
       userId: req.user.id,
       title,
       image,
-      price
+      price,
+      showBazaar: true
     }
   });
 });
 
 app.patch('/api/items/:id', authMiddleware, async (req, res) => {
-  const item = await get('SELECT * FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
-  if (!item) return res.status(404).json({ error: 'Item not found' });
+  const existing = await get(
+    'SELECT id, userId, title, image, price, show_bazaar AS "showBazaar" FROM items WHERE id = ? AND userId = ?',
+    [req.params.id, req.user.id]
+  );
 
-  const price = cleanPrice(req.body.price);
+  if (!existing) {
+    return res.status(404).json({ error: 'Item not found' });
+  }
+
+  const nextPrice = Object.prototype.hasOwnProperty.call(req.body, 'price')
+    ? cleanPrice(req.body.price)
+    : existing.price || '';
+
+  const nextShowBazaar = Object.prototype.hasOwnProperty.call(req.body, 'showBazaar')
+    ? Boolean(req.body.showBazaar)
+    : Boolean(existing.showBazaar ?? true);
 
   await run(
-    'UPDATE items SET price = ? WHERE id = ? AND userId = ?',
-    [price, req.params.id, req.user.id]
+    'UPDATE items SET price = ?, show_bazaar = ? WHERE id = ? AND userId = ?',
+    [nextPrice, nextShowBazaar, req.params.id, req.user.id]
   );
 
-  const updated = await get(
-    'SELECT id, title, image, price, userId AS "userId" FROM items WHERE id = ?',
-    [req.params.id]
-  );
-
-  res.json({ ok: true, item: updated });
+  res.json({
+    ok: true,
+    item: {
+      ...existing,
+      price: nextPrice,
+      showBazaar: nextShowBazaar
+    }
+  });
 });
 
 app.post('/api/items/:id/refresh-imgur', authMiddleware, async (req, res) => {
@@ -951,7 +1047,7 @@ app.get('/api/inventory/:username', optionalAuth, async (req, res) => {
     [req.user?.id || 0, user.id]
   );
 
-  res.json({ user: { ...user, bio: user.bio || '', isVerified: Boolean(user.is_verified), online: isUserOnline(user.id) }, items });
+  res.json({ user: { ...user, bio: user.bio || '', isVerified: Boolean(user.is_verified), showBazaarInventory: user.show_bazaar_inventory !== false, online: isUserOnline(user.id) }, items });
 });
 
 app.get('/api/trades', authMiddleware, async (req, res) => {
@@ -1141,7 +1237,7 @@ app.get('/api/admin/rooms', authMiddleware, requireAdmin, async (req, res) => {
 
 app.get('/api/admin/users', authMiddleware, requireAdmin, async (req, res) => {
   const rows = await all(
-    `SELECT id, username, is_admin, is_verified, bio
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
      FROM users
      ORDER BY LOWER(username) ASC`
   );
@@ -1158,7 +1254,7 @@ app.post('/api/admin/set-admin', authMiddleware, requireAdmin, async (req, res) 
   if (!cleanUsername) return res.status(400).json({ error: 'Username required' });
 
   const target = await get(
-    `SELECT id, username, is_admin, is_verified
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory
      FROM users
      WHERE LOWER(username) = LOWER(?)`,
     [cleanUsername]
@@ -1173,7 +1269,7 @@ app.post('/api/admin/set-admin', authMiddleware, requireAdmin, async (req, res) 
   await run('UPDATE users SET is_admin = ? WHERE id = ?', [Boolean(isAdmin), target.id]);
 
   const updated = await get(
-    `SELECT id, username, is_admin, is_verified
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory
      FROM users
      WHERE id = ?`,
     [target.id]
@@ -1230,7 +1326,7 @@ app.post('/api/admin/set-verified', authMiddleware, requireAdmin, async (req, re
   await run('UPDATE users SET is_verified = ? WHERE id = ?', [Boolean(isVerified), target.id]);
 
   const updated = await get(
-    `SELECT id, username, is_admin, is_verified
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory
      FROM users
      WHERE id = ?`,
     [target.id]
@@ -1260,6 +1356,112 @@ app.post('/api/admin/reset-password', authMiddleware, requireAdmin, async (req, 
   res.json({ ok: true, message: `Password reset for ${target.username}` });
 });
 
+
+
+app.get('/api/bazaar', authMiddleware, async (req, res) => {
+  const search = String(req.query.search || '').trim().toLowerCase();
+  const sort = String(req.query.sort || 'newest');
+  const min = req.query.min !== undefined && req.query.min !== '' ? Number(req.query.min) : null;
+  const max = req.query.max !== undefined && req.query.max !== '' ? Number(req.query.max) : null;
+  const minInterest = req.query.minInterest !== undefined && req.query.minInterest !== '' ? Number(req.query.minInterest) : null;
+
+  const rows = await all(
+    `SELECT
+      items.id,
+      items.title,
+      items.image,
+      items.price,
+      items.show_bazaar AS "showBazaar",
+      items.createdAt AS "createdAt",
+      users.id AS "ownerId",
+      COALESCE(COUNT(item_buy_requests.id), 0)::int AS "interestCount",
+      COALESCE(MAX(CASE WHEN item_buy_requests.userId = ? THEN 1 ELSE 0 END), 0)::int AS "viewerInterested"
+     FROM items
+     JOIN users ON users.id = items.userId
+     LEFT JOIN item_buy_requests ON item_buy_requests.itemId = items.id
+     WHERE users.last_seen_at >= NOW() - INTERVAL '7 days'
+       AND users.show_bazaar_inventory = TRUE
+     GROUP BY items.id, users.id
+     ORDER BY items.createdAt DESC`,
+    [req.user.id]
+  );
+
+  let items = rows
+    .map(row => normalizeBazaarItem(row, req.user.id))
+    .filter(item => item.priceAmount !== null);
+
+  if (search) {
+    items = items.filter(item => {
+      return [
+        item.title,
+        item.price,
+        String(item.priceAmount)
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(search);
+    });
+  }
+
+  if (Number.isFinite(min)) {
+    items = items.filter(item => item.priceAmount >= min);
+  }
+
+  if (Number.isFinite(max)) {
+    items = items.filter(item => item.priceAmount <= max);
+  }
+
+  if (Number.isFinite(minInterest)) {
+    items = items.filter(item => item.interestCount >= minInterest);
+  }
+
+  if (sort === 'interest') {
+    items.sort((a, b) => b.interestCount - a.interestCount || new Date(b.createdAt) - new Date(a.createdAt));
+  } else if (sort === 'highest') {
+    items.sort((a, b) => b.priceAmount - a.priceAmount || new Date(b.createdAt) - new Date(a.createdAt));
+  } else if (sort === 'lowest') {
+    items.sort((a, b) => a.priceAmount - b.priceAmount || new Date(b.createdAt) - new Date(a.createdAt));
+  } else {
+    items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
+  res.json({ items });
+});
+
+app.post('/api/bazaar/items/:id/interest', authMiddleware, async (req, res) => {
+  const item = await get(
+    `SELECT id, userId
+     FROM items
+     WHERE id = ?`,
+    [req.params.id]
+  );
+
+  if (!item) return res.status(404).json({ error: 'Item not found' });
+
+  if (Number(item.userId) === Number(req.user.id)) {
+    return res.status(400).json({ error: 'You cannot mark interest in your own item' });
+  }
+
+  await run(
+    `INSERT INTO item_buy_requests (itemId, userId)
+     VALUES (?, ?)
+     ON CONFLICT (itemId, userId) DO NOTHING`,
+    [req.params.id, req.user.id]
+  );
+
+  res.json({ ok: true });
+});
+
+app.delete('/api/bazaar/items/:id/interest', authMiddleware, async (req, res) => {
+  await run(
+    `DELETE FROM item_buy_requests
+     WHERE itemId = ? AND userId = ?`,
+    [req.params.id, req.user.id]
+  );
+
+  res.json({ ok: true });
+});
 
 app.get('/api/notifications', authMiddleware, async (req, res) => {
   const prefs = await ensureNotificationPrefs(req.user.id);
@@ -1354,6 +1556,7 @@ io.use((socket, next) => {
 
 io.on('connection', socket => {
   const userId = Number(socket.user.id);
+  markUserSeen(userId);
   const existing = onlineUsers.get(userId) || {
     id: userId,
     username: socket.user.username,

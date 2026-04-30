@@ -262,9 +262,6 @@ function StatLineChart({ inventory, trades, user }) {
                   y={padTop}
                   width={chartWidth / 5}
                   height={chartHeight}
-                  fill="transparent"
-                  stroke="transparent"
-                  opacity="0"
                   onMouseEnter={() => setHoveredPoint(point)}
                 />
 
@@ -404,6 +401,10 @@ export default function Dashboard({
 
         <button className="dashboard-tile" onClick={() => onNavigate('trades')}>
           Trades
+        </button>
+
+        <button className="dashboard-tile" onClick={() => onNavigate('bazaar')}>
+          Bazaar
         </button>
 
         <button className="dashboard-tile" onClick={onCreateRoom}>
