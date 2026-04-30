@@ -19,11 +19,9 @@ function lower(value) {
 
 function normalizeArrayResponse(data, keys) {
   if (Array.isArray(data)) return data;
-
   for (const key of keys) {
     if (Array.isArray(data?.[key])) return data[key];
   }
-
   return [];
 }
 
@@ -45,7 +43,7 @@ function getPayload(notification) {
 
 function normalizedRole(player) {
   const username = lower(player?.username);
-  const role = lower(player?.role || player?.highestBadge || player?.badge || player?.accountType);
+  const role = lower(player?.role || player?.highestBadge || player?.badge || player?.accountType || player?.type);
 
   if (
     player?.isDeveloper ||
@@ -143,13 +141,16 @@ export default function PresenceHub({
   currentUser,
   onlineUsers = [],
   currentRoomId = '',
+  notifications: propNotifications = [],
+  preferences: propPreferences = {},
+  unseenCount = 0,
   onInvitePlayer = () => {}
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState('online');
   const [fetchedUsers, setFetchedUsers] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [prefs, setPrefs] = useState(DEFAULT_PREFS);
+  const [notifications, setNotifications] = useState(Array.isArray(propNotifications) ? propNotifications : []);
+  const [prefs, setPrefs] = useState({ ...DEFAULT_PREFS, ...(propPreferences || {}) });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statusTextLine, setStatusTextLine] = useState('');
 
@@ -170,7 +171,7 @@ export default function PresenceHub({
       ]);
       setNotifications(normalizeArrayResponse(data, ['notifications', 'data']));
     } catch {
-      setNotifications([]);
+      setNotifications(Array.isArray(propNotifications) ? propNotifications : []);
     }
   }
 
@@ -183,7 +184,7 @@ export default function PresenceHub({
       ]);
       setPrefs({ ...DEFAULT_PREFS, ...(data.preferences || data.notificationPreferences || data || {}) });
     } catch {
-      setPrefs(DEFAULT_PREFS);
+      setPrefs({ ...DEFAULT_PREFS, ...(propPreferences || {}) });
     }
   }
 
@@ -225,8 +226,9 @@ export default function PresenceHub({
   }, [fetchedUsers, onlineUsers, currentUser]);
 
   const unreadCount = useMemo(() => {
-    return notifications.filter(notification => !notification.read && !notification.seen && !notification.isRead).length;
-  }, [notifications]);
+    const fetchedUnread = notifications.filter(notification => !notification.read && !notification.seen && !notification.isRead).length;
+    return Math.max(Number(unseenCount || 0), fetchedUnread);
+  }, [notifications, unseenCount]);
 
   function openProfile(username) {
     if (!username) return;
@@ -306,8 +308,14 @@ export default function PresenceHub({
   }
 
   return (
-    <div className="presence-hub">
-      <button type="button" className="presence-hub-trigger" title="Online players and notifications" aria-label="Online players and notifications" onClick={() => setOpen(value => !value)}>
+    <div className="presence-hub active-player-menu-rewrite">
+      <button
+        type="button"
+        className="presence-hub-trigger"
+        title="Online players and notifications"
+        aria-label="Online players and notifications"
+        onClick={() => setOpen(value => !value)}
+      >
         ≡
         {unreadCount > 0 && <span>{unreadCount}</span>}
       </button>

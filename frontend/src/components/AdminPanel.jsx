@@ -34,7 +34,7 @@ function canModifyUser(currentUser, targetUser) {
   if (!isDeveloperUser(targetUser)) return true;
 
   const sameId = currentUser?.id && targetUser?.id && Number(currentUser.id) === Number(targetUser.id);
-  const sameName = String(currentUser?.username || '').trim().toLowerCase() === String(targetUser?.username || '').trim().toLowerCase();
+  const sameName = lowerUsername(currentUser?.username) === lowerUsername(targetUser?.username);
 
   return Boolean(isDeveloperUser(currentUser) || sameId || sameName);
 }
@@ -63,21 +63,32 @@ function UserBadge({ user }) {
   return <span className="user-badge">User</span>;
 }
 
+function getIcValue(trade, keys) {
+  for (const key of keys) {
+    const value = trade?.[key];
+    if (value !== undefined && value !== null && value !== '' && Number(value) !== 0) {
+      return Number(value);
+    }
+  }
+  return 0;
+}
 
-function normalizeTradeItems(trade) {
-  const directItems = [
-    ...(Array.isArray(trade?.items) ? trade.items : []),
-    ...(Array.isArray(trade?.offeredItems) ? trade.offeredItems : []),
-    ...(Array.isArray(trade?.requestedItems) ? trade.requestedItems : []),
-    ...(Array.isArray(trade?.offer_items) ? trade.offer_items : []),
-    ...(Array.isArray(trade?.request_items) ? trade.request_items : [])
-  ];
+function normalizeTradeItems(trade, side) {
+  const detailKeys = side === 'from'
+    ? ['fromItemDetails', 'from_items_details', 'offerItemDetails', 'offeredItemDetails']
+    : ['toItemDetails', 'to_items_details', 'requestItemDetails', 'requestedItemDetails'];
 
-  if (directItems.length) return directItems;
+  const idKeys = side === 'from'
+    ? ['fromItems', 'from_items', 'offerItems', 'offeredItems']
+    : ['toItems', 'to_items', 'requestItems', 'requestedItems'];
 
-  for (const key of ['itemSummary', 'itemsSummary', 'summary', 'details']) {
-    if (typeof trade?.[key] === 'string' && trade[key].trim()) {
-      return [{ name: trade[key] }];
+  for (const key of detailKeys) {
+    if (Array.isArray(trade?.[key]) && trade[key].length) return trade[key];
+  }
+
+  for (const key of idKeys) {
+    if (Array.isArray(trade?.[key]) && trade[key].length) {
+      return trade[key].map(item => typeof item === 'object' ? item : { id: item, title: `Item #${item}` });
     }
   }
 
@@ -85,7 +96,8 @@ function normalizeTradeItems(trade) {
 }
 
 function normalizeTradeChat(trade) {
-  const directChat = trade?.chat || trade?.messages || trade?.chatLog || trade?.chat_log || trade?.logs || trade?.log;
+  const directChat = trade?.chatHistory || trade?.chat_history || trade?.chat || trade?.messages || trade?.chatLog || trade?.chat_log || trade?.logs || trade?.log;
+
   if (Array.isArray(directChat)) return directChat;
 
   if (typeof directChat === 'string' && directChat.trim()) {
@@ -100,25 +112,70 @@ function normalizeTradeChat(trade) {
   return [];
 }
 
-function renderUnknownTradeShape(trade) {
+function getTradeSummary(trade) {
+  const fromItems = normalizeTradeItems(trade, 'from');
+  const toItems = normalizeTradeItems(trade, 'to');
+  const fromIc = getIcValue(trade, ['fromIc', 'fromIC', 'fromIcAmount', 'fromICAmount', 'offerIc', 'offeredIc', 'offerIC', 'offeredIC']);
+  const toIc = getIcValue(trade, ['toIc', 'toIC', 'toIcAmount', 'toICAmount', 'requestIc', 'requestedIc', 'requestIC', 'requestedIC']);
+
+  const parts = [];
+
+  if (fromItems.length) parts.push(`${trade.fromUsername || 'From'}: ${fromItems.map(item => item.title || item.name || `Item #${item.id}`).join(', ')}`);
+  if (fromIc) parts.push(`${trade.fromUsername || 'From'}: ${fromIc.toLocaleString()} IC`);
+
+  if (toItems.length) parts.push(`${trade.toUsername || 'To'}: ${toItems.map(item => item.title || item.name || `Item #${item.id}`).join(', ')}`);
+  if (toIc) parts.push(`${trade.toUsername || 'To'}: ${toIc.toLocaleString()} IC`);
+
+  return parts.length ? parts.join(' | ') : 'No items or IC';
+}
+
+function TradeItemList({ title, items, ic }) {
   return (
-    <pre className="admin-raw-json">
-      {JSON.stringify(trade, null, 2)}
-    </pre>
+    <div className="admin-trade-side">
+      <h3>{title}</h3>
+
+      {ic > 0 && <p className="admin-ic-line">{ic.toLocaleString()} IC</p>}
+
+      {items.length === 0 && ic <= 0 ? (
+        <p className="muted">No items or IC.</p>
+      ) : (
+        <ul>
+          {items.map((item, index) => (
+            <li key={`${title}-${item.id || index}`}>
+              {item.image && <img src={item.image} alt="" className="admin-trade-item-thumb" />}
+              <span>{item.title || item.name || `Item #${item.id || index + 1}`}</span>
+              {item.price && <em>{item.price}</em>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
+function ChatLog({ messages }) {
+  if (!messages.length) return <p className="muted">No chat messages.</p>;
 
-function getTradeSummary(trade) {
-  const items = [...(trade?.items || []), ...(trade?.offeredItems || []), ...(trade?.requestedItems || [])];
-  const itemNames = items.map(item => item?.title || item?.name).filter(Boolean).slice(0, 4);
-  const ic = trade?.icAmount || trade?.ic || trade?.offeredIc || trade?.offeredIC || 0;
-  const parts = [];
+  return (
+    <ul className="admin-chat-log">
+      {messages.map((message, index) => (
+        <li key={message.id || index}>
+          <strong>{message.username || message.author || `User ${message.userId || ''}`}:</strong>{' '}
+          <span>{message.message || message.text || ''}</span>
+          {(message.createdAt || message.created_at) && <small>{new Date(message.createdAt || message.created_at).toLocaleString()}</small>}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
-  if (itemNames.length) parts.push(itemNames.join(', '));
-  if (Number(ic)) parts.push(`${Number(ic).toLocaleString()} IC`);
-
-  return parts.length ? parts.join(' + ') : 'No items';
+function RawTradeDebug({ trade }) {
+  return (
+    <details className="admin-raw-trade-details">
+      <summary>Raw trade data</summary>
+      <pre>{JSON.stringify(trade, null, 2)}</pre>
+    </details>
+  );
 }
 
 async function tryApi(calls) {
@@ -282,7 +339,6 @@ export default function AdminPanel({ currentUser, user }) {
   function enterRoom(room) {
     const roomId = room.roomId || room.id;
     if (!roomId) return;
-
     window.history.pushState({}, '', `/room/${encodeURIComponent(roomId)}`);
     window.dispatchEvent(new PopStateEvent('popstate'));
   }
@@ -404,16 +460,22 @@ export default function AdminPanel({ currentUser, user }) {
           <div className="panel-title-row">
             <div>
               <h2>Trades</h2>
-              <p className="muted">Expandable trade summaries with items and chat when available.</p>
+              <p className="muted">Expandable trade summaries with items, IC, and chat history.</p>
             </div>
           </div>
+
           <div className="admin-trade-list">
             {trades.length === 0 && <p className="muted tidy-empty">No trades found.</p>}
+
             {trades.map((trade, index) => {
               const tradeId = trade.id || trade.tradeId || index;
               const expanded = expandedTradeIds.has(tradeId);
+              const fromItems = normalizeTradeItems(trade, 'from');
+              const toItems = normalizeTradeItems(trade, 'to');
               const chat = normalizeTradeChat(trade);
-              const items = normalizeTradeItems(trade);
+              const fromIc = getIcValue(trade, ['fromIc', 'fromIC', 'fromIcAmount', 'fromICAmount', 'offerIc', 'offeredIc', 'offerIC', 'offeredIC']);
+              const toIc = getIcValue(trade, ['toIc', 'toIC', 'toIcAmount', 'toICAmount', 'requestIc', 'requestedIc', 'requestIC', 'requestedIC']);
+
               return (
                 <article className="admin-trade-card" key={tradeId}>
                   <button type="button" className="admin-trade-summary" onClick={() => toggleTrade(tradeId)}>
@@ -421,20 +483,25 @@ export default function AdminPanel({ currentUser, user }) {
                     <strong>Trade #{tradeId}</strong>
                     <em>{getTradeSummary(trade)}</em>
                   </button>
+
                   {expanded && (
                     <div className="admin-trade-details">
-                      <div>
-                        <h3>Items</h3>
-                        {items.length === 0 ? <p className="muted">No items.</p> : (
-                          <ul>{items.map((item, itemIndex) => <li key={`${tradeId}-item-${itemIndex}`}>{item.title || item.name || 'Unnamed item'}{item.price && ` — ${item.price}`}</li>)}</ul>
-                        )}
+                      <div className="admin-trade-meta">
+                        <p><strong>Room:</strong> {trade.roomId || trade.room_id || 'Unknown'}</p>
+                        <p><strong>From:</strong> {trade.fromUsername || trade.from_user || trade.fromUser || 'Unknown'}</p>
+                        <p><strong>To:</strong> {trade.toUsername || trade.to_user || trade.toUser || 'Unknown'}</p>
+                        <p><strong>Status:</strong> {trade.status || 'Unknown'}</p>
                       </div>
-                      <div>
-                        <h3>Chat Log</h3>
-                        {chat.length === 0 ? <><p className="muted">No chat messages.</p>{renderUnknownTradeShape(trade)}</> : (
-                          <ul>{chat.map((messageItem, chatIndex) => <li key={`${tradeId}-chat-${chatIndex}`}><strong>{messageItem.username || messageItem.author || 'System'}:</strong> {messageItem.message || messageItem.text || ''}</li>)}</ul>
-                        )}
+
+                      <TradeItemList title={`${trade.fromUsername || 'From'} offers`} items={fromItems} ic={fromIc} />
+                      <TradeItemList title={`${trade.toUsername || 'To'} offers`} items={toItems} ic={toIc} />
+
+                      <div className="admin-trade-chat">
+                        <h3>Chat History</h3>
+                        <ChatLog messages={chat} />
                       </div>
+
+                      <RawTradeDebug trade={trade} />
                     </div>
                   )}
                 </article>

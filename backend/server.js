@@ -1730,11 +1730,12 @@ app.delete('/api/bazaar/items/:id/interest', authMiddleware, async (req, res) =>
 
 
 
+
 app.get('/api/online-users', authMiddleware, async (req, res) => {
-  const socketUsers = onlineUserList();
+  const socketUsers = typeof onlineUserList === 'function' ? onlineUserList() : [];
 
   if (socketUsers.length) {
-    return res.json({ users: socketUsers });
+    return res.json({ users: socketUsers.map(user => onlineUserPayload(user)) });
   }
 
   const rows = await all(
