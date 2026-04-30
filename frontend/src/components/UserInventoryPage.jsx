@@ -13,10 +13,6 @@ function formatPriceDisplay(price) {
   return clean.replace(/^\$\s*/, '');
 }
 
-function getBackendShareBase() {
-  return import.meta.env.VITE_API_URL || 'https://velktrade.onrender.com';
-}
-
 export default function UserInventoryPage({
   username,
   userRecord,
@@ -31,10 +27,6 @@ export default function UserInventoryPage({
   onLoginRequired,
   onToggleBuyRequest
 }) {
-  const discordShareUrl = userRecord
-    ? `${getBackendShareBase().replace(/\/$/, '')}/u/${encodeURIComponent(userRecord.username)}?v=${Date.now()}`
-    : '';
-
   return (
     <section className="card">
       <div className="panel-title-row">
@@ -52,7 +44,7 @@ export default function UserInventoryPage({
         <>
           <div className="profile-header">
             <div>
-              <h3>{userRecord.username}'s Inventory</h3>
+              <h3>{userRecord.username}'s Inventory {userRecord.online ? <span className="online-status">Online</span> : <span className="offline-status">Offline</span>}</h3>
               <span className="status-pill">{items.length} item{items.length === 1 ? '' : 's'}</span>
             </div>
 
@@ -62,29 +54,18 @@ export default function UserInventoryPage({
               <p className="muted">No bio yet.</p>
             )}
 
-            <div className="inline-controls">
-              <button
-                type="button"
-                onClick={() => {
-                  if (isLoggedIn) {
-                    onStartTrade(userRecord.username);
-                  } else {
-                    onLoginRequired(userRecord.username);
-                  }
-                }}
-              >
-                Start Trade with {userRecord.username}
-              </button>
-
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => navigator.clipboard?.writeText(discordShareUrl)}
-                title="Copy Discord/social preview link"
-              >
-                Copy Discord Share Link
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (isLoggedIn) {
+                  onStartTrade(userRecord.username);
+                } else {
+                  onLoginRequired(userRecord.username);
+                }
+              }}
+            >
+              Start Trade with {userRecord.username}
+            </button>
           </div>
 
           <div className="item-grid drop-zone">

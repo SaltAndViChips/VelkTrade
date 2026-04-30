@@ -48,6 +48,135 @@ const io = new Server(server, {
   }
 });
 
+
+const onlineUsers = new Map(); // userId -> { id, username, sockets:Set<string> }
+
+const DEFAULT_NOTIFICATION_PREFS = {
+  offline_trades: true,
+  counters: true,
+  room_invites: true,
+  invite_responses: true,
+  sound_volume: 0.5,
+  flash_tab: true
+};
+
+function isUserOnline(userId) {
+  return onlineUsers.has(Number(userId));
+}
+
+function onlineUserList() {
+  return Array.from(onlineUsers.values()).map(user => ({
+    id: user.id,
+    username: user.username
+  }));
+}
+
+function socketRoomForUser(userId) {
+  return `user:${userId}`;
+}
+
+function parsePayload(value) {
+  try {
+    if (!value) return {};
+    if (typeof value === 'object') return value;
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+}
+
+function normalizeNotification(row) {
+  return {
+    id: row.id,
+    userId: row.user_id ?? row.userId,
+    type: row.type,
+    title: row.title,
+    message: row.message,
+    payload: parsePayload(row.payload),
+    seen: Boolean(row.seen),
+    createdAt: row.created_at ?? row.createdAt
+  };
+}
+
+async function ensureNotificationPrefs(userId) {
+  await run(
+    `INSERT INTO notification_preferences (user_id)
+     VALUES (?)
+     ON CONFLICT (user_id) DO NOTHING`,
+    [userId]
+  );
+
+  const prefs = await get(
+    `SELECT
+      user_id,
+      offline_trades,
+      counters,
+      room_invites,
+      invite_responses,
+      sound_volume,
+      flash_tab
+     FROM notification_preferences
+     WHERE user_id = ?`,
+    [userId]
+  );
+
+  return {
+    offlineTrades: prefs?.offline_trades ?? DEFAULT_NOTIFICATION_PREFS.offline_trades,
+    counters: prefs?.counters ?? DEFAULT_NOTIFICATION_PREFS.counters,
+    roomInvites: prefs?.room_invites ?? DEFAULT_NOTIFICATION_PREFS.room_invites,
+    inviteResponses: prefs?.invite_responses ?? DEFAULT_NOTIFICATION_PREFS.invite_responses,
+    soundVolume: Number(prefs?.sound_volume ?? DEFAULT_NOTIFICATION_PREFS.sound_volume),
+    flashTab: prefs?.flash_tab ?? DEFAULT_NOTIFICATION_PREFS.flash_tab
+  };
+}
+
+function prefKeyForNotificationType(type) {
+  return {
+    offline_trade: 'offlineTrades',
+    counter_offer: 'counters',
+    room_invite: 'roomInvites',
+    invite_response: 'inviteResponses'
+  }[type];
+}
+
+async function createNotification({ userId, type, title, message, payload = {} }) {
+  const prefs = await ensureNotificationPrefs(userId);
+  const prefKey = prefKeyForNotificationType(type);
+
+  if (prefKey && prefs[prefKey] === false) {
+    return null;
+  }
+
+  const result = await run(
+    `INSERT INTO notifications (user_id, type, title, message, payload)
+     VALUES (?, ?, ?, ?, ?) RETURNING id`,
+    [userId, type, title, message, JSON.stringify(payload)]
+  );
+
+  const notification = await get(
+    `SELECT id, user_id, type, title, message, payload, seen, created_at
+     FROM notifications
+     WHERE id = ?`,
+    [result.lastID]
+  );
+
+  const normalized = normalizeNotification(notification);
+
+  io.to(socketRoomForUser(userId)).emit('notification:new', {
+    notification: normalized
+  });
+
+  return normalized;
+}
+
+function broadcastPresence() {
+  io.emit('presence:update', {
+    users: onlineUserList()
+  });
+}
+
+
+
 function cleanBio(value) {
   return String(value || '').trim().slice(0, 1000);
 }
@@ -438,7 +567,8 @@ app.get('/api/profile/:username', optionalAuth, async (req, res) => {
     user: {
       id: profileUser.id,
       username: profileUser.username,
-      bio: profileUser.bio || ''
+      bio: profileUser.bio || '',
+      online: isUserOnline(profileUser.id)
     },
     items
   });
@@ -611,7 +741,7 @@ app.get('/api/inventory/:username', optionalAuth, async (req, res) => {
     [req.user?.id || 0, user.id]
   );
 
-  res.json({ user: { ...user, bio: user.bio || '' }, items });
+  res.json({ user: { ...user, bio: user.bio || '', online: isUserOnline(user.id) }, items });
 });
 
 app.get('/api/trades', authMiddleware, async (req, res) => {
@@ -659,6 +789,29 @@ app.post('/api/trades/offers', authMiddleware, async (req, res) => {
       toIc,
       status: 'pending',
       message
+    });
+
+    await createNotification({
+      userId: target.id,
+      type: 'offline_trade',
+      title: 'New offline trade request',
+      message: `${req.user.username} sent you an offline trade request.`,
+      payload: {
+        tradeId: result.lastID,
+        fromUsername: req.user.username
+      }
+    });
+
+    await createNotification({
+      userId: otherUser.id,
+      type: 'counter_offer',
+      title: 'New counter offer',
+      message: `${req.user.username} sent you a counter offer.`,
+      payload: {
+        tradeId: result.lastID,
+        originalTradeId: original.id,
+        fromUsername: req.user.username
+      }
     });
 
     res.json({ ok: true, tradeId: result.lastID });
@@ -826,6 +979,81 @@ app.post('/api/admin/reset-password', authMiddleware, requireAdmin, async (req, 
   res.json({ ok: true, message: `Password reset for ${target.username}` });
 });
 
+
+app.get('/api/notifications', authMiddleware, async (req, res) => {
+  const prefs = await ensureNotificationPrefs(req.user.id);
+  const rows = await all(
+    `SELECT id, user_id, type, title, message, payload, seen, created_at
+     FROM notifications
+     WHERE user_id = ?
+     ORDER BY created_at DESC
+     LIMIT 100`,
+    [req.user.id]
+  );
+
+  res.json({
+    notifications: rows.map(normalizeNotification),
+    preferences: prefs,
+    onlineUsers: onlineUserList()
+  });
+});
+
+app.put('/api/notification-preferences', authMiddleware, async (req, res) => {
+  const soundVolume = Math.max(0, Math.min(1, Number(req.body.soundVolume ?? 0.5)));
+
+  await run(
+    `INSERT INTO notification_preferences
+      (user_id, offline_trades, counters, room_invites, invite_responses, sound_volume, flash_tab)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (user_id) DO UPDATE SET
+      offline_trades = EXCLUDED.offline_trades,
+      counters = EXCLUDED.counters,
+      room_invites = EXCLUDED.room_invites,
+      invite_responses = EXCLUDED.invite_responses,
+      sound_volume = EXCLUDED.sound_volume,
+      flash_tab = EXCLUDED.flash_tab`,
+    [
+      req.user.id,
+      Boolean(req.body.offlineTrades),
+      Boolean(req.body.counters),
+      Boolean(req.body.roomInvites),
+      Boolean(req.body.inviteResponses),
+      soundVolume,
+      Boolean(req.body.flashTab)
+    ]
+  );
+
+  res.json({
+    ok: true,
+    preferences: await ensureNotificationPrefs(req.user.id)
+  });
+});
+
+app.post('/api/notifications/:id/read', authMiddleware, async (req, res) => {
+  await run(
+    'UPDATE notifications SET seen = TRUE WHERE id = ? AND user_id = ?',
+    [req.params.id, req.user.id]
+  );
+
+  res.json({ ok: true });
+});
+
+app.post('/api/notifications/read-all', authMiddleware, async (req, res) => {
+  await run(
+    'UPDATE notifications SET seen = TRUE WHERE user_id = ?',
+    [req.user.id]
+  );
+
+  res.json({ ok: true });
+});
+
+app.get('/api/presence', authMiddleware, async (req, res) => {
+  res.json({
+    onlineUsers: onlineUserList()
+  });
+});
+
+
 io.use((socket, next) => {
   try {
     socket.user = jwt.verify(socket.handshake.auth.token, process.env.JWT_SECRET);
@@ -836,10 +1064,94 @@ io.use((socket, next) => {
 });
 
 io.on('connection', socket => {
+  const userId = Number(socket.user.id);
+  const existing = onlineUsers.get(userId) || {
+    id: userId,
+    username: socket.user.username,
+    sockets: new Set()
+  };
+
+  existing.sockets.add(socket.id);
+  onlineUsers.set(userId, existing);
+  socket.join(socketRoomForUser(userId));
+  broadcastPresence();
+
+  socket.on('disconnect', () => {
+    const current = onlineUsers.get(userId);
+
+    if (!current) return;
+
+    current.sockets.delete(socket.id);
+
+    if (current.sockets.size === 0) {
+      onlineUsers.delete(userId);
+    } else {
+      onlineUsers.set(userId, current);
+    }
+
+    broadcastPresence();
+  });
+
   socket.on('room:create', () => {
     const room = createRoom(socket.user);
     socket.join(room.roomId);
     socket.emit('room:update', publicRoomState(room));
+  });
+
+
+  socket.on('room:invite', async ({ roomId, username }) => {
+    try {
+      const cleanRoomId = String(roomId || '').trim().toUpperCase();
+      const target = await get(
+        'SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)',
+        [normalizeUsername(username)]
+      );
+
+      if (!target) {
+        return socket.emit('room:error', 'Player not found');
+      }
+
+      if (Number(target.id) === Number(socket.user.id)) {
+        return socket.emit('room:error', 'You cannot invite yourself');
+      }
+
+      await createNotification({
+        userId: target.id,
+        type: 'room_invite',
+        title: 'Room invite',
+        message: `${socket.user.username} invited you to join room ${cleanRoomId}.`,
+        payload: {
+          roomId: cleanRoomId,
+          fromUserId: socket.user.id,
+          fromUsername: socket.user.username
+        }
+      });
+    } catch (error) {
+      socket.emit('room:error', error.message || 'Could not send invite');
+    }
+  });
+
+  socket.on('room:invite-response', async ({ roomId, inviterId, accepted }) => {
+    try {
+      const cleanRoomId = String(roomId || '').trim().toUpperCase();
+
+      if (!inviterId) return;
+
+      await createNotification({
+        userId: Number(inviterId),
+        type: 'invite_response',
+        title: accepted ? 'Room invite accepted' : 'Room invite declined',
+        message: `${socket.user.username} ${accepted ? 'accepted' : 'declined'} your invite to room ${cleanRoomId}.`,
+        payload: {
+          roomId: cleanRoomId,
+          fromUserId: socket.user.id,
+          fromUsername: socket.user.username,
+          accepted: Boolean(accepted)
+        }
+      });
+    } catch (error) {
+      socket.emit('room:error', error.message || 'Could not send invite response');
+    }
   });
 
   socket.on('room:join', ({ roomId }) => {

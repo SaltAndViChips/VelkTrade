@@ -92,6 +92,32 @@ async function initDb() {
     )
   `);
 
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      payload TEXT DEFAULT '{}',
+      seen BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS notification_preferences (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      offline_trades BOOLEAN DEFAULT TRUE,
+      counters BOOLEAN DEFAULT TRUE,
+      room_invites BOOLEAN DEFAULT TRUE,
+      invite_responses BOOLEAN DEFAULT TRUE,
+      sound_volume NUMERIC DEFAULT 0.5,
+      flash_tab BOOLEAN DEFAULT TRUE
+    )
+  `);
+
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_unique
     ON users (LOWER(username))

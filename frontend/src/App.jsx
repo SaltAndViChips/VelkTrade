@@ -21,6 +21,7 @@ import AdminPanel from './components/AdminPanel';
 import Trades from './components/Trades';
 import TradeOfferPanel from './components/TradeOfferPanel';
 import UserInventoryPage from './components/UserInventoryPage';
+import Notifications from './components/Notifications';
 
 function parseDraggedItemId(active) {
   const dataItemId = active?.data?.current?.itemId;
@@ -129,6 +130,16 @@ export default function App() {
   const [viewedInventory, setViewedInventory] = useState([]);
   const [trades, setTrades] = useState([]);
   const [buyRequests, setBuyRequests] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    offlineTrades: true,
+    counters: true,
+    roomInvites: true,
+    inviteResponses: true,
+    soundVolume: 0.5,
+    flashTab: true
+  });
+  const [onlineUsers, setOnlineUsers] = useState([]);
   const [room, setRoom] = useState(null);
   const [error, setError] = useState('');
   const [activeDragItem, setActiveDragItem] = useState(null);
@@ -178,6 +189,7 @@ export default function App() {
   }, []);
 
   const isAdmin = Boolean(user?.isAdmin);
+  const unseenNotificationCount = notifications.filter(notification => !notification.seen).length;
 
   const myOfferIds = useMemo(
     () => normalizeIds(room && user ? room.offers?.[user.id] || [] : []),
@@ -223,6 +235,12 @@ export default function App() {
   const theirAccepted = Boolean(room && theirPlayer && room.accepted?.[theirPlayer.id]);
   const myConfirmed = Boolean(room && user && room.confirmed?.[user.id]);
   const theirConfirmed = Boolean(room && theirPlayer && room.confirmed?.[theirPlayer.id]);
+
+
+  useEffect(() => {
+    const baseTitle = 'Salts Trading Board';
+    document.title = unseenNotificationCount > 0 ? `(${unseenNotificationCount}) ${baseTitle}` : baseTitle;
+  }, [unseenNotificationCount]);
 
   useEffect(() => {
     if (!getToken()) return;
@@ -298,6 +316,24 @@ export default function App() {
       }
     });
 
+
+    nextSocket.on('notification:new', ({ notification }) => {
+      setNotifications(current => [notification, ...current]);
+      playNotificationSound();
+
+      if (notificationPrefs.flashTab) {
+        const original = document.title;
+        document.title = `● ${original}`;
+        setTimeout(() => {
+          document.title = original;
+        }, 900);
+      }
+    });
+
+    nextSocket.on('presence:update', ({ users }) => {
+      setOnlineUsers(users || []);
+    });
+
     nextSocket.on('room:error', message => {
       setError(message || 'Room error');
     });
@@ -357,7 +393,8 @@ export default function App() {
 
     await Promise.all([
       refreshInventory(targetUser.username),
-      loadTrades()
+      loadTrades(),
+      loadNotifications()
     ]);
   }
 
@@ -409,6 +446,62 @@ export default function App() {
     } finally {
       setProfileLoading(false);
     }
+  }
+
+
+  async function loadNotifications() {
+    if (!getToken()) return;
+
+    const data = await api('/api/notifications');
+    setNotifications(data.notifications || []);
+    setNotificationPrefs(data.preferences || notificationPrefs);
+    setOnlineUsers(data.onlineUsers || []);
+  }
+
+  function playNotificationSound() {
+    const volume = Number(notificationPrefs.soundVolume ?? 0.5);
+    if (volume <= 0) return;
+
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const context = new AudioContext();
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 740;
+      gain.gain.value = volume * 0.12;
+
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start();
+
+      setTimeout(() => {
+        oscillator.stop();
+        context.close();
+      }, 140);
+    } catch {
+      // Browser may block audio until user interaction.
+    }
+  }
+
+  async function saveNotificationPreferences(preferences) {
+    const data = await api('/api/notification-preferences', {
+      method: 'PUT',
+      body: JSON.stringify(preferences)
+    });
+
+    setNotificationPrefs(data.preferences || preferences);
+  }
+
+  async function markNotificationRead(id) {
+    await api(`/api/notifications/${id}/read`, { method: 'POST' });
+    await loadNotifications();
+  }
+
+  async function markAllNotificationsRead() {
+    await api('/api/notifications/read-all', { method: 'POST' });
+    await loadNotifications();
   }
 
   async function loadTrades() {
@@ -545,6 +638,48 @@ export default function App() {
     setPendingRoomId(cleanRoomId);
     joinedInitialRoomRef.current = true;
     socketRef.current?.emit('room:join', { roomId: cleanRoomId });
+  }
+
+
+  function invitePlayerToRoom(username) {
+    const cleanUsername = String(username || '').trim();
+    const activeRoom = roomRef.current;
+
+    if (!cleanUsername || !activeRoom?.roomId) return;
+
+    socketRef.current?.emit('room:invite', {
+      roomId: activeRoom.roomId,
+      username: cleanUsername
+    });
+  }
+
+  function acceptRoomInvite(notification) {
+    const roomId = notification?.payload?.roomId;
+    const inviterId = notification?.payload?.fromUserId;
+
+    if (!roomId) return;
+
+    socketRef.current?.emit('room:invite-response', {
+      roomId,
+      inviterId,
+      accepted: true
+    });
+
+    markNotificationRead(notification.id);
+    joinRoom(roomId);
+  }
+
+  function declineRoomInvite(notification) {
+    const roomId = notification?.payload?.roomId;
+    const inviterId = notification?.payload?.fromUserId;
+
+    socketRef.current?.emit('room:invite-response', {
+      roomId,
+      inviterId,
+      accepted: false
+    });
+
+    markNotificationRead(notification.id);
   }
 
   function leaveRoom() {
@@ -757,6 +892,12 @@ export default function App() {
               <button className="ghost danger" onClick={leaveRoom}>Exit Room</button>
             )}
 
+            {user && (
+              <button className="notification-bell-button" onClick={() => setView('notifications')} aria-label="Open notifications">
+                🔔 {unseenNotificationCount > 0 && <span>{unseenNotificationCount}</span>}
+              </button>
+            )}
+
             {user && <button onClick={logout}>Logout</button>}
           </div>
         </header>
@@ -851,6 +992,21 @@ export default function App() {
           />
         )}
 
+
+        {user && view === 'notifications' && (
+          <Notifications
+            notifications={notifications}
+            preferences={notificationPrefs}
+            onlineUsers={onlineUsers}
+            onRefresh={loadNotifications}
+            onMarkRead={markNotificationRead}
+            onMarkAllRead={markAllNotificationsRead}
+            onSavePreferences={saveNotificationPreferences}
+            onAcceptRoomInvite={acceptRoomInvite}
+            onDeclineRoomInvite={declineRoomInvite}
+          />
+        )}
+
         {user && view === 'admin' && isAdmin && <AdminPanel />}
 
         {user && view === 'trade' && (
@@ -867,6 +1023,20 @@ export default function App() {
                 {roomUrl && <button onClick={() => navigator.clipboard?.writeText(roomUrl)}>Copy Room Link</button>}
                 {room?.roomId && <button onClick={() => navigator.clipboard?.writeText(room.roomId)}>Copy Room ID</button>}
               </div>
+
+              <form
+                className="inline-controls room-invite-form"
+                onSubmit={event => {
+                  event.preventDefault();
+                  const form = event.currentTarget;
+                  const input = form.elements.inviteUsername;
+                  invitePlayerToRoom(input.value);
+                  input.value = '';
+                }}
+              >
+                <input name="inviteUsername" placeholder="Invite player by username" />
+                <button type="submit">Send Invite</button>
+              </form>
             </section>
 
             <section className="grid two">

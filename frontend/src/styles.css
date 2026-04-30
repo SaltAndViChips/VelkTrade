@@ -1209,3 +1209,204 @@ p {
     border-radius: 14px;
   }
 }
+
+
+/* Notifications + online presence */
+
+.notification-bell-button {
+  position: relative;
+  min-width: 50px;
+}
+
+.notification-bell-button span {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--red);
+  border: 1px solid #ffd9df;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.notifications-page {
+  display: grid;
+  gap: 16px;
+}
+
+.notification-settings,
+.online-panel {
+  display: grid;
+  gap: 12px;
+  background: rgba(8, 7, 12, 0.42);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.toggle-row,
+.range-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  color: #ded8ff;
+}
+
+.toggle-row input {
+  width: auto;
+}
+
+.range-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--purple);
+}
+
+.online-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.online-chip,
+.online-status,
+.offline-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+}
+
+.online-chip {
+  color: #d9ffe5;
+  background: rgba(32, 94, 59, 0.22);
+  border-color: rgba(98, 209, 138, 0.45);
+}
+
+.online-chip i,
+.online-status::before,
+.offline-status::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--green);
+}
+
+.online-status {
+  color: #d9ffe5;
+  background: rgba(32, 94, 59, 0.22);
+  border-color: rgba(98, 209, 138, 0.45);
+  margin-left: 8px;
+}
+
+.offline-status {
+  color: var(--muted);
+  background: rgba(15, 13, 23, 0.6);
+  border-color: var(--border);
+  margin-left: 8px;
+}
+
+.offline-status::before {
+  background: #77708d;
+}
+
+.notification-list {
+  display: grid;
+  gap: 12px;
+}
+
+.notification-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  background:
+    radial-gradient(circle at top left, rgba(141, 99, 255, 0.08), transparent 34%),
+    linear-gradient(180deg, #171522, #100f18);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.notification-card.unseen {
+  border-color: var(--border-bright);
+  box-shadow: 0 0 0 1px rgba(141,99,255,.18), 0 12px 32px rgba(0,0,0,.28);
+}
+
+.notification-card.seen {
+  opacity: 0.78;
+}
+
+.notification-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--purple-soft);
+  border: 1px solid var(--border-bright);
+  color: #e7dcff;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.notification-title-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.notification-card p {
+  margin: 6px 0;
+  color: #ded8ff;
+  overflow-wrap: anywhere;
+}
+
+.notification-card small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.notification-card-actions {
+  display: flex;
+  justify-content: end;
+}
+
+.notification-actions {
+  margin-top: 10px;
+}
+
+.room-invite-form {
+  grid-column: 1 / -1;
+  margin-top: 12px;
+}
+
+.room-invite-form input {
+  min-width: min(320px, 100%);
+}
+
+@media (max-width: 720px) {
+  .notification-card {
+    grid-template-columns: 1fr;
+  }
+
+  .notification-card-actions {
+    justify-content: start;
+  }
+
+  .toggle-row,
+  .range-row {
+    grid-template-columns: 1fr;
+  }
+}
