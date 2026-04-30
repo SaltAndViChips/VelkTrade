@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
 
 const { get, all, run, transaction, getDatabaseDiagnostics } = require('./db');
+const { registerProfileShareRoute } = require('./profileShareRoute');
 const { createToken, authMiddleware } = require('./auth');
 const { fetchImgurItem, isImgurUrl } = require('./imgur');
 const {
@@ -38,9 +39,17 @@ const server = http.createServer(app);
 
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
 const PORT = process.env.PORT || 3001;
+const PUBLIC_FRONTEND_URL = (process.env.PUBLIC_FRONTEND_URL || FRONTEND_ORIGIN || 'https://nicecock.ca/VelkTrade').replace(/\/$/, '');
 
 app.use(express.json());
 app.use(cors({ origin: FRONTEND_ORIGIN }));
+
+registerProfileShareRoute(app, {
+  get,
+  publicFrontendUrl: PUBLIC_FRONTEND_URL
+});
+
+
 
 const io = new Server(server, {
   cors: {
