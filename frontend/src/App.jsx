@@ -23,6 +23,7 @@ import TradeOfferPanel from './components/TradeOfferPanel';
 import UserInventoryPage from './components/UserInventoryPage';
 import Bazaar from './components/Bazaar';
 import Notifications from './components/Notifications';
+import SafeOnlinePlayersDropdown from './components/SafeOnlinePlayersDropdown.jsx';
 
 function parseDraggedItemId(active) {
   const dataItemId = active?.data?.current?.itemId;
@@ -1015,6 +1016,16 @@ previousRoomPlayerIdsRef.current = nextIds;
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveDragItem(null)}
     >
+      {user && (
+        <SafeOnlinePlayersDropdown
+          currentUser={user}
+          onlineUsers={Array.isArray(onlineUsers) ? onlineUsers : []}
+          currentRoomId={room?.roomId || ''}
+          onInvitePlayer={invitePlayerToRoom || (() => {})}
+        />
+      )}
+
+
 <main className="app-shell">
         <header className="topbar">
           <div>
