@@ -1363,6 +1363,7 @@ app.post('/api/admin/reset-password', authMiddleware, requireAdmin, async (req, 
 
 
 
+
 app.get('/api/bazaar', authMiddleware, async (req, res) => {
   const search = String(req.query.search || '').trim().toLowerCase();
   const sort = String(req.query.sort || 'newest');
@@ -1381,11 +1382,12 @@ app.get('/api/bazaar', authMiddleware, async (req, res) => {
       items.userId AS "ownerId",
       users.username AS "ownerUsername",
       COALESCE(users.is_verified, FALSE) AS "ownerVerified",
-      COALESCE(COUNT(buy_requests.id), 0)::int AS "interestCount",
+      COALESCE(COUNT(CASE WHEN interested_users.is_verified = TRUE THEN buy_requests.id END), 0)::int AS "interestCount",
       COALESCE(MAX(CASE WHEN buy_requests.requester_id = ? THEN 1 ELSE 0 END), 0)::int AS "viewerInterested"
      FROM items
      JOIN users ON users.id = items.userId
      LEFT JOIN buy_requests ON buy_requests.item_id = items.id
+     LEFT JOIN users AS interested_users ON interested_users.id = buy_requests.requester_id
      WHERE COALESCE(users.show_bazaar_inventory, TRUE) = TRUE
        AND COALESCE(users.last_seen_at, NOW()) >= NOW() - INTERVAL '7 days'
      GROUP BY items.id, items.title, items.image, items.price, items.createdAt, items.userId, users.username, users.is_verified

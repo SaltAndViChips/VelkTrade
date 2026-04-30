@@ -194,8 +194,17 @@ export default function Bazaar({ currentUser }) {
                   </span>
                 )}
 
+                <div className="bazaar-full-preview">
+                  <img src={item.image} alt={item.title} />
+                  <strong>{item.title}</strong>
+                  <em>{formatNumber(item.priceAmount)} IC</em>
+                  {item.ownerVerified && (
+                    <span><span className="verified-badge mini" title="Verified user">✓</span> Verified seller</span>
+                  )}
+                </div>
+
                 <div className="bazaar-interest-row">
-                  <span>{otherInterestCount} other user{otherInterestCount === 1 ? '' : 's'} interested</span>
+                  <span>{otherInterestCount} verified user{otherInterestCount === 1 ? '' : 's'} interested</span>
                   {item.viewerInterested && <span className="status-pill">you are interested</span>}
                 </div>
 
