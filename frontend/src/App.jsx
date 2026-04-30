@@ -85,6 +85,12 @@ function makeRoomPath(roomId) {
   return `${window.location.origin}${cleanBase}/room/${roomId}`;
 }
 
+function makeUserProfilePath(username) {
+  const base = import.meta.env.BASE_URL || '/';
+  const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
+  return `${window.location.origin}${cleanBase}/user/${encodeURIComponent(username)}`;
+}
+
 export default function App() {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 2 } }),
@@ -607,6 +613,11 @@ export default function App() {
     });
   }
 
+  function viewMyProfile() {
+    if (!user?.username) return;
+    window.location.href = makeUserProfilePath(user.username);
+  }
+
   function logout() {
     clearUserDeepLinkUrl();
     clearToken();
@@ -668,6 +679,10 @@ export default function App() {
           <div className="inline-controls">
             {view !== 'dashboard' && user && (
               <button className="ghost" onClick={returnToDashboard}>Dashboard</button>
+            )}
+
+            {user && (
+              <button className="ghost" onClick={viewMyProfile}>Profile</button>
             )}
 
             {view === 'userProfile' && !user && (
