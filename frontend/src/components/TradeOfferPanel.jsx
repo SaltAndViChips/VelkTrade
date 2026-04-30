@@ -2,14 +2,50 @@ import { useEffect, useMemo, useState } from 'react';
 import { DndContext, DragOverlay, useDraggable, useDroppable } from '@dnd-kit/core';
 import { api } from '../api';
 
-function DropZone({ id, title, items, onDoubleClickItem }) {
+function normalizeIcInput(value) {
+  const raw = String(value || '').trim().replace(/^\$\s*/, '');
+  if (!raw) return '';
+
+  const withoutIc = raw.replace(/\bic\b/ig, '').trim();
+
+  if (/^\d+(\.\d+)?$/.test(withoutIc.replace(/,/g, ''))) {
+    const [whole, decimal] = withoutIc.replace(/,/g, '').split('.');
+    const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `${decimal !== undefined ? `${withCommas}.${decimal}` : withCommas} IC`;
+  }
+
+  if (/^\d+(\.\d+)?\s*[kmb]$/i.test(withoutIc)) {
+    return `${withoutIc} IC`;
+  }
+
+  if (/\bic\b/i.test(raw)) {
+    return raw.replace(/\bic\b/i, 'IC');
+  }
+
+  return `${raw} IC`;
+}
+
+function DropZone({ id, title, items, icAmount, onDoubleClickItem, onAddIc, onRemoveIc }) {
   const { setNodeRef } = useDroppable({ id });
 
   return (
     <section className="card">
-      <h2>{title}</h2>
+      <div className="panel-title-row">
+        <h2>{title}</h2>
+        <button type="button" className="ghost" onClick={onAddIc}>Add IC</button>
+      </div>
+
       <div ref={setNodeRef} className="item-grid drop-zone trade-zone">
-        {items.length === 0 && <p className="muted">No items selected.</p>}
+        {!icAmount && items.length === 0 && <p className="muted">No items selected.</p>}
+
+        {icAmount && (
+          <div className="item-card ic-offer-card">
+            <div className="ic-token">IC</div>
+            <span>{icAmount}</span>
+            <button type="button" className="mini-danger" onClick={onRemoveIc}>Remove IC</button>
+          </div>
+        )}
+
         {items.map(item => (
           <TradeItem key={item.id} item={item} dragPrefix="selected" onDoubleClick={() => onDoubleClickItem(item.id)} />
         ))}
@@ -32,9 +68,11 @@ function TradeItem({ item, dragPrefix, onDoubleClick }) {
     >
       <img src={item.image} alt={item.title} draggable="false" />
       <span>{item.title}</span>
+      {item.price && <strong className="item-price">{item.price}</strong>}
       <div className="item-full-preview">
         <img src={item.image} alt={item.title} />
         <strong>{item.title}</strong>
+        {item.price && <em>{item.price}</em>}
       </div>
     </div>
   );
@@ -51,11 +89,26 @@ function InventoryDrop({ id, children }) {
   );
 }
 
+function extractIcFromTrade(trade, userId) {
+  const metaMessage = (trade?.chatHistory || []).find(message => message.type === 'trade-meta');
+
+  if (!metaMessage?.message) return '';
+
+  try {
+    const meta = JSON.parse(metaMessage.message);
+    return meta.icOffers?.[userId] || '';
+  } catch {
+    return '';
+  }
+}
+
 export default function TradeOfferPanel({ currentUser, inventory, counterTrade, initialTargetUsername = '', onClose }) {
   const [targetUsername, setTargetUsername] = useState(initialTargetUsername);
   const [targetInventory, setTargetInventory] = useState([]);
   const [offerIds, setOfferIds] = useState([]);
   const [requestIds, setRequestIds] = useState([]);
+  const [offerIc, setOfferIc] = useState('');
+  const [requestIc, setRequestIc] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [activeDragItem, setActiveDragItem] = useState(null);
@@ -74,6 +127,9 @@ export default function TradeOfferPanel({ currentUser, inventory, counterTrade, 
       ? counterTrade.toUsername
       : counterTrade.fromUsername;
 
+    const currentUserId = currentUser.id;
+    const otherUserId = currentUserIsOriginalSender ? counterTrade.toUser : counterTrade.fromUser;
+
     setTargetUsername(otherUsername);
     setMessage(`Counter offer for trade #${counterTrade.id}`);
 
@@ -86,6 +142,9 @@ export default function TradeOfferPanel({ currentUser, inventory, counterTrade, 
       setRequestIds(counterTrade.fromItems || []);
       setTargetInventory(counterTrade.fromItemDetails || []);
     }
+
+    setOfferIc(extractIcFromTrade(counterTrade, currentUserId));
+    setRequestIc(extractIcFromTrade(counterTrade, otherUserId));
   }, [counterTrade, currentUser]);
 
   useEffect(() => {
@@ -112,6 +171,24 @@ export default function TradeOfferPanel({ currentUser, inventory, counterTrade, 
 
     setError('');
     setTargetInventory(data.items || []);
+  }
+
+  function promptIc(currentValue = '') {
+    const amount = window.prompt('Enter IC amount:', currentValue.replace(/\s*IC$/i, ''));
+
+    if (amount === null) return currentValue;
+
+    return normalizeIcInput(amount);
+  }
+
+  function addOfferIc() {
+    const next = promptIc(offerIc);
+    setOfferIc(next);
+  }
+
+  function addRequestIc() {
+    const next = promptIc(requestIc);
+    setRequestIc(next);
   }
 
   function addOfferItem(itemId) {
@@ -169,6 +246,8 @@ export default function TradeOfferPanel({ currentUser, inventory, counterTrade, 
           body: JSON.stringify({
             fromItems: offerIds,
             toItems: requestIds,
+            fromIc: offerIc,
+            toIc: requestIc,
             message
           })
         });
@@ -179,6 +258,8 @@ export default function TradeOfferPanel({ currentUser, inventory, counterTrade, 
             toUsername: targetUsername.trim(),
             fromItems: offerIds,
             toItems: requestIds,
+            fromIc: offerIc,
+            toIc: requestIc,
             message
           })
         });
@@ -196,7 +277,7 @@ export default function TradeOfferPanel({ currentUser, inventory, counterTrade, 
         <div className="panel-title-row">
           <div>
             <h2>{counterTrade ? 'Counter Offer' : 'Offline Trade Offer'}</h2>
-            <p className="muted">Drag or double-click items into the trade. The other player does not need to be online.</p>
+            <p className="muted">Drag or double-click items into the trade, or add IC.</p>
           </div>
           <button className="ghost" onClick={onClose}>Close</button>
         </div>
@@ -242,8 +323,24 @@ export default function TradeOfferPanel({ currentUser, inventory, counterTrade, 
         </div>
 
         <div className="grid two">
-          <DropZone id="offer-drop" title="Your Offer" items={offerItems} onDoubleClickItem={removeOfferItem} />
-          <DropZone id="request-drop" title="Requested Items" items={requestedItems} onDoubleClickItem={removeRequestItem} />
+          <DropZone
+            id="offer-drop"
+            title="Your Offer"
+            items={offerItems}
+            icAmount={offerIc}
+            onDoubleClickItem={removeOfferItem}
+            onAddIc={addOfferIc}
+            onRemoveIc={() => setOfferIc('')}
+          />
+          <DropZone
+            id="request-drop"
+            title="Requested Items"
+            items={requestedItems}
+            icAmount={requestIc}
+            onDoubleClickItem={removeRequestItem}
+            onAddIc={addRequestIc}
+            onRemoveIc={() => setRequestIc('')}
+          />
         </div>
 
         <div className="inline-controls">
@@ -257,6 +354,7 @@ export default function TradeOfferPanel({ currentUser, inventory, counterTrade, 
           <div className="item-card drag-overlay">
             <img src={activeDragItem.image} alt={activeDragItem.title} />
             <span>{activeDragItem.title}</span>
+            {activeDragItem.price && <strong className="item-price">{activeDragItem.price}</strong>}
           </div>
         ) : null}
       </DragOverlay>

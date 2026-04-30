@@ -1,12 +1,7 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 
-function OfferItem({ item, onDoubleClick, onRemove }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    isDragging
-  } = useDraggable({
+function OfferedItem({ item, onDoubleClick }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `offer-item-${item.id}`,
     data: {
       itemId: item.id,
@@ -14,91 +9,84 @@ function OfferItem({ item, onDoubleClick, onRemove }) {
     }
   });
 
-  function handleDoubleClick(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    onDoubleClick?.(item.id);
-  }
-
   return (
     <div
       ref={setNodeRef}
       className={`item-card ${isDragging ? 'is-dragging' : ''}`}
-      onDoubleClick={handleDoubleClick}
+      onDoubleClick={() => onDoubleClick?.(item.id)}
       {...attributes}
       {...listeners}
     >
       <img src={item.image} alt={item.title} draggable="false" />
       <span>{item.title}</span>
+      {item.price && <strong className="item-price">{item.price}</strong>}
 
       <div className="item-full-preview">
         <img src={item.image} alt={item.title} />
         <strong>{item.title}</strong>
-      </div>
-
-      <button
-        type="button"
-        className="mini-danger"
-        onPointerDown={event => event.stopPropagation()}
-        onClick={event => {
-          event.preventDefault();
-          event.stopPropagation();
-          onRemove?.(item.id);
-        }}
-      >
-        Remove
-      </button>
-    </div>
-  );
-}
-
-function ReadOnlyOfferItem({ item }) {
-  return (
-    <div className="item-card readonly">
-      <img src={item.image} alt={item.title} />
-      <span>{item.title}</span>
-
-      <div className="item-full-preview">
-        <img src={item.image} alt={item.title} />
-        <strong>{item.title}</strong>
+        {item.price && <em>{item.price}</em>}
       </div>
     </div>
   );
 }
 
-function OfferZone({ title, items, droppableId, readOnly, onDoubleClickOfferItem }) {
+function OfferZone({ id, title, items, icAmount, accepted, confirmed, isMine, onDoubleClickOfferItem, onRemoveIc }) {
   const { setNodeRef, isOver } = useDroppable({
-    id: droppableId,
+    id,
     data: {
-      zone: droppableId
+      zone: id
     }
   });
 
   return (
-    <div className="card">
-      <h2>{title}</h2>
+    <section className="card">
+      <div className="panel-title-row">
+        <h2>{title}</h2>
+        <span className={`status-pill ${confirmed ? 'status-completed' : accepted ? 'status-accepted' : 'status-pending'}`}>
+          {confirmed ? 'Confirmed' : accepted ? 'Accepted' : 'Editing'}
+        </span>
+      </div>
 
       <div ref={setNodeRef} className={`item-grid drop-zone trade-zone ${isOver ? 'drop-zone-active' : ''}`}>
-        {items.length === 0 && <p className="muted">No items offered.</p>}
+        {!icAmount && items.length === 0 && <p className="muted">No items here.</p>}
 
-        {items.map(item => readOnly ? (
-          <ReadOnlyOfferItem key={item.id} item={item} />
-        ) : (
-          <OfferItem
+        {icAmount && (
+          <div className="item-card ic-offer-card">
+            <div className="ic-token">IC</div>
+            <span>{icAmount}</span>
+            {isMine && (
+              <button
+                type="button"
+                className="mini-danger"
+                onClick={event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onRemoveIc?.();
+                }}
+              >
+                Remove IC
+              </button>
+            )}
+          </div>
+        )}
+
+        {items.map(item => (
+          <OfferedItem
             key={item.id}
             item={item}
-            onDoubleClick={onDoubleClickOfferItem}
-            onRemove={onDoubleClickOfferItem}
+            onDoubleClick={isMine ? onDoubleClickOfferItem : undefined}
           />
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
 export default function TradeBoard({
   myOfferItems,
   theirOfferItems,
+  myIcOffer = '',
+  theirIcOffer = '',
   myAccepted,
   theirAccepted,
   myConfirmed,
@@ -107,42 +95,47 @@ export default function TradeBoard({
   canConfirm,
   onAccept,
   onConfirm,
-  onDoubleClickOfferItem
+  onDoubleClickOfferItem,
+  onOfferIc,
+  onRemoveIc
 }) {
   return (
     <section className="trade-board">
-      <div className="grid two">
-        <OfferZone
-          title="Your Offer"
-          items={myOfferItems}
-          droppableId="my-offer-drop"
-          onDoubleClickOfferItem={onDoubleClickOfferItem}
-        />
-
-        <OfferZone
-          title="Their Offer"
-          items={theirOfferItems}
-          droppableId="their-offer-drop"
-          readOnly
-        />
-      </div>
-
-      <div className="card trade-actions">
+      <div className="trade-actions card">
         <div>
-          <p>You: {myAccepted ? 'Accepted' : 'Not accepted'} / {myConfirmed ? 'Confirmed' : 'Not confirmed'}</p>
-          <p>Them: {theirAccepted ? 'Accepted' : 'Not accepted'} / {theirConfirmed ? 'Confirmed' : 'Not confirmed'}</p>
+          <h2>Trade</h2>
+          <p className="muted">Drag items into your offer, double-click to remove them, or add IC.</p>
         </div>
 
         <div className="inline-controls">
-          <button disabled={!canAccept || myAccepted} onClick={onAccept}>
-            {myAccepted ? 'Accepted' : 'Accept Trade'}
-          </button>
-
-          <button disabled={!canConfirm || myConfirmed} onClick={onConfirm}>
-            {myConfirmed ? 'Confirmed' : 'Confirm Trade'}
-          </button>
+          <button type="button" onClick={onOfferIc}>Offer IC</button>
+          <button onClick={onAccept} disabled={!canAccept || myAccepted}>Accept</button>
+          <button onClick={onConfirm} disabled={!canConfirm || myConfirmed}>Confirm</button>
         </div>
       </div>
+
+      <section className="grid two">
+        <OfferZone
+          id="my-offer-drop"
+          title="Your Offer"
+          items={myOfferItems}
+          icAmount={myIcOffer}
+          accepted={myAccepted}
+          confirmed={myConfirmed}
+          isMine
+          onDoubleClickOfferItem={onDoubleClickOfferItem}
+          onRemoveIc={onRemoveIc}
+        />
+
+        <OfferZone
+          id="their-offer-drop"
+          title="Their Offer"
+          items={theirOfferItems}
+          icAmount={theirIcOffer}
+          accepted={theirAccepted}
+          confirmed={theirConfirmed}
+        />
+      </section>
     </section>
   );
 }

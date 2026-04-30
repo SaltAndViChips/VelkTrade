@@ -20,13 +20,16 @@ const {
   createRoom,
   joinRoom,
   setOffer,
+  setIcOffer,
+  removeIcOffer,
   acceptTrade,
   confirmTrade,
   addChatMessage,
   maybeSaveAcceptedSnapshot,
   finalizeTrade,
   leaveRoom,
-  publicRoomState
+  publicRoomState,
+  normalizeIcAmount
 } = require('./rooms');
 
 const app = express();
@@ -34,95 +37,6 @@ const server = http.createServer(app);
 
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
 const PORT = process.env.PORT || 3001;
-const PUBLIC_FRONTEND_URL = (process.env.PUBLIC_FRONTEND_URL || FRONTEND_ORIGIN || 'https://nicecock.ca/VelkTrade').replace(/\/$/, '');
-
-function escapeHtml(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function profileUrl(username) {
-  return `${PUBLIC_FRONTEND_URL}/user/${encodeURIComponent(username)}`;
-}
-
-function socialPreviewImageUrl() {
-  if (PUBLIC_FRONTEND_URL.includes('nicecock.ca')) {
-    return `${PUBLIC_FRONTEND_URL}/social-preview.png`;
-  }
-
-  return 'https://nicecock.ca/VelkTrade/social-preview.png';
-}
-
-function isCrawlerRequest(req) {
-  const userAgent = String(req.get('user-agent') || '').toLowerCase();
-
-  return [
-    'discordbot',
-    'twitterbot',
-    'facebookexternalhit',
-    'facebot',
-    'slackbot',
-    'linkedinbot',
-    'telegrambot',
-    'whatsapp',
-    'embedly',
-    'quora link preview',
-    'pinterest',
-    'vkshare'
-  ].some(bot => userAgent.includes(bot));
-}
-
-function sharePageHtml({
-  req,
-  title,
-  description,
-  image,
-  destination,
-  shouldRedirect
-}) {
-  const canonicalShareUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>${escapeHtml(title)}</title>
-  <meta name="description" content="${escapeHtml(description)}">
-  <meta name="theme-color" content="#8d63ff">
-
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Salts Trading Board">
-  <meta property="og:title" content="${escapeHtml(title)}">
-  <meta property="og:description" content="${escapeHtml(description)}">
-  <meta property="og:url" content="${escapeHtml(canonicalShareUrl)}">
-  <meta property="og:image" content="${escapeHtml(image)}">
-  <meta property="og:image:secure_url" content="${escapeHtml(image)}">
-  <meta property="og:image:type" content="image/png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="1200">
-
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="${escapeHtml(title)}">
-  <meta name="twitter:description" content="${escapeHtml(description)}">
-  <meta name="twitter:image" content="${escapeHtml(image)}">
-
-  <link rel="canonical" href="${escapeHtml(destination)}">
-  ${shouldRedirect ? `<meta http-equiv="refresh" content="0; url=${escapeHtml(destination)}">` : ''}
-</head>
-<body style="background:#09070f;color:#f2efff;font-family:Arial,sans-serif">
-  <main style="max-width:720px;margin:40px auto;padding:24px;border:1px solid #6f5ca8;border-radius:16px;background:#171522">
-    <h1>${escapeHtml(title)}</h1>
-    <p>${escapeHtml(description)}</p>
-    <p><a style="color:#b99dff" href="${escapeHtml(destination)}">Open profile</a></p>
-  </main>
-  ${shouldRedirect ? `<script>window.location.replace(${JSON.stringify(destination)});</script>` : ''}
-</body>
-</html>`;
-}
 
 app.use(express.json());
 app.use(cors({ origin: FRONTEND_ORIGIN }));
@@ -289,19 +203,35 @@ async function assertItemOwnership(tx, itemIds, userId) {
   }
 }
 
-async function createStoredTrade({ fromUser, toUser, fromItems, toItems, status = 'pending', message = '' }) {
+async function createStoredTrade({ fromUser, toUser, fromItems, toItems, fromIc = '', toIc = '', status = 'pending', message = '' }) {
   const cleanFromItems = Array.from(new Set((fromItems || []).map(Number))).filter(Boolean);
   const cleanToItems = Array.from(new Set((toItems || []).map(Number))).filter(Boolean);
 
-  const chatHistory = message
-    ? [{
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        userId: fromUser.id,
-        username: fromUser.username,
-        message: String(message).trim().slice(0, 500),
-        createdAt: new Date().toISOString()
-      }]
-    : [];
+  const chatHistory = [];
+
+  if (message) {
+    chatHistory.push({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      userId: fromUser.id,
+      username: fromUser.username,
+      message: String(message).trim().slice(0, 500),
+      createdAt: new Date().toISOString()
+    });
+  }
+
+  const icOffers = {
+    [fromUser.id]: normalizeIcAmount(fromIc),
+    [toUser.id]: normalizeIcAmount(toIc)
+  };
+
+  if (Object.values(icOffers).some(Boolean)) {
+    chatHistory.push({
+      id: `meta-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      type: 'trade-meta',
+      message: JSON.stringify({ icOffers }),
+      createdAt: new Date().toISOString()
+    });
+  }
 
   return transaction(async tx => {
     await assertItemOwnership(tx, cleanFromItems, fromUser.id);
@@ -367,66 +297,6 @@ async function getBuyRequestRowsForUser(userId) {
     [userId, userId]
   );
 }
-
-
-app.get('/u/:username', async (req, res) => {
-  const username = normalizeUsername(req.params.username);
-
-  const profileUser = await get(
-    `SELECT id, username, bio
-     FROM users
-     WHERE LOWER(username) = LOWER(?)`,
-    [username]
-  );
-
-  const image = socialPreviewImageUrl();
-
-  if (!profileUser) {
-    const fallbackUrl = `${PUBLIC_FRONTEND_URL}/`;
-    const title = 'Player not found - Salts Trading Board';
-    const description = 'This VelkTrade profile could not be found.';
-
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-store, max-age=0');
-
-    return res.status(404).send(sharePageHtml({
-      req,
-      title,
-      description,
-      image,
-      destination: fallbackUrl,
-      shouldRedirect: !isCrawlerRequest(req)
-    }));
-  }
-
-  const itemCountRow = await get(
-    `SELECT COUNT(*)::int AS count
-     FROM items
-     WHERE userId = ?`,
-    [profileUser.id]
-  );
-
-  const sellingCount = Number(itemCountRow?.count || 0);
-  const itemWord = sellingCount === 1 ? 'item' : 'items';
-  const bio = cleanBio(profileUser.bio || '');
-  const title = `${profileUser.username}'s Trading Board`;
-  const description = bio
-    ? `${bio} • Selling ${sellingCount} ${itemWord} on Salts Trading Board.`
-    : `Selling ${sellingCount} ${itemWord} on Salts Trading Board.`;
-  const destination = profileUrl(profileUser.username);
-
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store, max-age=0');
-
-  res.send(sharePageHtml({
-    req,
-    title,
-    description,
-    image,
-    destination,
-    shouldRedirect: !isCrawlerRequest(req)
-  }));
-});
 
 app.get('/api/health', async (req, res) => {
   res.json({
@@ -773,7 +643,7 @@ app.get('/api/trades', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/trades/offers', authMiddleware, async (req, res) => {
-  const { toUsername, fromItems = [], toItems = [], message = '' } = req.body;
+  const { toUsername, fromItems = [], toItems = [], fromIc = '', toIc = '', message = '' } = req.body;
   const target = await get('SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)', [normalizeUsername(toUsername)]);
 
   if (!target) return res.status(404).json({ error: 'Target user not found' });
@@ -785,6 +655,8 @@ app.post('/api/trades/offers', authMiddleware, async (req, res) => {
       toUser: target,
       fromItems,
       toItems,
+      fromIc,
+      toIc,
       status: 'pending',
       message
     });
@@ -821,6 +693,8 @@ app.post('/api/trades/:id/counter', authMiddleware, async (req, res) => {
       toUser: otherUser,
       fromItems: req.body.fromItems || [],
       toItems: req.body.toItems || [],
+      fromIc: req.body.fromIc || '',
+      toIc: req.body.toIc || '',
       status: 'countered',
       message: req.body.message || `Counter offer for trade #${original.id}`
     });
@@ -1016,6 +890,39 @@ io.on('connection', socket => {
       });
     } catch (error) {
       socket.emit('room:error', error.message || 'Could not update offer');
+    }
+  });
+
+
+  socket.on('trade:ic-offer', ({ roomId, amount }) => {
+    try {
+      const room = setIcOffer(roomId, socket.user.id, amount);
+      const state = publicRoomState(room);
+
+      io.to(room.roomId).emit('room:update', state);
+      io.to(room.roomId).emit('trade:offer-updated', {
+        room: state,
+        userId: socket.user.id,
+        username: socket.user.username
+      });
+    } catch (error) {
+      socket.emit('room:error', error.message || 'Could not update IC offer');
+    }
+  });
+
+  socket.on('trade:ic-remove', ({ roomId }) => {
+    try {
+      const room = removeIcOffer(roomId, socket.user.id);
+      const state = publicRoomState(room);
+
+      io.to(room.roomId).emit('room:update', state);
+      io.to(room.roomId).emit('trade:offer-updated', {
+        room: state,
+        userId: socket.user.id,
+        username: socket.user.username
+      });
+    } catch (error) {
+      socket.emit('room:error', error.message || 'Could not remove IC offer');
     }
   });
 

@@ -906,93 +906,37 @@ p {
 }
 
 
-/* Dashboard two-line time chart */
+/* IC as a trade line item */
 
-.dashboard-time-chart {
-  max-height: 260px;
+.ic-offer-card {
+  border-color: rgba(215, 181, 94, 0.75);
+  background: linear-gradient(180deg, rgba(95, 74, 28, 0.9), rgba(35, 27, 14, 0.95));
 }
 
-.line-chart .chart-axis {
-  stroke: #50476b;
-  stroke-width: 2;
+.ic-token {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: clamp(28px, 8vw, 54px);
+  font-weight: 900;
+  letter-spacing: -0.08em;
+  color: #ffe6a1;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 230, 161, 0.32), transparent 30%),
+    linear-gradient(135deg, #5b4218, #21170a);
+  border: 1px solid rgba(215, 181, 94, 0.65);
+  text-shadow: 0 2px 12px rgba(0,0,0,0.55);
 }
 
-.line-chart .line-inventory,
-.line-chart .line-traded {
-  fill: none;
-  stroke-width: 4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.ic-offer-card span {
+  color: #ffe6a1;
+  font-weight: 800;
+  text-align: center;
 }
 
-.line-chart .line-inventory {
-  stroke: var(--purple);
-}
-
-.line-chart .line-traded {
-  stroke: var(--green);
-}
-
-.line-chart .point-inventory {
-  fill: #b99dff;
-}
-
-.line-chart .point-traded {
-  fill: var(--green);
-}
-
-.line-chart .chart-label {
-  fill: var(--muted);
-  font-size: 12px;
-}
-
-.horizontal-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.horizontal-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.legend-dot {
-  width: 10px;
-  height: 10px;
-  display: inline-block;
-  border-radius: 999px;
-}
-
-.inventory-dot {
-  background: var(--purple);
-}
-
-.traded-dot {
-  background: var(--green);
-}
-
-/* Stable pie hover: no scaling/warping */
-
-.pie-chart {
-  overflow: visible;
-  transform: rotate(-90deg);
-}
-
-.pie-slice {
-  transform: none !important;
-  transform-origin: center;
-  transition: opacity 0.16s ease, stroke-width 0.16s ease, filter 0.16s ease;
-}
-
-.pie-slice.hovered {
-  transform: none !important;
-  stroke-width: 11.5;
-  filter: brightness(1.2);
-}
-
-.pie-slice.dimmed {
-  opacity: 0.22;
-  transform: none !important;
+.trade-board {
+  display: grid;
+  gap: 18px;
 }

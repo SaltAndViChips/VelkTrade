@@ -3,6 +3,34 @@ import { api } from '../api';
 
 const FILTERS = ['all', 'pending', 'countered', 'accepted', 'completed', 'declined'];
 
+function getTradeMeta(trade) {
+  const metaMessage = (trade.chatHistory || []).find(message => message.type === 'trade-meta');
+
+  if (!metaMessage?.message) return { icOffers: {} };
+
+  try {
+    return JSON.parse(metaMessage.message);
+  } catch {
+    return { icOffers: {} };
+  }
+}
+
+function getIcForUser(trade, userId) {
+  const meta = getTradeMeta(trade);
+  return meta.icOffers?.[userId] || '';
+}
+
+function IcTradeItem({ amount }) {
+  if (!amount) return null;
+
+  return (
+    <div className="mini-trade-item ic-offer-card">
+      <div className="ic-token">IC</div>
+      <span>{amount}</span>
+    </div>
+  );
+}
+
 function formatPriceDisplay(price) {
   const clean = String(price || '').trim();
   if (!clean) return '';
@@ -36,14 +64,15 @@ function MiniTradeItem({ item }) {
   );
 }
 
-function ItemStrip({ label, items }) {
+function ItemStrip({ label, items, icAmount }) {
   return (
     <div className="trade-item-strip">
       <strong>{label}</strong>
       <div className="mini-trade-grid">
+        {icAmount && <IcTradeItem amount={icAmount} />}
         {items?.length ? items.map(item => (
           <MiniTradeItem key={item.id} item={item} />
-        )) : <span className="muted">No items</span>}
+        )) : !icAmount ? <span className="muted">No items</span> : null}
       </div>
     </div>
   );
@@ -66,6 +95,7 @@ function tradeSearchText(trade) {
     trade.fromUsername,
     trade.toUsername,
     trade.createdAt,
+    ...Object.values(getTradeMeta(trade).icOffers || {}),
     ...(trade.fromItems || []),
     ...(trade.toItems || []),
     ...itemNames,
@@ -263,8 +293,8 @@ export default function Trades({ trades, buyRequests = [], currentUser, onRefres
                 <small>Room: {trade.roomId}</small>
 
                 <div className="grid two trade-items-grid">
-                  <ItemStrip label={`${trade.fromUsername} offers`} items={trade.fromItemDetails || []} />
-                  <ItemStrip label={`${trade.toUsername} offers/requested`} items={trade.toItemDetails || []} />
+                  <ItemStrip label={`${trade.fromUsername} offers`} items={trade.fromItemDetails || []} icAmount={getIcForUser(trade, trade.fromUser)} />
+                  <ItemStrip label={`${trade.toUsername} offers/requested`} items={trade.toItemDetails || []} icAmount={getIcForUser(trade, trade.toUser)} />
                 </div>
 
                 <details>

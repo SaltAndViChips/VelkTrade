@@ -2,48 +2,98 @@ const { run, transaction } = require('./db');
 
 const rooms = new Map();
 
-function createRoom(owner) {
-  const roomId = Math.random().toString(36).slice(2, 9);
-
-  rooms.set(roomId, {
-    roomId,
-    players: [owner],
-    offers: { [owner.id]: [] },
-    accepted: { [owner.id]: false },
-    confirmed: { [owner.id]: false },
-    messages: [],
-    acceptedSnapshotSaved: false,
-    acceptedTradeId: null,
-    completed: false
-  });
-
-  return rooms.get(roomId);
+function createRoomId() {
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
 }
 
-function joinRoom(roomId, player) {
-  const room = rooms.get(roomId);
+function normalizeIds(ids) {
+  return Array.from(new Set((ids || []).map(Number))).filter(Number.isFinite);
+}
 
-  if (!room) throw new Error('Room not found');
-  if (room.completed) throw new Error('Trade already completed');
+function normalizeIcAmount(value) {
+  const raw = String(value || '').trim().replace(/^\$\s*/, '');
+  if (!raw) return '';
 
-  const alreadyInRoom = room.players.some(p => Number(p.id) === Number(player.id));
+  const withoutIc = raw.replace(/\bic\b/ig, '').trim();
 
-  if (room.players.length >= 2 && !alreadyInRoom) {
-    throw new Error('Room is full');
+  if (/^\d+(\.\d+)?$/.test(withoutIc.replace(/,/g, ''))) {
+    const [whole, decimal] = withoutIc.replace(/,/g, '').split('.');
+    const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `${decimal !== undefined ? `${withCommas}.${decimal}` : withCommas} IC`;
   }
 
-  if (alreadyInRoom) return room;
+  if (/^\d+(\.\d+)?\s*[kmb]$/i.test(withoutIc)) {
+    return `${withoutIc} IC`;
+  }
 
-  room.players.push(player);
-  room.offers[player.id] = [];
-  room.accepted[player.id] = false;
-  room.confirmed[player.id] = false;
+  if (/\bic\b/i.test(raw)) {
+    return raw.replace(/\bic\b/i, 'IC');
+  }
+
+  return `${raw} IC`;
+}
+
+function createRoom(user) {
+  const roomId = createRoomId();
+
+  const room = {
+    roomId,
+    players: [{ id: user.id, username: user.username }],
+    offers: {},
+    icOffers: {},
+    accepted: {},
+    confirmed: {},
+    messages: [],
+    acceptedTradeId: null,
+    completed: false
+  };
+
+  room.offers[user.id] = [];
+  room.icOffers[user.id] = '';
+
+  rooms.set(roomId, room);
+  return room;
+}
+
+function joinRoom(roomId, user) {
+  const room = rooms.get(String(roomId || '').trim().toUpperCase());
+
+  if (!room) {
+    throw new Error('Room not found');
+  }
+
+  if (!room.players.some(player => Number(player.id) === Number(user.id))) {
+    if (room.players.length >= 2) {
+      throw new Error('Room is full');
+    }
+
+    room.players.push({ id: user.id, username: user.username });
+  }
+
+  room.offers[user.id] = room.offers[user.id] || [];
+  room.icOffers[user.id] = room.icOffers[user.id] || '';
+  room.accepted[user.id] = false;
+  room.confirmed[user.id] = false;
 
   return room;
 }
 
-function assertPlayerInRoom(room, userId) {
-  if (!room.players.some(player => Number(player.id) === Number(userId))) {
+function leaveRoom(roomId, userId) {
+  const room = rooms.get(String(roomId || '').trim().toUpperCase());
+
+  if (!room) return;
+
+  room.players = room.players.filter(player => Number(player.id) !== Number(userId));
+
+  if (room.players.length === 0) {
+    rooms.delete(room.roomId);
+  }
+
+  return room;
+}
+
+function assertPlayer(room, userId) {
+  if (!room || !room.players.some(player => Number(player.id) === Number(userId))) {
     throw new Error('You are not in this room');
   }
 }
@@ -54,68 +104,73 @@ function resetApprovals(room) {
     room.confirmed[player.id] = false;
   }
 
-  room.acceptedSnapshotSaved = false;
   room.acceptedTradeId = null;
-}
-
-function cleanItemIds(itemIds) {
-  return Array.from(new Set((itemIds || []).map(Number))).filter(Number.isFinite);
+  room.completed = false;
 }
 
 function setOffer(roomId, userId, itemIds) {
-  const room = rooms.get(roomId);
+  const room = rooms.get(String(roomId || '').trim().toUpperCase());
+  assertPlayer(room, userId);
 
-  if (!room) throw new Error('Room not found');
-  if (room.completed) throw new Error('Trade already completed');
+  room.offers[userId] = normalizeIds(itemIds);
+  resetApprovals(room);
 
-  assertPlayerInRoom(room, userId);
+  return room;
+}
 
-  // Do not block live room updates with database ownership validation.
-  // Ownership is still validated in finalizeTrade() before items transfer.
-  // This keeps live offering responsive even when DB schemas differ between SQLite/Postgres patches.
-  room.offers[userId] = cleanItemIds(itemIds);
+function setIcOffer(roomId, userId, amount) {
+  const room = rooms.get(String(roomId || '').trim().toUpperCase());
+  assertPlayer(room, userId);
+
+  room.icOffers[userId] = normalizeIcAmount(amount);
+  resetApprovals(room);
+
+  return room;
+}
+
+function removeIcOffer(roomId, userId) {
+  const room = rooms.get(String(roomId || '').trim().toUpperCase());
+  assertPlayer(room, userId);
+
+  room.icOffers[userId] = '';
   resetApprovals(room);
 
   return room;
 }
 
 function acceptTrade(roomId, userId) {
-  const room = rooms.get(roomId);
-
-  if (!room) throw new Error('Room not found');
-  if (room.completed) throw new Error('Trade already completed');
-
-  assertPlayerInRoom(room, userId);
+  const room = rooms.get(String(roomId || '').trim().toUpperCase());
+  assertPlayer(room, userId);
 
   room.accepted[userId] = true;
+
   return room;
 }
 
 function confirmTrade(roomId, userId) {
-  const room = rooms.get(roomId);
-
-  if (!room) throw new Error('Room not found');
-  if (room.completed) throw new Error('Trade already completed');
-
-  assertPlayerInRoom(room, userId);
+  const room = rooms.get(String(roomId || '').trim().toUpperCase());
+  assertPlayer(room, userId);
 
   const everyoneAccepted = room.players.length === 2 && room.players.every(player => room.accepted[player.id]);
-  if (!everyoneAccepted) throw new Error('Both players must accept before confirming');
+
+  if (!everyoneAccepted) {
+    throw new Error('Both players must accept before confirming');
+  }
 
   room.confirmed[userId] = true;
+
   return room;
 }
 
 function addChatMessage(roomId, user, message) {
-  const room = rooms.get(roomId);
-
-  if (!room) throw new Error('Room not found');
-  if (room.completed) throw new Error('Trade already completed');
-
-  assertPlayerInRoom(room, user.id);
+  const room = rooms.get(String(roomId || '').trim().toUpperCase());
+  assertPlayer(room, user.id);
 
   const cleanMessage = String(message || '').trim().slice(0, 500);
-  if (!cleanMessage) throw new Error('Message cannot be empty');
+
+  if (!cleanMessage) {
+    throw new Error('Message required');
+  }
 
   const chatMessage = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -126,146 +181,138 @@ function addChatMessage(roomId, user, message) {
   };
 
   room.messages.push(chatMessage);
-  room.messages = room.messages.slice(-100);
 
   return { room, chatMessage };
 }
 
-function everyoneAccepted(room) {
-  return room.players.length === 2 && room.players.every(player => room.accepted[player.id]);
+function buildTradeMeta(room) {
+  return {
+    icOffers: room.icOffers || {}
+  };
 }
 
-function isFullyConfirmed(room) {
-  return room.players.length === 2 && room.players.every(player => room.confirmed[player.id]);
+function addMetaMessage(room) {
+  const meta = buildTradeMeta(room);
+
+  if (!Object.values(meta.icOffers).some(Boolean)) {
+    return room.messages || [];
+  }
+
+  return [
+    ...(room.messages || []),
+    {
+      id: `meta-${Date.now()}`,
+      type: 'trade-meta',
+      message: JSON.stringify(meta),
+      createdAt: new Date().toISOString()
+    }
+  ];
 }
 
-async function saveTradeSnapshot(room, status) {
-  if (!room || room.players.length < 2) return null;
+async function maybeSaveAcceptedSnapshot(room) {
+  if (!room || room.acceptedTradeId || room.players.length !== 2) {
+    return null;
+  }
 
-  const [playerA, playerB] = room.players;
+  const everyoneAccepted = room.players.every(player => room.accepted[player.id]);
 
-  return run(
+  if (!everyoneAccepted) {
+    return null;
+  }
+
+  const [fromPlayer, toPlayer] = room.players;
+  const result = await run(
     `INSERT INTO trades (roomId, fromUser, toUser, fromItems, toItems, chatHistory, status)
      VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
     [
       room.roomId,
-      playerA.id,
-      playerB.id,
-      JSON.stringify(room.offers[playerA.id] || []),
-      JSON.stringify(room.offers[playerB.id] || []),
-      JSON.stringify(room.messages || []),
-      status
+      fromPlayer.id,
+      toPlayer.id,
+      JSON.stringify(room.offers[fromPlayer.id] || []),
+      JSON.stringify(room.offers[toPlayer.id] || []),
+      JSON.stringify(addMetaMessage(room)),
+      'accepted'
     ]
   );
-}
 
-async function maybeSaveAcceptedSnapshot(room) {
-  if (!everyoneAccepted(room) || room.acceptedSnapshotSaved) return null;
-
-  const result = await saveTradeSnapshot(room, 'accepted');
-  room.acceptedSnapshotSaved = true;
-  room.acceptedTradeId = result?.lastID || null;
-
+  room.acceptedTradeId = result.lastID;
   return result;
 }
 
-async function getOwnedItem(tx, itemId, userId) {
-  // Postgres folds userId to userid, but older/generated code may differ.
-  // Try both query forms so final confirmation remains safe.
-  let item = await tx.get('SELECT * FROM items WHERE id = ? AND userId = ?', [itemId, userId]);
-
-  if (item) return item;
-
-  try {
-    item = await tx.get('SELECT * FROM items WHERE id = ? AND userid = ?', [itemId, userId]);
-  } catch {
-    // Ignore and let caller throw standard ownership error.
-  }
-
-  return item;
-}
-
-async function updateItemOwner(tx, itemId, userId) {
-  try {
-    await tx.run('UPDATE items SET userId = ? WHERE id = ?', [userId, itemId]);
-  } catch {
-    await tx.run('UPDATE items SET userid = ? WHERE id = ?', [userId, itemId]);
-  }
-}
-
 async function finalizeTrade(room) {
-  if (!isFullyConfirmed(room)) return room;
+  if (!room || room.players.length !== 2) {
+    throw new Error('Room must have two players');
+  }
 
-  const [playerA, playerB] = room.players;
-  const playerAItems = room.offers[playerA.id] || [];
-  const playerBItems = room.offers[playerB.id] || [];
+  const everyoneAccepted = room.players.every(player => room.accepted[player.id]);
+  const everyoneConfirmed = room.players.every(player => room.confirmed[player.id]);
+
+  if (!everyoneAccepted || !everyoneConfirmed) {
+    return false;
+  }
+
+  const [fromPlayer, toPlayer] = room.players;
+  const fromItems = normalizeIds(room.offers[fromPlayer.id] || []);
+  const toItems = normalizeIds(room.offers[toPlayer.id] || []);
 
   await transaction(async tx => {
-    for (const itemId of playerAItems) {
-      const item = await getOwnedItem(tx, itemId, playerA.id);
-      if (!item) throw new Error(`Item ${itemId} is no longer owned by ${playerA.username}`);
+    for (const itemId of fromItems) {
+      const item = await tx.get('SELECT id FROM items WHERE id = ? AND userId = ?', [itemId, fromPlayer.id]);
+      if (!item) throw new Error(`Invalid item ownership for item ${itemId}`);
     }
 
-    for (const itemId of playerBItems) {
-      const item = await getOwnedItem(tx, itemId, playerB.id);
-      if (!item) throw new Error(`Item ${itemId} is no longer owned by ${playerB.username}`);
+    for (const itemId of toItems) {
+      const item = await tx.get('SELECT id FROM items WHERE id = ? AND userId = ?', [itemId, toPlayer.id]);
+      if (!item) throw new Error(`Invalid item ownership for item ${itemId}`);
     }
 
-    for (const itemId of playerAItems) {
-      await updateItemOwner(tx, itemId, playerB.id);
+    for (const itemId of fromItems) {
+      await tx.run('UPDATE items SET userId = ? WHERE id = ?', [toPlayer.id, itemId]);
     }
 
-    for (const itemId of playerBItems) {
-      await updateItemOwner(tx, itemId, playerA.id);
+    for (const itemId of toItems) {
+      await tx.run('UPDATE items SET userId = ? WHERE id = ?', [fromPlayer.id, itemId]);
     }
 
-    await tx.run(
-      `INSERT INTO trades (roomId, fromUser, toUser, fromItems, toItems, chatHistory, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-      [
-        room.roomId,
-        playerA.id,
-        playerB.id,
-        JSON.stringify(playerAItems),
-        JSON.stringify(playerBItems),
-        JSON.stringify(room.messages || []),
-        'completed'
-      ]
-    );
+    if (room.acceptedTradeId) {
+      await tx.run(
+        'UPDATE trades SET status = ?, chatHistory = ? WHERE id = ?',
+        ['completed', JSON.stringify(addMetaMessage(room)), room.acceptedTradeId]
+      );
+    } else {
+      await tx.run(
+        `INSERT INTO trades (roomId, fromUser, toUser, fromItems, toItems, chatHistory, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          room.roomId,
+          fromPlayer.id,
+          toPlayer.id,
+          JSON.stringify(fromItems),
+          JSON.stringify(toItems),
+          JSON.stringify(addMetaMessage(room)),
+          'completed'
+        ]
+      );
+    }
   });
 
   room.completed = true;
-  rooms.delete(room.roomId);
-
-  return room;
-}
-
-async function leaveRoom(roomId, userId) {
-  const room = rooms.get(roomId);
-
-  if (!room) throw new Error('Room not found');
-
-  assertPlayerInRoom(room, userId);
-
-  if (!room.completed && room.players.length === 2) {
-    await saveTradeSnapshot(room, 'declined');
-  }
-
-  rooms.delete(roomId);
-
-  return room;
+  return true;
 }
 
 function publicRoomState(room) {
+  if (!room) return null;
+
   return {
     roomId: room.roomId,
-    players: room.players.map(player => ({ id: player.id, username: player.username })),
+    players: room.players,
     offers: room.offers,
+    icOffers: room.icOffers || {},
     accepted: room.accepted,
     confirmed: room.confirmed,
-    messages: room.messages || [],
-    acceptedTradeId: room.acceptedTradeId || null,
-    completed: Boolean(room.completed)
+    messages: room.messages,
+    acceptedTradeId: room.acceptedTradeId,
+    completed: room.completed
   };
 }
 
@@ -273,11 +320,14 @@ module.exports = {
   createRoom,
   joinRoom,
   setOffer,
+  setIcOffer,
+  removeIcOffer,
   acceptTrade,
   confirmTrade,
   addChatMessage,
   maybeSaveAcceptedSnapshot,
   finalizeTrade,
   leaveRoom,
-  publicRoomState
+  publicRoomState,
+  normalizeIcAmount
 };

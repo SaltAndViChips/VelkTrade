@@ -40,6 +40,29 @@ function normalizeIds(ids) {
   return Array.from(new Set((ids || []).map(Number))).filter(Number.isFinite);
 }
 
+function normalizeIcInput(value) {
+  const raw = String(value || '').trim().replace(/^\$\s*/, '');
+  if (!raw) return '';
+
+  const withoutIc = raw.replace(/\bic\b/ig, '').trim();
+
+  if (/^\d+(\.\d+)?$/.test(withoutIc.replace(/,/g, ''))) {
+    const [whole, decimal] = withoutIc.replace(/,/g, '').split('.');
+    const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `${decimal !== undefined ? `${withCommas}.${decimal}` : withCommas} IC`;
+  }
+
+  if (/^\d+(\.\d+)?\s*[kmb]$/i.test(withoutIc)) {
+    return `${withoutIc} IC`;
+  }
+
+  if (/\bic\b/i.test(raw)) {
+    return raw.replace(/\bic\b/i, 'IC');
+  }
+
+  return `${raw} IC`;
+}
+
 function tradeCollisionDetection(args) {
   const pointerCollisions = pointerWithin(args);
   if (pointerCollisions.length > 0) return pointerCollisions;
@@ -168,6 +191,16 @@ export default function App() {
 
   const theirOfferIds = useMemo(
     () => normalizeIds(room && theirPlayer ? room.offers?.[theirPlayer.id] || [] : []),
+    [room, theirPlayer]
+  );
+
+  const myIcOffer = useMemo(
+    () => room && user ? room.icOffers?.[user.id] || '' : '',
+    [room, user]
+  );
+
+  const theirIcOffer = useMemo(
+    () => room && theirPlayer ? room.icOffers?.[theirPlayer.id] || '' : '',
     [room, theirPlayer]
   );
 
@@ -559,6 +592,39 @@ export default function App() {
     updateOffer(myOfferIds.filter(existingId => Number(existingId) !== id));
   }
 
+  function offerIc() {
+    const activeRoom = roomRef.current;
+
+    if (!activeRoom) {
+      setError('You are not in a room.');
+      return;
+    }
+
+    const current = activeRoom.icOffers?.[userRef.current?.id] || '';
+    const amount = window.prompt('Enter IC amount:', current.replace(/\s*IC$/i, ''));
+
+    if (amount === null) return;
+
+    const cleanAmount = normalizeIcInput(amount);
+
+    if (!cleanAmount) return;
+
+    socketRef.current?.emit('trade:ic-offer', {
+      roomId: activeRoom.roomId,
+      amount: cleanAmount
+    });
+  }
+
+  function removeIcOffer() {
+    const activeRoom = roomRef.current;
+
+    if (!activeRoom) return;
+
+    socketRef.current?.emit('trade:ic-remove', {
+      roomId: activeRoom.roomId
+    });
+  }
+
   function handleDragStart(event) {
     const itemId = parseDraggedItemId(event.active);
 
@@ -830,6 +896,8 @@ export default function App() {
             <TradeBoard
               myOfferItems={myOfferItems}
               theirOfferItems={theirOfferItems}
+              myIcOffer={myIcOffer}
+              theirIcOffer={theirIcOffer}
               myAccepted={myAccepted}
               theirAccepted={theirAccepted}
               myConfirmed={myConfirmed}
@@ -839,6 +907,8 @@ export default function App() {
               onAccept={acceptTrade}
               onConfirm={confirmTrade}
               onDoubleClickOfferItem={moveToInventory}
+              onOfferIc={offerIc}
+              onRemoveIc={removeIcOffer}
             />
 
             <TradeChat
