@@ -124,16 +124,6 @@ export default function Notifications({
             Invite responses
           </label>
 
-
-          <label className="toggle-row">
-            <input
-              type="checkbox"
-              checked={Boolean(draftPrefs.nonVerifiedNotifications)}
-              onChange={event => updatePref('nonVerifiedNotifications', event.target.checked)}
-            />
-            Notifications from non-verified users
-          </label>
-
           <label className="range-row">
             <span>Notification sound volume</span>
             <input
@@ -159,19 +149,6 @@ export default function Notifications({
           <button type="submit">Save Settings</button>
         </form>
       )}
-
-      <section className="online-panel">
-        <h3>Online Players</h3>
-        <div className="online-chip-list">
-          {onlineUsers.length === 0 && <span className="muted">No players online.</span>}
-          {onlineUsers.map(player => (
-            <span className="online-chip" key={player.id}>
-              <i /> {player.username}
-            </span>
-          ))}
-        </div>
-      </section>
-
       <div className="notification-list">
         {notifications.length === 0 && <p className="muted tidy-empty">No notifications yet.</p>}
 

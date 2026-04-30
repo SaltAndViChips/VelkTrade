@@ -75,10 +75,35 @@ function isUserOnline(userId) {
   return onlineUsers.has(Number(userId));
 }
 
+
+async function hydrateOnlinePresenceUser(userId, fallbackUser) {
+  try {
+    const row = await get(
+      `SELECT id, username, is_admin, is_verified
+       FROM users
+       WHERE id = ?`,
+      [userId]
+    );
+
+    if (!row) return fallbackUser;
+
+    return {
+      id: row.id,
+      username: row.username,
+      isAdmin: Boolean(row.is_admin || String(row.username || '').toLowerCase() === 'salt'),
+      isVerified: Boolean(row.is_verified)
+    };
+  } catch {
+    return fallbackUser;
+  }
+}
+
 function onlineUserList() {
   return Array.from(onlineUsers.values()).map(user => ({
     id: user.id,
-    username: user.username
+    username: user.username,
+    isAdmin: Boolean(user.isAdmin || String(user.username || '').toLowerCase() === 'salt'),
+    isVerified: Boolean(user.isVerified)
   }));
 }
 
@@ -1844,6 +1869,8 @@ io.on('connection', socket => {
   const existing = onlineUsers.get(userId) || {
     id: userId,
     username: socket.user.username,
+    isAdmin: Boolean(socket.user.isAdmin || socket.user.is_admin || String(socket.user.username || '').toLowerCase() === 'salt'),
+    isVerified: Boolean(socket.user.isVerified || socket.user.is_verified),
     sockets: new Set()
   };
 

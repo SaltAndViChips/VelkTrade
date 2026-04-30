@@ -2331,3 +2331,145 @@ svg .chart-hover-target {
     transform: translate(-50%, -50%) scale(1) !important;
   }
 }
+
+
+/* Online players side tab */
+
+.online-sidebar {
+  position: fixed;
+  top: 108px;
+  right: 0;
+  z-index: 2600;
+  pointer-events: none;
+}
+
+.online-sidebar-handle {
+  position: absolute;
+  top: 22px;
+  right: 0;
+  width: 38px;
+  height: 74px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  border-radius: 14px 0 0 14px;
+  border-right: 0;
+  background:
+    radial-gradient(circle at top left, rgba(141, 99, 255, 0.26), transparent 38%),
+    linear-gradient(180deg, #211c31, #11101a);
+  border-color: var(--border-bright);
+  box-shadow: 0 16px 44px rgba(0,0,0,.42);
+  pointer-events: auto;
+}
+
+.online-sidebar-handle span {
+  width: 18px;
+  height: 3px;
+  display: block;
+  border-radius: 999px;
+  background: #ded8ff;
+}
+
+.online-sidebar-panel {
+  width: min(380px, calc(100vw - 58px));
+  max-height: calc(100vh - 140px);
+  overflow: auto;
+  transform: translateX(calc(100% + 12px));
+  transition: transform 0.18s ease;
+  padding: 14px;
+  margin-right: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border-bright);
+  background:
+    radial-gradient(circle at top left, rgba(141, 99, 255, 0.18), transparent 34%),
+    linear-gradient(180deg, #171522, #100f18);
+  box-shadow: 0 24px 70px rgba(0,0,0,.62);
+  pointer-events: auto;
+}
+
+.online-sidebar.open .online-sidebar-panel {
+  transform: translateX(0);
+}
+
+.online-sidebar.open .online-sidebar-handle {
+  right: calc(min(380px, calc(100vw - 58px)) + 12px);
+}
+
+.online-sidebar-hint {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(8, 7, 12, 0.42);
+  border: 1px solid var(--border);
+}
+
+.online-sidebar-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.online-player-card {
+  display: grid;
+  gap: 10px;
+  background: rgba(8, 7, 12, 0.42);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.online-player-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+}
+
+.online-player-main strong {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.online-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--green);
+  box-shadow: 0 0 14px rgba(98, 209, 138, 0.55);
+}
+
+.admin-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #fff3c2;
+  background: rgba(95, 74, 28, 0.32);
+  border: 1px solid rgba(215, 181, 94, 0.48);
+}
+
+.online-player-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.online-player-actions button {
+  flex: 1;
+  min-width: 96px;
+}
+
+@media (max-width: 760px) {
+  .online-sidebar {
+    top: 84px;
+  }
+
+  .online-sidebar-panel {
+    max-height: calc(100vh - 108px);
+  }
+}
