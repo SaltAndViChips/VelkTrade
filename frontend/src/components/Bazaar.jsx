@@ -8,16 +8,23 @@ const SORTS = [
   { key: 'lowest', label: 'Lowest Cost' }
 ];
 
+const VERIFIED_FILTERS = [
+  { key: 'all', label: 'All Users' },
+  { key: 'verified', label: 'Verified' },
+  { key: 'nonverified', label: 'Non-Verified' }
+];
+
 function formatNumber(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return '';
   return number.toLocaleString();
 }
 
-export default function Bazaar() {
+export default function Bazaar({ currentUser }) {
   const [items, setItems] = useState([]);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('newest');
+  const [verified, setVerified] = useState('all');
   const [min, setMin] = useState('');
   const [max, setMax] = useState('');
   const [minInterest, setMinInterest] = useState('');
@@ -29,12 +36,13 @@ export default function Bazaar() {
 
     if (search.trim()) params.set('search', search.trim());
     if (sort) params.set('sort', sort);
+    if (verified && verified !== 'all') params.set('verified', verified);
     if (min !== '') params.set('min', min);
     if (max !== '') params.set('max', max);
     if (minInterest !== '') params.set('minInterest', minInterest);
 
     return params.toString();
-  }, [search, sort, min, max, minInterest]);
+  }, [search, sort, verified, min, max, minInterest]);
 
   async function loadBazaar() {
     setLoading(true);
@@ -91,7 +99,7 @@ export default function Bazaar() {
           <input
             value={search}
             onChange={event => setSearch(event.target.value)}
-            placeholder="Search by item or IC price..."
+            placeholder={currentUser?.isAdmin ? 'Search by item, IC price, or owner...' : 'Search by item or IC price...'}
           />
 
           <input
@@ -116,17 +124,32 @@ export default function Bazaar() {
           />
         </div>
 
-        <div className="segmented-control compact bazaar-sort-tabs">
-          {SORTS.map(option => (
-            <button
-              type="button"
-              key={option.key}
-              className={sort === option.key ? 'active' : ''}
-              onClick={() => setSort(option.key)}
-            >
-              {option.label}
-            </button>
-          ))}
+        <div className="bazaar-filter-row">
+          <div className="segmented-control compact bazaar-sort-tabs">
+            {SORTS.map(option => (
+              <button
+                type="button"
+                key={option.key}
+                className={sort === option.key ? 'active' : ''}
+                onClick={() => setSort(option.key)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="segmented-control compact bazaar-verified-tabs">
+            {VERIFIED_FILTERS.map(option => (
+              <button
+                type="button"
+                key={option.key}
+                className={verified === option.key ? 'active' : ''}
+                onClick={() => setVerified(option.key)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -156,7 +179,20 @@ export default function Bazaar() {
               <div className="bazaar-item-body">
                 <h3>{item.title}</h3>
 
+                {currentUser?.isAdmin && item.ownerUsername && (
+                  <p className="bazaar-admin-owner">
+                    Owner: <strong>{item.ownerUsername}</strong>
+                    {item.ownerVerified && <span className="verified-badge mini" title="Verified user">✓</span>}
+                  </p>
+                )}
+
                 <strong className="bazaar-price">{formatNumber(item.priceAmount)} IC</strong>
+
+                {item.ownerVerified && !currentUser?.isAdmin && (
+                  <span className="bazaar-verified-owner">
+                    <span className="verified-badge mini" title="Verified user">✓</span> Verified seller
+                  </span>
+                )}
 
                 <div className="bazaar-interest-row">
                   <span>{otherInterestCount} other user{otherInterestCount === 1 ? '' : 's'} interested</span>

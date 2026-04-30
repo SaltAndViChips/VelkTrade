@@ -1358,9 +1358,12 @@ app.post('/api/admin/reset-password', authMiddleware, requireAdmin, async (req, 
 
 
 
+
+
 app.get('/api/bazaar', authMiddleware, async (req, res) => {
   const search = String(req.query.search || '').trim().toLowerCase();
   const sort = String(req.query.sort || 'newest');
+  const verifiedFilter = String(req.query.verified || 'all');
   const min = req.query.min !== undefined && req.query.min !== '' ? Number(req.query.min) : null;
   const max = req.query.max !== undefined && req.query.max !== '' ? Number(req.query.max) : null;
   const minInterest = req.query.minInterest !== undefined && req.query.minInterest !== '' ? Number(req.query.minInterest) : null;
@@ -1371,31 +1374,46 @@ app.get('/api/bazaar', authMiddleware, async (req, res) => {
       items.title,
       items.image,
       items.price,
-      items.show_bazaar AS "showBazaar",
       items.createdAt AS "createdAt",
-      users.id AS "ownerId",
+      items.userId AS "ownerId",
+      users.username AS "ownerUsername",
+      COALESCE(users.is_verified, FALSE) AS "ownerVerified",
       COALESCE(COUNT(item_buy_requests.id), 0)::int AS "interestCount",
       COALESCE(MAX(CASE WHEN item_buy_requests.userId = ? THEN 1 ELSE 0 END), 0)::int AS "viewerInterested"
      FROM items
      JOIN users ON users.id = items.userId
      LEFT JOIN item_buy_requests ON item_buy_requests.itemId = items.id
-     WHERE users.last_seen_at >= NOW() - INTERVAL '7 days'
-       AND users.show_bazaar_inventory = TRUE
-     GROUP BY items.id, users.id
+     WHERE COALESCE(users.show_bazaar_inventory, TRUE) = TRUE
+       AND COALESCE(users.last_seen_at, NOW()) >= NOW() - INTERVAL '7 days'
+     GROUP BY items.id, items.title, items.image, items.price, items.createdAt, items.userId, users.username, users.is_verified
      ORDER BY items.createdAt DESC`,
     [req.user.id]
   );
 
   let items = rows
-    .map(row => normalizeBazaarItem(row, req.user.id))
+    .map(row => {
+      const item = normalizeBazaarItem(row, req.user.id);
+      return {
+        ...item,
+        ownerUsername: row.ownerUsername ?? row.ownerusername,
+        ownerVerified: Boolean(row.ownerVerified ?? row.ownerverified)
+      };
+    })
     .filter(item => item.priceAmount !== null);
+
+  if (verifiedFilter === 'verified') {
+    items = items.filter(item => item.ownerVerified);
+  } else if (verifiedFilter === 'nonverified') {
+    items = items.filter(item => !item.ownerVerified);
+  }
 
   if (search) {
     items = items.filter(item => {
       return [
         item.title,
         item.price,
-        String(item.priceAmount)
+        String(item.priceAmount),
+        req.user.isAdmin ? item.ownerUsername : ''
       ]
         .filter(Boolean)
         .join(' ')
@@ -1426,7 +1444,28 @@ app.get('/api/bazaar', authMiddleware, async (req, res) => {
     items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
 
-  res.json({ items });
+  res.json({
+    items: items.map(item => {
+      const publicItem = {
+        id: item.id,
+        title: item.title,
+        image: item.image,
+        price: item.price,
+        priceAmount: item.priceAmount,
+        createdAt: item.createdAt,
+        interestCount: item.interestCount,
+        viewerInterested: item.viewerInterested,
+        isOwnItem: item.isOwnItem,
+        ownerVerified: item.ownerVerified
+      };
+
+      if (req.user.isAdmin) {
+        publicItem.ownerUsername = item.ownerUsername;
+      }
+
+      return publicItem;
+    })
+  });
 });
 
 app.post('/api/bazaar/items/:id/interest', authMiddleware, async (req, res) => {
@@ -1437,7 +1476,9 @@ app.post('/api/bazaar/items/:id/interest', authMiddleware, async (req, res) => {
     [req.params.id]
   );
 
-  if (!item) return res.status(404).json({ error: 'Item not found' });
+  if (!item) {
+    return res.status(404).json({ error: 'Item not found' });
+  }
 
   if (Number(item.userId) === Number(req.user.id)) {
     return res.status(400).json({ error: 'You cannot mark interest in your own item' });
