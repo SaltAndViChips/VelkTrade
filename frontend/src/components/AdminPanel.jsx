@@ -1,6 +1,162 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 
+function getTradeMeta(trade) {
+  const metaMessage = (trade.chatHistory || []).find(message => message.type === 'trade-meta');
+
+  if (!metaMessage?.message) return { icOffers: {} };
+
+  try {
+    return JSON.parse(metaMessage.message);
+  } catch {
+    return { icOffers: {} };
+  }
+}
+
+function getIcForUser(trade, userId) {
+  const meta = getTradeMeta(trade);
+  return meta.icOffers?.[userId] || '';
+}
+
+function itemCountText(count) {
+  return `${count} item${count === 1 ? '' : 's'}`;
+}
+
+function buildSideSummary(username, items, icAmount) {
+  const parts = [itemCountText(items.length)];
+  if (icAmount) parts.push(icAmount);
+  return `${username}: ${parts.join(' + ')}`;
+}
+
+function MiniAdminItem({ item }) {
+  return (
+    <div className="admin-mini-item">
+      <img src={item.image} alt={item.title} />
+      <div>
+        <span>{item.title}</span>
+        {item.price && <strong className="item-price">{item.price}</strong>}
+      </div>
+    </div>
+  );
+}
+
+function AdminTradeSide({ label, items, icAmount }) {
+  return (
+    <section className="admin-trade-side">
+      <div className="panel-title-row">
+        <h4>{label}</h4>
+        <span className="status-pill">{itemCountText(items.length)}{icAmount ? ` + ${icAmount}` : ''}</span>
+      </div>
+
+      {icAmount && (
+        <div className="admin-ic-line">
+          <div className="ic-token mini">IC</div>
+          <strong>{icAmount}</strong>
+        </div>
+      )}
+
+      <div className="admin-mini-item-grid">
+        {items.length === 0 && !icAmount && <p className="muted">No items or IC.</p>}
+        {items.map(item => (
+          <MiniAdminItem key={item.id} item={item} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AdminTradeCard({ trade }) {
+  const [open, setOpen] = useState(false);
+
+  const fromItems = trade.fromItemDetails || [];
+  const toItems = trade.toItemDetails || [];
+  const fromIc = getIcForUser(trade, trade.fromUser);
+  const toIc = getIcForUser(trade, trade.toUser);
+  const visibleMessages = (trade.chatHistory || []).filter(message => message.type !== 'trade-meta');
+
+  const fromSummary = buildSideSummary(trade.fromUsername, fromItems, fromIc);
+  const toSummary = buildSideSummary(trade.toUsername, toItems, toIc);
+
+  return (
+    <article className={`tidy-trade-card admin-trade-card ${open ? 'open' : ''}`}>
+      <button
+        type="button"
+        className="admin-expand-arrow"
+        onClick={() => setOpen(current => !current)}
+        aria-label={open ? 'Collapse trade details' : 'Expand trade details'}
+        title={open ? 'Collapse details' : 'Expand details'}
+      >
+        {open ? '▼' : '▶'}
+      </button>
+
+      <div className="admin-trade-main">
+        <div className="tidy-card-header">
+          <div>
+            <strong>Trade #{trade.id}</strong>
+            <small>{trade.fromUsername} ⇄ {trade.toUsername}</small>
+            <small>Room {trade.roomId}</small>
+          </div>
+
+          <span className={`status-pill status-${trade.status}`}>{trade.status}</span>
+        </div>
+
+        <div className="admin-trade-summary">
+          <span>{fromSummary}</span>
+          <span>{toSummary}</span>
+        </div>
+
+        <small className="muted">{trade.createdAt}</small>
+
+        {open && (
+          <div className="admin-trade-expanded">
+            <div className="admin-trade-sides">
+              <AdminTradeSide
+                label={`${trade.fromUsername} offered`}
+                items={fromItems}
+                icAmount={fromIc}
+              />
+
+              <AdminTradeSide
+                label={`${trade.toUsername} offered/requested`}
+                items={toItems}
+                icAmount={toIc}
+              />
+            </div>
+
+            <section className="admin-chat-log">
+              <div className="panel-title-row">
+                <h4>Chat Log</h4>
+                <span className="status-pill">{visibleMessages.length} message{visibleMessages.length === 1 ? '' : 's'}</span>
+              </div>
+
+              {visibleMessages.length === 0 && <p className="muted">No chat messages recorded.</p>}
+
+              <div className="history-chat">
+                {visibleMessages.map(message => (
+                  <p key={message.id}>
+                    <strong>{message.username || 'System'}:</strong> {message.message}
+                    {message.createdAt && <small> · {message.createdAt}</small>}
+                  </p>
+                ))}
+              </div>
+            </section>
+
+            <section className="admin-trade-meta">
+              <h4>Metadata</h4>
+              <div className="tidy-meta-grid">
+                <span><strong>Trade ID</strong>{trade.id}</span>
+                <span><strong>Room ID</strong>{trade.roomId}</span>
+                <span><strong>Status</strong>{trade.status}</span>
+                <span><strong>Created</strong>{trade.createdAt}</span>
+              </div>
+            </section>
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
 function RoomPlayerSummary({ player, room }) {
   const itemCount = room.offers?.[player.id]?.length || 0;
   const icAmount = room.icOffers?.[player.id] || '';
@@ -72,13 +228,24 @@ export default function AdminPanel({ onJoinRoom }) {
     if (!needle) return allTrades;
 
     return allTrades.filter(trade => {
+      const fromIc = getIcForUser(trade, trade.fromUser);
+      const toIc = getIcForUser(trade, trade.toUser);
+      const fromItems = (trade.fromItemDetails || []).map(item => `${item.title} ${item.price || ''}`).join(' ');
+      const toItems = (trade.toItemDetails || []).map(item => `${item.title} ${item.price || ''}`).join(' ');
+      const chat = (trade.chatHistory || []).map(message => `${message.username || ''} ${message.message || ''}`).join(' ');
+
       return [
         trade.id,
         trade.roomId,
         trade.status,
         trade.fromUsername,
         trade.toUsername,
-        trade.createdAt
+        trade.createdAt,
+        fromIc,
+        toIc,
+        fromItems,
+        toItems,
+        chat
       ]
         .filter(Boolean)
         .join(' ')
@@ -284,29 +451,17 @@ export default function AdminPanel({ onJoinRoom }) {
             <input
               value={tradeSearch}
               onChange={event => setTradeSearch(event.target.value)}
-              placeholder="Search all trades by user, room, status..."
+              placeholder="Search trades by user, item, IC, chat, room, status..."
             />
           </div>
 
           <p className="muted tidy-count">
-            Showing {filteredTrades.length} of {allTrades.length} trades.
+            Showing {filteredTrades.length} of {allTrades.length} trades. Use the side arrow to expand details.
           </p>
 
           <div className="tidy-list">
             {filteredTrades.map(trade => (
-              <article className="tidy-trade-card" key={trade.id}>
-                <div className="tidy-card-header">
-                  <div>
-                    <strong>Trade #{trade.id}</strong>
-                    <small>{trade.fromUsername} ⇄ {trade.toUsername}</small>
-                    <small>Room {trade.roomId}</small>
-                  </div>
-
-                  <span className={`status-pill status-${trade.status}`}>{trade.status}</span>
-                </div>
-
-                <small className="muted">{trade.createdAt}</small>
-              </article>
+              <AdminTradeCard key={trade.id} trade={trade} />
             ))}
           </div>
         </section>

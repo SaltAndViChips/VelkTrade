@@ -66,17 +66,13 @@ export default function UserInventoryPage({
   onLoginRequired,
   onToggleBuyRequest
 }) {
+  const profileUrl = userRecord ? getFrontendProfileUrl(userRecord.username) : '';
   const discordShareUrl = userRecord
     ? `${getBackendShareBase()}/u/${encodeURIComponent(userRecord.username)}?v=${Date.now()}`
     : '';
 
   return (
-    <section className="card">
-      <div className="panel-title-row">
-        <div>
-          <h2>User Inventory</h2>
-        </div>
-      </div>
+    <>
 
       {loginRequiredMessage && <p className="error">{loginRequiredMessage}</p>}
 
@@ -122,16 +118,17 @@ export default function UserInventoryPage({
                 type="button"
                 className="profile-share-icon-button ghost"
                 onClick={() => copyText(discordShareUrl)}
-                title="Copy Discord/social share link"
-                aria-label="Copy profile share link"
+                title="Copy Discord/social preview link"
+                aria-label="Copy Discord/social preview link"
               >
                 ↗
               </button>
             </div>
           </div>
 
-          <div className="item-grid drop-zone">
-            {items.length === 0 && <p className="muted">This player has no items.</p>}
+          <div className="card profile-items-card">
+            <div className="item-grid drop-zone">
+              {items.length === 0 && <p className="muted">This player has no items.</p>}
 
             {items.map(item => {
               const isOwnProfile = String(currentUsername || '').toLowerCase() === String(userRecord.username || '').toLowerCase();
@@ -168,6 +165,7 @@ export default function UserInventoryPage({
                 </div>
               );
             })}
+            </div>
           </div>
         </>
       )}
@@ -179,6 +177,6 @@ export default function UserInventoryPage({
           </button>
         </div>
       )}
-    </section>
+    </>
   );
 }

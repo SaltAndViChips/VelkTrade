@@ -1701,3 +1701,170 @@ svg .chart-hover-target {
     border-radius: 10px;
   }
 }
+
+
+/* Admin expandable trade details */
+
+.admin-trade-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.admin-expand-arrow {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(8, 7, 12, 0.42);
+  border-color: var(--border);
+  box-shadow: none;
+  color: #ded8ff;
+  position: sticky;
+  top: 10px;
+}
+
+.admin-expand-arrow:hover {
+  background: var(--purple-soft);
+  border-color: var(--border-bright);
+}
+
+.admin-trade-main {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.admin-trade-summary {
+  display: grid;
+  gap: 6px;
+  background: rgba(8, 7, 12, 0.38);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.admin-trade-summary span {
+  overflow-wrap: anywhere;
+  color: #ded8ff;
+}
+
+.admin-trade-expanded {
+  display: grid;
+  gap: 14px;
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.admin-trade-sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-trade-side,
+.admin-chat-log,
+.admin-trade-meta {
+  background: rgba(8, 7, 12, 0.42);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.admin-trade-side h4,
+.admin-chat-log h4,
+.admin-trade-meta h4 {
+  margin: 0;
+}
+
+.admin-mini-item-grid {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.admin-mini-item {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  background: rgba(23, 21, 34, 0.72);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.admin-mini-item img {
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 7px;
+  background: #07070a;
+}
+
+.admin-mini-item div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.admin-mini-item span {
+  overflow-wrap: anywhere;
+  color: #ded8ff;
+  font-size: 13px;
+}
+
+.admin-ic-line {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  background: rgba(95, 74, 28, 0.22);
+  border: 1px solid rgba(215, 181, 94, 0.42);
+  border-radius: 10px;
+  padding: 8px;
+  margin-top: 10px;
+}
+
+.ic-token.mini {
+  width: 54px;
+  height: 54px;
+  aspect-ratio: auto;
+  font-size: 22px;
+}
+
+.admin-chat-log .history-chat {
+  margin-top: 10px;
+}
+
+.admin-chat-log .history-chat p {
+  background: rgba(23, 21, 34, 0.72);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.admin-chat-log .history-chat small {
+  color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .admin-trade-card {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-expand-arrow {
+    position: static;
+    width: 100%;
+    border-radius: 10px;
+  }
+
+  .admin-trade-sides {
+    grid-template-columns: 1fr;
+  }
+}
