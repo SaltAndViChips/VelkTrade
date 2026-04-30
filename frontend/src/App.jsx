@@ -140,6 +140,8 @@ export default function App() {
     flashTab: true
   });
   const [onlineUsers, setOnlineUsers] = useState([]);
+  const [tradeStatuses, setTradeStatuses] = useState({});
+  const [focusedTradeId, setFocusedTradeId] = useState(null);
   const [room, setRoom] = useState(null);
   const [error, setError] = useState('');
   const [activeDragItem, setActiveDragItem] = useState(null);
@@ -189,7 +191,38 @@ export default function App() {
   }, []);
 
   const isAdmin = Boolean(user?.isAdmin);
-  const unseenNotificationCount = notifications.filter(notification => !notification.seen).length;
+  function isTerminalTradeStatus(status) {
+    return ['declined', 'completed'].includes(String(status || '').toLowerCase());
+  }
+
+  function isIncompleteTradeStatus(status) {
+    return ['pending', 'countered', 'accepted'].includes(String(status || '').toLowerCase());
+  }
+
+  function shouldKeepNotificationVisible(notification, statuses = tradeStatuses) {
+    if (!notification?.seen) return true;
+
+    const createdAt = new Date(notification.createdAt || Date.now()).getTime();
+    const ageMs = Date.now() - createdAt;
+    const fiveMinutesMs = 5 * 60 * 1000;
+
+    const isTradeNotification = ['offline_trade', 'counter_offer'].includes(notification.type);
+    const tradeId = notification.payload?.tradeId;
+    const tradeStatus = statuses[String(tradeId)];
+
+    if (isTradeNotification && isIncompleteTradeStatus(tradeStatus)) {
+      return true;
+    }
+
+    if (isTradeNotification && !tradeStatus) {
+      return true;
+    }
+
+    return ageMs < fiveMinutesMs;
+  }
+
+  const visibleNotifications = notifications.filter(notification => shouldKeepNotificationVisible(notification));
+  const unseenNotificationCount = visibleNotifications.filter(notification => !notification.seen).length;
 
   const myOfferIds = useMemo(
     () => normalizeIds(room && user ? room.offers?.[user.id] || [] : []),
@@ -241,6 +274,15 @@ export default function App() {
     const baseTitle = 'Salts Trading Board';
     document.title = unseenNotificationCount > 0 ? `(${unseenNotificationCount}) ${baseTitle}` : baseTitle;
   }, [unseenNotificationCount]);
+
+  useEffect(() => {
+    const pruneTimer = window.setInterval(() => {
+      setNotifications(current => current.filter(notification => shouldKeepNotificationVisible(notification)));
+    }, 30000);
+
+    return () => window.clearInterval(pruneTimer);
+  }, [tradeStatuses]);
+
 
   useEffect(() => {
     if (!getToken()) return;
@@ -318,7 +360,7 @@ export default function App() {
 
 
     nextSocket.on('notification:new', ({ notification }) => {
-      setNotifications(current => [notification, ...current]);
+      setNotifications(current => [notification, ...current].filter(item => shouldKeepNotificationVisible(item)));
       playNotificationSound();
 
       if (notificationPrefs.flashTab) {
@@ -328,6 +370,12 @@ export default function App() {
           document.title = original;
         }, 900);
       }
+    });
+
+    nextSocket.on('notification:updated', ({ notification }) => {
+      setNotifications(current => current.map(item => (
+        Number(item.id) === Number(notification.id) ? notification : item
+      )).filter(item => shouldKeepNotificationVisible(item)));
     });
 
     nextSocket.on('presence:update', ({ users }) => {
@@ -453,7 +501,9 @@ export default function App() {
     if (!getToken()) return;
 
     const data = await api('/api/notifications');
-    setNotifications(data.notifications || []);
+    const nextTradeStatuses = data.tradeStatuses || {};
+    setTradeStatuses(nextTradeStatuses);
+    setNotifications((data.notifications || []).filter(notification => shouldKeepNotificationVisible(notification, nextTradeStatuses)));
     setNotificationPrefs(data.preferences || notificationPrefs);
     setOnlineUsers(data.onlineUsers || []);
   }
@@ -694,6 +744,7 @@ export default function App() {
     socketRef.current?.emit('room:invite-response', {
       roomId,
       inviterId,
+      notificationId: notification.id,
       accepted: true
     });
 
@@ -708,6 +759,7 @@ export default function App() {
     socketRef.current?.emit('room:invite-response', {
       roomId,
       inviterId,
+      notificationId: notification.id,
       accepted: false
     });
 
@@ -873,6 +925,22 @@ export default function App() {
     setView('offer');
   }
 
+  async function checkTradeNotification(notification) {
+    const tradeId = notification?.payload?.tradeId;
+
+    if (notification?.id) {
+      await markNotificationRead(notification.id);
+    }
+
+    await loadTrades();
+
+    if (tradeId) {
+      setFocusedTradeId(Number(tradeId));
+    }
+
+    setView('trades');
+  }
+
   function navigateFromDashboard(nextView) {
     setView(nextView);
   }
@@ -1004,6 +1072,8 @@ export default function App() {
             trades={trades}
             buyRequests={buyRequests}
             currentUser={user}
+            focusedTradeId={focusedTradeId}
+            onFocusedTradeHandled={() => setFocusedTradeId(null)}
             onRefresh={() => refreshAllForUser(user)}
             onCounter={openCounter}
           />
@@ -1027,13 +1097,15 @@ export default function App() {
 
         {user && view === 'notifications' && (
           <Notifications
-            notifications={notifications}
+            notifications={visibleNotifications}
             preferences={notificationPrefs}
             onlineUsers={onlineUsers}
+            tradeStatuses={tradeStatuses}
             onRefresh={loadNotifications}
             onMarkRead={markNotificationRead}
             onMarkAllRead={markAllNotificationsRead}
             onSavePreferences={saveNotificationPreferences}
+            onCheckTrade={checkTradeNotification}
             onAcceptRoomInvite={acceptRoomInvite}
             onDeclineRoomInvite={declineRoomInvite}
           />

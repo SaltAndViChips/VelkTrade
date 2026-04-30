@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 
 const FILTERS = ['all', 'pending', 'countered', 'accepted', 'completed', 'declined'];
@@ -215,11 +215,32 @@ function BuyRequestsTab({ requests, currentUser, onRefresh }) {
   );
 }
 
-export default function Trades({ trades, buyRequests = [], currentUser, onRefresh, onCounter }) {
+export default function Trades({ trades, buyRequests = [], currentUser, focusedTradeId, onFocusedTradeHandled, onRefresh, onCounter }) {
   const [activeTab, setActiveTab] = useState('trades');
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
+
+  const focusedTradeRef = useRef(null);
+
+  useEffect(() => {
+    if (!focusedTradeId) return;
+
+    setActiveTab('trades');
+    setFilter('all');
+    setSearch('');
+
+    const timer = window.setTimeout(() => {
+      focusedTradeRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+
+      onFocusedTradeHandled?.();
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [focusedTradeId, onFocusedTradeHandled]);
 
   const filtered = useMemo(() => {
     const cleanSearch = search.trim().toLowerCase();
@@ -299,7 +320,11 @@ export default function Trades({ trades, buyRequests = [], currentUser, onRefres
 
           <div className="tidy-list">
             {filtered.map(trade => (
-              <article className="tidy-trade-card" key={trade.id}>
+              <article
+                ref={Number(focusedTradeId) === Number(trade.id) ? focusedTradeRef : null}
+                className={`tidy-trade-card ${Number(focusedTradeId) === Number(trade.id) ? 'focused-trade-card' : ''}`}
+                key={trade.id}
+              >
                 <div className="tidy-card-header">
                   <div>
                     <strong>Trade #{trade.id}</strong>

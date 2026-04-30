@@ -169,6 +169,96 @@ async function createNotification({ userId, type, title, message, payload = {} }
   return normalized;
 }
 
+
+async function updateNotificationPayload(notificationId, payloadPatch) {
+  const row = await get(
+    `SELECT id, payload
+     FROM notifications
+     WHERE id = ?`,
+    [notificationId]
+  );
+
+  if (!row) return null;
+
+  const nextPayload = {
+    ...parsePayload(row.payload),
+    ...payloadPatch
+  };
+
+  await run(
+    `UPDATE notifications
+     SET payload = ?
+     WHERE id = ?`,
+    [JSON.stringify(nextPayload), notificationId]
+  );
+
+  return nextPayload;
+}
+
+async function expireRoomInviteNotifications(roomId) {
+  const cleanRoomId = String(roomId || '').trim().toUpperCase();
+  if (!cleanRoomId) return;
+
+  const rows = await all(
+    `SELECT id, user_id, type, title, message, payload, seen, created_at
+     FROM notifications
+     WHERE type = 'room_invite'`,
+    []
+  );
+
+  for (const row of rows) {
+    const payload = parsePayload(row.payload);
+
+    if (String(payload.roomId || '').toUpperCase() !== cleanRoomId) continue;
+    if (payload.expired || payload.accepted || payload.declined) continue;
+
+    const nextPayload = {
+      ...payload,
+      expired: true,
+      expiredAt: new Date().toISOString(),
+      expiryReason: 'room_closed'
+    };
+
+    await run(
+      `UPDATE notifications
+       SET message = ?, payload = ?
+       WHERE id = ?`,
+      [
+        'This room invite expired because the room was closed.',
+        JSON.stringify(nextPayload),
+        row.id
+      ]
+    );
+
+    const updated = normalizeNotification({
+      ...row,
+      message: 'This room invite expired because the room was closed.',
+      payload: JSON.stringify(nextPayload)
+    });
+
+    io.to(socketRoomForUser(row.user_id)).emit('notification:updated', {
+      notification: updated
+    });
+  }
+}
+
+async function getTradeStatusesByIds(tradeIds) {
+  const ids = Array.from(new Set((tradeIds || []).map(Number))).filter(Number.isFinite);
+
+  if (ids.length === 0) return {};
+
+  const placeholders = ids.map((_, index) => `$${index + 1}`).join(', ');
+  const rows = await all(
+    `SELECT id, status
+     FROM trades
+     WHERE id IN (${placeholders})`,
+    ids
+  );
+
+  return Object.fromEntries(rows.map(row => [String(row.id), row.status]));
+}
+
+
 function broadcastPresence() {
   io.emit('presence:update', {
     users: onlineUserList()
@@ -990,10 +1080,16 @@ app.get('/api/notifications', authMiddleware, async (req, res) => {
     [req.user.id]
   );
 
+  const normalizedNotifications = rows.map(normalizeNotification);
+  const tradeIds = normalizedNotifications
+    .filter(notification => ['offline_trade', 'counter_offer'].includes(notification.type))
+    .map(notification => notification.payload?.tradeId);
+
   res.json({
-    notifications: rows.map(normalizeNotification),
+    notifications: normalizedNotifications,
     preferences: prefs,
-    onlineUsers: onlineUserList()
+    onlineUsers: onlineUserList(),
+    tradeStatuses: await getTradeStatusesByIds(tradeIds)
   });
 });
 
@@ -1130,9 +1226,32 @@ io.on('connection', socket => {
     }
   });
 
-  socket.on('room:invite-response', async ({ roomId, inviterId, accepted }) => {
+  socket.on('room:invite-response', async ({ roomId, inviterId, accepted, notificationId }) => {
     try {
       const cleanRoomId = String(roomId || '').trim().toUpperCase();
+
+      if (notificationId) {
+        const nextPayload = await updateNotificationPayload(notificationId, {
+          accepted: Boolean(accepted),
+          declined: !accepted,
+          respondedAt: new Date().toISOString()
+        });
+
+        if (nextPayload) {
+          const updatedRow = await get(
+            `SELECT id, user_id, type, title, message, payload, seen, created_at
+             FROM notifications
+             WHERE id = ?`,
+            [notificationId]
+          );
+
+          if (updatedRow) {
+            io.to(socketRoomForUser(socket.user.id)).emit('notification:updated', {
+              notification: normalizeNotification(updatedRow)
+            });
+          }
+        }
+      }
 
       if (!inviterId) return;
 
@@ -1166,8 +1285,10 @@ io.on('connection', socket => {
 
   socket.on('room:leave', async ({ roomId }) => {
     try {
-      await leaveRoom(roomId, socket.user.id);
-      io.to(roomId).emit('room:closed');
+      const cleanRoomId = String(roomId || '').trim().toUpperCase();
+      await expireRoomInviteNotifications(cleanRoomId);
+      await leaveRoom(cleanRoomId, socket.user.id);
+      io.to(cleanRoomId).emit('room:closed');
     } catch (error) {
       socket.emit('room:error', error.message);
     }

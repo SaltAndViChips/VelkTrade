@@ -9,14 +9,31 @@ function notificationIcon(type) {
   }[type] || '•';
 }
 
+function isTerminalTradeStatus(status) {
+  return ['declined', 'completed'].includes(String(status || '').toLowerCase());
+}
+
+function isInviteExpired(notification) {
+  return Boolean(notification.payload?.expired || notification.payload?.declined || notification.payload?.accepted);
+}
+
+function inviteStatusLabel(notification) {
+  if (notification.payload?.expired) return 'Expired';
+  if (notification.payload?.declined) return 'Declined';
+  if (notification.payload?.accepted) return 'Accepted';
+  return '';
+}
+
 export default function Notifications({
   notifications,
   preferences,
   onlineUsers,
+  tradeStatuses = {},
   onRefresh,
   onMarkRead,
   onMarkAllRead,
   onSavePreferences,
+  onCheckTrade,
   onAcceptRoomInvite,
   onDeclineRoomInvite
 }) {
@@ -39,6 +56,15 @@ export default function Notifications({
   function savePrefs(event) {
     event.preventDefault();
     onSavePreferences(draftPrefs);
+  }
+
+  function shouldShowCheckTrade(notification) {
+    if (!['offline_trade', 'counter_offer'].includes(notification.type)) return false;
+
+    const tradeId = notification.payload?.tradeId;
+    const status = tradeStatuses[String(tradeId)];
+
+    return !isTerminalTradeStatus(status);
   }
 
   return (
@@ -139,48 +165,71 @@ export default function Notifications({
       <div className="notification-list">
         {notifications.length === 0 && <p className="muted tidy-empty">No notifications yet.</p>}
 
-        {notifications.map(notification => (
-          <article className={`notification-card ${notification.seen ? 'seen' : 'unseen'}`} key={notification.id}>
-            <div className="notification-icon">{notificationIcon(notification.type)}</div>
+        {notifications.map(notification => {
+          const tradeId = notification.payload?.tradeId;
+          const tradeStatus = tradeStatuses[String(tradeId)];
+          const inviteExpired = notification.type === 'room_invite' && isInviteExpired(notification);
+          const inviteLabel = notification.type === 'room_invite' ? inviteStatusLabel(notification) : '';
 
-            <div>
-              <div className="notification-title-row">
-                <strong>{notification.title}</strong>
-                {!notification.seen && <span className="status-pill">new</span>}
+          return (
+            <article className={`notification-card ${notification.seen ? 'seen' : 'unseen'} ${inviteExpired ? 'expired' : ''}`} key={notification.id}>
+              <div className="notification-icon">{notificationIcon(notification.type)}</div>
+
+              <div>
+                <div className="notification-title-row">
+                  <strong>{notification.title}</strong>
+                  {!notification.seen && <span className="status-pill">new</span>}
+                  {inviteLabel && <span className={`status-pill ${notification.payload?.expired ? 'status-declined' : 'status-accepted'}`}>{inviteLabel}</span>}
+                  {tradeStatus && <span className={`status-pill status-${tradeStatus}`}>{tradeStatus}</span>}
+                </div>
+
+                <p>{notification.message}</p>
+                <small>{notification.createdAt}</small>
+
+                {notification.type === 'room_invite' && !inviteExpired && (
+                  <div className="inline-controls notification-actions">
+                    <button
+                      type="button"
+                      onClick={() => onAcceptRoomInvite(notification)}
+                    >
+                      Join Room
+                    </button>
+
+                    <button
+                      type="button"
+                      className="danger"
+                      onClick={() => onDeclineRoomInvite(notification)}
+                    >
+                      Decline
+                    </button>
+                  </div>
+                )}
+
+                {notification.type === 'room_invite' && inviteExpired && (
+                  <p className="muted expired-message">
+                    This room invite is no longer active.
+                  </p>
+                )}
+
+                {shouldShowCheckTrade(notification) && (
+                  <div className="inline-controls notification-actions">
+                    <button type="button" onClick={() => onCheckTrade(notification)}>
+                      Check Trade
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <p>{notification.message}</p>
-              <small>{notification.createdAt}</small>
-
-              {notification.type === 'room_invite' && (
-                <div className="inline-controls notification-actions">
-                  <button
-                    type="button"
-                    onClick={() => onAcceptRoomInvite(notification)}
-                  >
-                    Join Room
+              <div className="notification-card-actions">
+                {!notification.seen && (
+                  <button type="button" className="ghost" onClick={() => onMarkRead(notification.id)}>
+                    Mark Checked
                   </button>
-
-                  <button
-                    type="button"
-                    className="danger"
-                    onClick={() => onDeclineRoomInvite(notification)}
-                  >
-                    Decline
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="notification-card-actions">
-              {!notification.seen && (
-                <button type="button" className="ghost" onClick={() => onMarkRead(notification.id)}>
-                  Check
-                </button>
-              )}
-            </div>
-          </article>
-        ))}
+                )}
+              </div>
+            </article>
+          );
+        })}
       </div>
     </section>
   );
