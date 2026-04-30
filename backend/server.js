@@ -145,6 +145,10 @@ async function markUserSeen(userId) {
 
 
 
+
+
+
+
 function parseValidIcPrice(value) {
   const clean = String(value || '').trim();
 
@@ -187,18 +191,14 @@ async function isCurrentUserAdminForBazaar(user) {
   const username = String(user?.username || '').trim().toLowerCase();
   if (username === 'salt') return true;
 
-  try {
-    const row = await get(
-      `SELECT username, is_admin
-       FROM users
-       WHERE id = ?`,
-      [user.id]
-    );
+  const row = await get(
+    `SELECT username, is_admin
+     FROM users
+     WHERE id = ?`,
+    [user.id]
+  );
 
-    return Boolean(row?.is_admin || String(row?.username || '').trim().toLowerCase() === 'salt');
-  } catch {
-    return false;
-  }
+  return Boolean(row?.is_admin || String(row?.username || '').trim().toLowerCase() === 'salt');
 }
 
 async function getBazaarItemForInterest(itemId, userId) {
@@ -224,28 +224,20 @@ async function getBazaarItemForInterest(itemId, userId) {
   return item;
 }
 
-async function bazaarInterestExists(itemId, userId) {
-  return get(
-    `SELECT 1
-     FROM buy_requests
-     WHERE item_id = ? AND requester_id = ?
-     LIMIT 1`,
-    [itemId, userId]
-  );
-}
-
 async function addBazaarInterest(itemId, user) {
   const item = await getBazaarItemForInterest(itemId, user.id);
-  const existing = await bazaarInterestExists(itemId, user.id);
 
-  if (!existing) {
-    await run(
-      `INSERT INTO buy_requests (item_id, requester_id, owner_id)
-       VALUES (?, ?, ?)
-       ON CONFLICT (item_id, requester_id) DO NOTHING`,
-      [itemId, user.id, item.userId]
-    );
-  }
+  await run(
+    `DELETE FROM buy_requests
+     WHERE item_id = ? AND requester_id = ?`,
+    [itemId, user.id]
+  );
+
+  await run(
+    `INSERT INTO buy_requests (item_id, requester_id, owner_id)
+     VALUES (?, ?, ?)`,
+    [itemId, user.id, item.userId]
+  );
 
   return { ok: true, interested: true };
 }
@@ -263,7 +255,13 @@ async function removeBazaarInterest(itemId, user) {
 async function toggleBazaarInterest(itemId, user) {
   await getBazaarItemForInterest(itemId, user.id);
 
-  const existing = await bazaarInterestExists(itemId, user.id);
+  const existing = await get(
+    `SELECT 1
+     FROM buy_requests
+     WHERE item_id = ? AND requester_id = ?
+     LIMIT 1`,
+    [itemId, user.id]
+  );
 
   if (existing) {
     return removeBazaarInterest(itemId, user);
@@ -1484,6 +1482,7 @@ app.post('/api/admin/reset-password', authMiddleware, requireAdmin, async (req, 
 
   res.json({ ok: true, message: `Password reset for ${target.username}` });
 });
+
 
 
 
