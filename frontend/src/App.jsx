@@ -465,21 +465,53 @@ export default function App() {
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       const context = new AudioContext();
-      const oscillator = context.createOscillator();
+      const now = context.currentTime;
+
+      // Soft, deep water-drop style notification:
+      // a low sine tone with a quick downward pitch glide,
+      // subtle filtered overtone, soft attack, and smooth decay.
+      const drop = context.createOscillator();
+      const overtone = context.createOscillator();
+      const filter = context.createBiquadFilter();
       const gain = context.createGain();
+      const overtoneGain = context.createGain();
 
-      oscillator.type = 'sine';
-      oscillator.frequency.value = 740;
-      gain.gain.value = volume * 0.12;
+      drop.type = 'sine';
+      overtone.type = 'triangle';
 
-      oscillator.connect(gain);
+      drop.frequency.setValueAtTime(420, now);
+      drop.frequency.exponentialRampToValueAtTime(185, now + 0.18);
+
+      overtone.frequency.setValueAtTime(840, now);
+      overtone.frequency.exponentialRampToValueAtTime(370, now + 0.14);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(950, now);
+      filter.frequency.exponentialRampToValueAtTime(420, now + 0.2);
+      filter.Q.setValueAtTime(2.2, now);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(volume * 0.18, now + 0.018);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.36);
+
+      overtoneGain.gain.setValueAtTime(volume * 0.035, now);
+      overtoneGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+
+      drop.connect(filter);
+      filter.connect(gain);
       gain.connect(context.destination);
-      oscillator.start();
+
+      overtone.connect(overtoneGain);
+      overtoneGain.connect(filter);
+
+      drop.start(now);
+      overtone.start(now);
+      drop.stop(now + 0.38);
+      overtone.stop(now + 0.18);
 
       setTimeout(() => {
-        oscillator.stop();
         context.close();
-      }, 140);
+      }, 460);
     } catch {
       // Browser may block audio until user interaction.
     }
