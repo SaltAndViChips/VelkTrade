@@ -2565,3 +2565,147 @@ svg .chart-hover-target {
     justify-self: start;
   }
 }
+
+
+/* Presence badges + notification settings layout polish */
+
+.presence-player-main .verified-badge.mini {
+  flex: 0 0 auto;
+}
+
+.presence-player-main .admin-badge {
+  flex: 0 0 auto;
+}
+
+.presence-player-main small {
+  margin-left: 0;
+  width: 100%;
+  padding-left: 16px;
+}
+
+.notification-card-actions,
+.notification-actions,
+.notifications-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.notification-card-actions button,
+.notification-actions button,
+.notifications-actions button {
+  flex: 1 1 128px;
+  min-width: 118px;
+  white-space: nowrap;
+}
+
+.compact-notifications .notification-card-actions,
+.presence-notifications-tab .notification-card-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px;
+}
+
+.compact-notifications .notification-card-actions button,
+.presence-notifications-tab .notification-card-actions button {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Notification settings should not be squeezed inside the dropdown */
+
+.notification-settings,
+.settings-panel,
+.notification-preferences,
+.notifications-settings {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.notification-settings label,
+.settings-panel label,
+.notification-preferences label,
+.notifications-settings label,
+.toggle-row,
+.range-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: rgba(8, 7, 12, 0.32);
+  border: 1px solid rgba(111, 92, 168, 0.22);
+}
+
+.notification-settings input[type="checkbox"],
+.settings-panel input[type="checkbox"],
+.notification-preferences input[type="checkbox"],
+.notifications-settings input[type="checkbox"],
+.toggle-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+.range-row,
+.notification-settings .range-row,
+.settings-panel .range-row {
+  grid-template-columns: 1fr;
+}
+
+.range-row input[type="range"],
+.notification-settings input[type="range"],
+.settings-panel input[type="range"],
+.notification-preferences input[type="range"],
+.notifications-settings input[type="range"] {
+  width: 100%;
+  min-width: 180px;
+}
+
+.compact-notifications .notification-settings,
+.presence-notifications-tab .notification-settings,
+.compact-notifications .settings-panel,
+.presence-notifications-tab .settings-panel {
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(8, 7, 12, 0.34);
+  border: 1px solid var(--border);
+}
+
+.compact-notifications .panel-title-row,
+.presence-notifications-tab .panel-title-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.compact-notifications .panel-title-row .inline-controls,
+.presence-notifications-tab .panel-title-row .inline-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+@media (max-width: 520px) {
+  .notification-card-actions,
+  .notification-actions,
+  .notifications-actions,
+  .compact-notifications .notification-card-actions,
+  .presence-notifications-tab .notification-card-actions {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .notification-card-actions button,
+  .notification-actions button,
+  .notifications-actions button {
+    width: 100%;
+    min-width: 0;
+  }
+}

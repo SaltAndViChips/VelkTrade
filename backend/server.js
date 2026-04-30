@@ -93,7 +93,7 @@ async function hydrateOnlinePresenceUser(userId, fallbackUser) {
       isAdmin: Boolean(row.is_admin || String(row.username || '').toLowerCase() === 'salt'),
       isVerified: Boolean(row.is_verified),
       showOnline: row.show_online !== false,
-      status: 'online'
+      status: fallbackUser?.status || 'online'
     };
   } catch {
     return fallbackUser;
@@ -106,8 +106,8 @@ function onlineUserList() {
     .map(user => ({
       id: user.id,
       username: user.username,
-      isAdmin: Boolean(user.isAdmin || String(user.username || '').toLowerCase() === 'salt'),
-      isVerified: Boolean(user.isVerified),
+      isAdmin: Boolean(user.isAdmin || user.is_admin || String(user.username || '').toLowerCase() === 'salt'),
+      isVerified: Boolean(user.isVerified || user.is_verified),
       status: user.status || 'online'
     }));
 }

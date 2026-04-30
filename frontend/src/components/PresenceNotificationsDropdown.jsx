@@ -8,6 +8,14 @@ function getProfileUrl(username) {
   return `${window.location.origin}${cleanBase}/user/${encodeURIComponent(username)}`;
 }
 
+function isAdminPlayer(player) {
+  return Boolean(player?.isAdmin || player?.is_admin || String(player?.username || '').toLowerCase() === 'salt');
+}
+
+function isVerifiedPlayer(player) {
+  return Boolean(player?.isVerified || player?.is_verified);
+}
+
 function statusLabel(player) {
   if (player.status === 'trading') return 'In trade';
   if (player.status === 'idle') return 'Idle';
@@ -38,10 +46,10 @@ export default function PresenceNotificationsDropdown({
     return [...onlineUsers]
       .filter(player => Number(player.id) !== Number(currentUser?.id))
       .sort((a, b) => {
-        const adminDiff = Number(Boolean(b.isAdmin)) - Number(Boolean(a.isAdmin));
+        const adminDiff = Number(isAdminPlayer(b)) - Number(isAdminPlayer(a));
         if (adminDiff) return adminDiff;
 
-        const verifiedDiff = Number(Boolean(b.isVerified)) - Number(Boolean(a.isVerified));
+        const verifiedDiff = Number(isVerifiedPlayer(b)) - Number(isVerifiedPlayer(a));
         if (verifiedDiff) return verifiedDiff;
 
         return String(a.username || '').localeCompare(String(b.username || ''));
@@ -108,8 +116,8 @@ export default function PresenceNotificationsDropdown({
                   <div className="presence-player-main">
                     <span className="online-dot" />
                     <strong>{player.username}</strong>
-                    {player.isVerified && <span className="verified-badge mini" title="Verified user">✓</span>}
-                    {player.isAdmin && <span className="admin-badge">Admin</span>}
+                    {isVerifiedPlayer(player) && <span className="verified-badge mini" title="Verified user">✓</span>}
+                    {isAdminPlayer(player) && <span className="admin-badge">Admin</span>}
                     <small>{statusLabel(player)}</small>
                   </div>
 
