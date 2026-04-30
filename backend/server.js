@@ -57,6 +57,73 @@ function socialPreviewImageUrl() {
   return 'https://nicecock.ca/VelkTrade/social-preview.png';
 }
 
+function isCrawlerRequest(req) {
+  const userAgent = String(req.get('user-agent') || '').toLowerCase();
+
+  return [
+    'discordbot',
+    'twitterbot',
+    'facebookexternalhit',
+    'facebot',
+    'slackbot',
+    'linkedinbot',
+    'telegrambot',
+    'whatsapp',
+    'embedly',
+    'quora link preview',
+    'pinterest',
+    'vkshare'
+  ].some(bot => userAgent.includes(bot));
+}
+
+function sharePageHtml({
+  req,
+  title,
+  description,
+  image,
+  destination,
+  shouldRedirect
+}) {
+  const canonicalShareUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  <meta name="theme-color" content="#8d63ff">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Salts Trading Board">
+  <meta property="og:title" content="${escapeHtml(title)}">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:url" content="${escapeHtml(canonicalShareUrl)}">
+  <meta property="og:image" content="${escapeHtml(image)}">
+  <meta property="og:image:secure_url" content="${escapeHtml(image)}">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="1200">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${escapeHtml(title)}">
+  <meta name="twitter:description" content="${escapeHtml(description)}">
+  <meta name="twitter:image" content="${escapeHtml(image)}">
+
+  <link rel="canonical" href="${escapeHtml(destination)}">
+  ${shouldRedirect ? `<meta http-equiv="refresh" content="0; url=${escapeHtml(destination)}">` : ''}
+</head>
+<body style="background:#09070f;color:#f2efff;font-family:Arial,sans-serif">
+  <main style="max-width:720px;margin:40px auto;padding:24px;border:1px solid #6f5ca8;border-radius:16px;background:#171522">
+    <h1>${escapeHtml(title)}</h1>
+    <p>${escapeHtml(description)}</p>
+    <p><a style="color:#b99dff" href="${escapeHtml(destination)}">Open profile</a></p>
+  </main>
+  ${shouldRedirect ? `<script>window.location.replace(${JSON.stringify(destination)});</script>` : ''}
+</body>
+</html>`;
+}
+
 app.use(express.json());
 app.use(cors({ origin: FRONTEND_ORIGIN }));
 
@@ -312,22 +379,24 @@ app.get('/u/:username', async (req, res) => {
     [username]
   );
 
+  const image = socialPreviewImageUrl();
+
   if (!profileUser) {
     const fallbackUrl = `${PUBLIC_FRONTEND_URL}/`;
-    return res.status(404).send(`<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Player not found - Salts Trading Board</title>
-  <meta property="og:title" content="Player not found - Salts Trading Board">
-  <meta property="og:description" content="This VelkTrade profile could not be found.">
-  <meta property="og:image" content="${escapeHtml(socialPreviewImageUrl())}">
-  <meta name="theme-color" content="#8d63ff">
-</head>
-<body>
-  <p>Player not found. <a href="${escapeHtml(fallbackUrl)}">Open Salts Trading Board</a></p>
-</body>
-</html>`);
+    const title = 'Player not found - Salts Trading Board';
+    const description = 'This VelkTrade profile could not be found.';
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
+
+    return res.status(404).send(sharePageHtml({
+      req,
+      title,
+      description,
+      image,
+      destination: fallbackUrl,
+      shouldRedirect: !isCrawlerRequest(req)
+    }));
   }
 
   const itemCountRow = await get(
@@ -345,42 +414,18 @@ app.get('/u/:username', async (req, res) => {
     ? `${bio} • Selling ${sellingCount} ${itemWord} on Salts Trading Board.`
     : `Selling ${sellingCount} ${itemWord} on Salts Trading Board.`;
   const destination = profileUrl(profileUser.username);
-  const image = socialPreviewImageUrl();
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(`<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>${escapeHtml(title)}</title>
-  <meta name="description" content="${escapeHtml(description)}">
-  <meta name="theme-color" content="#8d63ff">
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
 
-  <meta property="og:type" content="profile">
-  <meta property="og:site_name" content="Salts Trading Board">
-  <meta property="og:title" content="${escapeHtml(title)}">
-  <meta property="og:description" content="${escapeHtml(description)}">
-  <meta property="og:url" content="${escapeHtml(req.protocol)}://${escapeHtml(req.get('host'))}${escapeHtml(req.originalUrl)}">
-  <meta property="og:image" content="${escapeHtml(image)}">
-  <meta property="og:image:secure_url" content="${escapeHtml(image)}">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="1200">
-
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="${escapeHtml(title)}">
-  <meta name="twitter:description" content="${escapeHtml(description)}">
-  <meta name="twitter:image" content="${escapeHtml(image)}">
-
-  <meta http-equiv="refresh" content="0; url=${escapeHtml(destination)}">
-  <link rel="canonical" href="${escapeHtml(destination)}">
-</head>
-<body>
-  <p>Opening <a href="${escapeHtml(destination)}">${escapeHtml(title)}</a>...</p>
-  <script>
-    window.location.replace(${JSON.stringify(destination)});
-  </script>
-</body>
-</html>`);
+  res.send(sharePageHtml({
+    req,
+    title,
+    description,
+    image,
+    destination,
+    shouldRedirect: !isCrawlerRequest(req)
+  }));
 });
 
 app.get('/api/health', async (req, res) => {

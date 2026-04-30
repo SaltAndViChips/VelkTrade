@@ -32,7 +32,7 @@ export default function UserInventoryPage({
   onToggleBuyRequest
 }) {
   const discordShareUrl = userRecord
-    ? `${getBackendShareBase().replace(/\/$/, '')}/u/${encodeURIComponent(userRecord.username)}`
+    ? `${getBackendShareBase().replace(/\/$/, '')}/u/${encodeURIComponent(userRecord.username)}?v=${Date.now()}`
     : '';
 
   return (
