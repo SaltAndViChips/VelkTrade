@@ -11,12 +11,33 @@ const { get, all, run, transaction, getDatabaseDiagnostics } = require('./db');
 const { registerProfileShareRoute } = require('./profileShareRoute');
 const { createToken, authMiddleware } = require('./auth');
 const { fetchImgurItem, isImgurUrl } = require('./imgur');
-const {
-  normalizeUsername,
-  isSaltUsername,
-  isAdminUser,
-  publicUser
-} = require('./admin');
+const { normalizeUsername, isSaltUsername, isDeveloperUsername, isProtectedDeveloperUser, isAdminUser, publicUser } = require('./admin');
+
+function isProtectedDeveloperAccount(value) {
+  const username = typeof value === 'string' ? value : value?.username;
+  return ['salt', 'velkon'].includes(String(username || '').trim().toLowerCase());
+}
+
+function developerAwareUser(user) {
+  if (!user) return null;
+
+  const isDeveloper = Boolean(user?.is_developer || user?.isDeveloper || isProtectedDeveloperAccount(user));
+  const isAdmin = Boolean(user?.is_admin || user?.isAdmin || isDeveloper);
+  const isVerified = Boolean(user?.is_verified || user?.isVerified);
+
+  return {
+    ...publicUser(user),
+    isAdmin,
+    isVerified,
+    isDeveloper,
+    showBazaarInventory: user.show_bazaar_inventory !== false && user.showBazaarInventory !== false,
+    showOnline: user.show_online !== false && user.showOnline !== false,
+    bio: user.bio || '',
+    highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'verified' : 'none'
+  };
+}
+
+
 const {
   createRoom,
   joinRoom,
@@ -111,19 +132,6 @@ function isProtectedDeveloperAccount(value) {
   return ['salt', 'velkon'].includes(String(username || '').trim().toLowerCase());
 }
 
-function developerAwareUser(user) {
-  const isDeveloper = Boolean(user?.is_developer || user?.isDeveloper || isProtectedDeveloperAccount(user));
-  const isAdmin = Boolean(user?.is_admin || user?.isAdmin || isDeveloper);
-  const isVerified = Boolean(user?.is_verified || user?.isVerified);
-
-  return {
-    ...developerAwareUser(user),
-    isAdmin,
-    isVerified,
-    isDeveloper,
-    highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'verified' : 'none'
-  };
-}
 
 function onlineUserList() {
   return Array.from(onlineUsers.values())
@@ -895,7 +903,7 @@ app.post('/api/login', async (req, res) => {
   const cleanUsername = normalizeUsername(req.body.username);
 
   const user = await get(
-    `SELECT id, username, password, is_admin, is_verified, show_bazaar_inventory, bio
+    `SELECT id, username, password, is_admin, is_verified, show_bazaar_inventory, show_online, bio, show_bazaar_inventory, bio
      FROM users
      WHERE LOWER(username) = LOWER(?)`,
     [cleanUsername]
@@ -933,7 +941,7 @@ app.get('/api/me', authMiddleware, async (req, res) => {
     user.is_admin = true;
   }
 
-  res.json({ user: user ? { ...developerAwareUser(user), bio: user.bio || '' } : null });
+  res.json({ user: user ? { ...publicUser(user), bio: user.bio || '' } : null });
 });
 
 
@@ -955,7 +963,7 @@ app.put('/api/me/bazaar-visibility', authMiddleware, async (req, res) => {
   res.json({
     ok: true,
     user: {
-      ...developerAwareUser(user),
+      ...publicUser(user),
       bio: user.bio || '',
       showBazaarInventory: user.show_bazaar_inventory !== false
     }
@@ -1408,7 +1416,7 @@ app.get('/api/admin/users', authMiddleware, requireAdmin, async (req, res) => {
   );
 
   res.json({
-    users: rows.map(user => ({ ...developerAwareUser(user), bio: user.bio || '', isVerified: Boolean(user.is_verified), online: typeof isUserOnline === 'function' ? isUserOnline(user.id) : false }))
+    users: rows.map(user => ({ ...publicUser(user), bio: user.bio || '', isVerified: Boolean(user.is_verified), online: typeof isUserOnline === 'function' ? isUserOnline(user.id) : false }))
   });
 });
 
@@ -1426,16 +1434,10 @@ app.post('/api/admin/set-admin', authMiddleware, requireAdmin, async (req, res) 
   );
 
   if (!target) return res.status(404).json({ error: 'User not found' });
-
-
   if (isProtectedDeveloperAccount(target)) {
     return res.status(403).json({ error: 'Developer accounts cannot be modified by admins' });
   }
-if (isProtectedDeveloperAccount(target)) {
-    return res.status(403).json({ error: 'Developer accounts cannot be modified by admins' });
-  }
-
-  if (isSaltUsername(target.username) && isAdmin === false) {
+if (isSaltUsername(target.username) && isAdmin === false) {
     return res.status(400).json({ error: 'Salt cannot lose admin access' });
   }
 

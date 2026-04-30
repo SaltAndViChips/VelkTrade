@@ -11,16 +11,6 @@ function isSaltUsername(value) {
   return normalizeUsername(value).toLowerCase() === 'salt';
 }
 
-function isAdminUser(user) {
-  return Boolean(
-    user?.is_admin ||
-    user?.isAdmin ||
-    user?.is_developer ||
-    user?.isDeveloper ||
-    isDeveloperUsername(user?.username)
-  );
-}
-
 function isProtectedDeveloperUser(userOrUsername) {
   if (typeof userOrUsername === 'string') {
     return isDeveloperUsername(userOrUsername);
@@ -33,16 +23,28 @@ function isProtectedDeveloperUser(userOrUsername) {
   );
 }
 
+function isAdminUser(user) {
+  return Boolean(
+    user?.is_admin ||
+    user?.isAdmin ||
+    isProtectedDeveloperUser(user)
+  );
+}
+
 function publicUser(user) {
+  if (!user) return null;
+
   const isDeveloper = isProtectedDeveloperUser(user);
+  const isAdmin = Boolean(user.is_admin || user.isAdmin || isDeveloper);
+  const isVerified = Boolean(user.is_verified || user.isVerified);
 
   return {
     id: user.id,
     username: user.username,
-    isAdmin: Boolean(user.is_admin || user.isAdmin || isDeveloper),
-    isVerified: Boolean(user.is_verified || user.isVerified),
+    isAdmin,
+    isVerified,
     isDeveloper,
-    highestBadge: isDeveloper ? 'developer' : (user.is_admin || user.isAdmin) ? 'admin' : (user.is_verified || user.isVerified) ? 'verified' : 'none'
+    highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'verified' : 'none'
   };
 }
 
@@ -50,7 +52,7 @@ module.exports = {
   normalizeUsername,
   isSaltUsername,
   isDeveloperUsername,
-  isAdminUser,
   isProtectedDeveloperUser,
+  isAdminUser,
   publicUser
 };
