@@ -803,13 +803,12 @@ app.post('/api/trades/offers', authMiddleware, async (req, res) => {
     });
 
     await createNotification({
-      userId: otherUser.id,
-      type: 'counter_offer',
-      title: 'New counter offer',
-      message: `${req.user.username} sent you a counter offer.`,
+      userId: target.id,
+      type: 'offline_trade',
+      title: 'New offline trade request',
+      message: `${req.user.username} sent you an offline trade request.`,
       payload: {
         tradeId: result.lastID,
-        originalTradeId: original.id,
         fromUsername: req.user.username
       }
     });
