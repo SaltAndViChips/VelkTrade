@@ -44,7 +44,7 @@ function publicUser(user) {
     isAdmin,
     isVerified,
     isDeveloper,
-    highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'verified' : 'none'
+    highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'trusted' : 'none'
   };
 }
 

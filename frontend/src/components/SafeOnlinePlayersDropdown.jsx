@@ -137,11 +137,11 @@ export default function SafeOnlinePlayersDropdown({
                         <strong>{player.username}</strong>
 
                         {developer ? (
-                          <span className="developer-badge">Developer</span>
+                          <span className="role-icon-badge developer-icon" title="Developer">🖥️</span>
                         ) : admin ? (
-                          <span className="admin-badge">Admin</span>
+                          <span className="role-icon-badge admin-icon" title="Admin">🛡️</span>
                         ) : trusted ? (
-                          <span className="trusted-badge">Trusted</span>
+                          <span className="role-icon-badge trusted-icon" title="Verified">✓</span>
                         ) : null}
 
                         <small>{statusLabel(player)}</small>

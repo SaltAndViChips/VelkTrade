@@ -1,6 +1,37 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 
+function isDeveloperUser(user) {
+  return Boolean(
+    user?.isDeveloper ||
+    user?.is_developer ||
+    user?.highestBadge === 'developer' ||
+    ['salt', 'velkon'].includes(String(user?.username || '').toLowerCase())
+  );
+}
+
+function isAdminUser(user) {
+  return Boolean(isDeveloperUser(user) || user?.isAdmin || user?.is_admin || user?.highestBadge === 'admin');
+}
+
+function isTrustedUser(user) {
+  return Boolean(user?.isTrusted || user?.isVerified || user?.is_verified || user?.highestBadge === 'trusted' || user?.highestBadge === 'verified');
+}
+
+function canModifyUser(currentUser, targetUser) {
+  if (!isDeveloperUser(targetUser)) return true;
+  return isDeveloperUser(currentUser);
+}
+
+function UserBadge({ user }) {
+  if (isDeveloperUser(user)) return <span className="developer-badge">🖥️ Developer</span>;
+  if (isAdminUser(user)) return <span className="admin-badge">Admin</span>;
+  if (isTrustedUser(user)) return <span className="trusted-badge">Trusted</span>;
+  return <span className="muted">User</span>;
+}
+
+
+
 function getTradeMeta(trade) {
   const metaMessage = (trade.chatHistory || []).find(message => message.type === 'trade-meta');
 
@@ -271,21 +302,6 @@ export default function AdminPanel({ onJoinRoom }) {
     setNewPassword('');
   }
 
-  async function setVerifiedFlag(username, isVerified) {
-    setMessage('');
-
-    const data = await api('/api/admin/set-verified', {
-      method: 'POST',
-      body: JSON.stringify({
-        username,
-        isVerified
-      })
-    });
-
-    setMessage(data.message || 'Verified flag updated.');
-    await loadAdminData();
-  }
-
   async function setAdminFlag(username, isAdmin) {
     setMessage('');
 
@@ -378,7 +394,6 @@ export default function AdminPanel({ onJoinRoom }) {
 
                   <div className="inline-controls">
                     {user.online ? <span className="online-status">Online</span> : <span className="offline-status">Offline</span>}
-                    {user.isVerified && <span className="verified-badge" title="Verified user">✓</span>}
                     {user.isAdmin && <span className="status-pill">admin</span>}
                   </div>
                 </div>
@@ -391,16 +406,6 @@ export default function AdminPanel({ onJoinRoom }) {
                   ) : (
                     <button onClick={() => setAdminFlag(user.username, true)}>
                       Make Admin
-                    </button>
-                  )}
-
-                  {user.isVerified ? (
-                    <button className="ghost" onClick={() => setVerifiedFlag(user.username, false)}>
-                      Remove Verified
-                    </button>
-                  ) : (
-                    <button className="ghost" onClick={() => setVerifiedFlag(user.username, true)}>
-                      Verify
                     </button>
                   )}
 

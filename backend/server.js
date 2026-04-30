@@ -13,29 +13,41 @@ const { createToken, authMiddleware } = require('./auth');
 const { fetchImgurItem, isImgurUrl } = require('./imgur');
 const { normalizeUsername, isSaltUsername, isDeveloperUsername, isProtectedDeveloperUser, isAdminUser, publicUser } = require('./admin');
 
-function isProtectedDeveloperAccount(value) {
-  const username = typeof value === 'string' ? value : value?.username;
-  return ['salt', 'velkon'].includes(String(username || '').trim().toLowerCase());
+function isRequesterDeveloper(user) {
+  return isProtectedDeveloperUser(user);
+}
+
+function canModifyDeveloperTarget(requester, target) {
+  if (!isProtectedDeveloperUser(target)) return true;
+  return isRequesterDeveloper(requester);
 }
 
 function developerAwareUser(user) {
   if (!user) return null;
 
-  const isDeveloper = Boolean(user?.is_developer || user?.isDeveloper || isProtectedDeveloperAccount(user));
-  const isAdmin = Boolean(user?.is_admin || user?.isAdmin || isDeveloper);
-  const isVerified = Boolean(user?.is_verified || user?.isVerified);
+  const isDeveloper = isProtectedDeveloperUser(user);
+  const isAdmin = Boolean(user.is_admin || user.isAdmin || isDeveloper);
+  const isVerified = Boolean(user.is_verified || user.isVerified);
 
   return {
     ...publicUser(user),
     isAdmin,
     isVerified,
     isDeveloper,
+    highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'trusted' : 'none',
     showBazaarInventory: user.show_bazaar_inventory !== false && user.showBazaarInventory !== false,
     showOnline: user.show_online !== false && user.showOnline !== false,
-    bio: user.bio || '',
-    highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'verified' : 'none'
+    bio: user.bio || ''
   };
 }
+
+
+
+function isProtectedDeveloperAccount(value) {
+  const username = typeof value === 'string' ? value : value?.username;
+  return ['salt', 'velkon'].includes(String(username || '').trim().toLowerCase());
+}
+
 
 
 const {
