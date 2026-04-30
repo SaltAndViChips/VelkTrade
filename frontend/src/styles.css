@@ -2888,3 +2888,31 @@ svg .chart-hover-target {
 .overlay-fallback button {
   min-height: 30px;
 }
+
+
+/* App crash fallback */
+
+.app-crash-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg, #09070f);
+  color: var(--text, #f2efff);
+}
+
+.app-crash-card {
+  width: min(720px, 100%);
+  display: grid;
+  gap: 12px;
+}
+
+.app-crash-card pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(0,0,0,.35);
+  border: 1px solid var(--border, #4a3f6b);
+  color: #ffd1d1;
+}

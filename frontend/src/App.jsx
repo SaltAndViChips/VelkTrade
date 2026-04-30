@@ -23,9 +23,6 @@ import TradeOfferPanel from './components/TradeOfferPanel';
 import UserInventoryPage from './components/UserInventoryPage';
 import Bazaar from './components/Bazaar';
 import Notifications from './components/Notifications';
-import PresenceNotificationsDropdown from './components/PresenceNotificationsDropdown';
-import AppUpdateNotice from './components/AppUpdateNotice';
-import SafeOverlayBoundary from './components/SafeOverlayBoundary';
 
 function parseDraggedItemId(active) {
   const dataItemId = active?.data?.current?.itemId;
@@ -145,7 +142,6 @@ export default function App() {
   });
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [pendingRoomInvite, setPendingRoomInvite] = useState(null);
-  const [pendingRoomInvite, setPendingRoomInvite] = useState(null);
   const [tradeStatuses, setTradeStatuses] = useState({});
   const [focusedTradeId, setFocusedTradeId] = useState(null);
   const [room, setRoom] = useState(null);
@@ -207,64 +203,7 @@ export default function App() {
       }
     };
   }, []);
-
-
-  function computePresenceStatus(nextView = view, nextRoom = room) {
-    if (document.hidden) return 'away';
-    if (nextRoom?.roomId || nextView === 'trade') return 'trade';
-    if (nextView === 'bazaar') return 'bazaar';
-    return 'online';
-  }
-
-  function emitPresenceStatus(status = computePresenceStatus()) {
-    if (!socket) return;
-    socket.emit('presence:set-status', status);
-  }
-
-  useEffect(() => {
-    emitPresenceStatus(computePresenceStatus());
-  }, [view, room?.roomId, socket]);
-
-  useEffect(() => {
-    function markAwayLater() {
-      if (awayTimerRef.current) {
-        window.clearTimeout(awayTimerRef.current);
-      }
-
-      awayTimerRef.current = window.setTimeout(() => {
-        emitPresenceStatus('away');
-      }, 5 * 60 * 1000);
-    }
-
-    function handleVisibilityChange() {
-      if (document.hidden) {
-        markAwayLater();
-      } else {
-        if (awayTimerRef.current) {
-          window.clearTimeout(awayTimerRef.current);
-        }
-
-        emitPresenceStatus(computePresenceStatus());
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleVisibilityChange);
-    window.addEventListener('blur', markAwayLater);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleVisibilityChange);
-      window.removeEventListener('blur', markAwayLater);
-
-      if (awayTimerRef.current) {
-        window.clearTimeout(awayTimerRef.current);
-      }
-    };
-  }, [socket, view, room?.roomId]);
-
-
-  const isAdmin = Boolean(user?.isAdmin);
+const isAdmin = Boolean(user?.isAdmin);
   function isTerminalTradeStatus(status) {
     return ['declined', 'completed'].includes(String(status || '').toLowerCase());
   }
@@ -394,14 +333,7 @@ export default function App() {
     nextSocket.on('room:update', nextRoom => {
       const previousIds = previousRoomPlayerIdsRef.current || [];
       const nextIds = (nextRoom?.players || []).map(player => Number(player.id)).filter(Number.isFinite);
-
-      if (previousIds.length && nextIds.length > previousIds.length) {
-        playRoomPresenceChime('join');
-      } else if (previousIds.length && nextIds.length < previousIds.length) {
-        playRoomPresenceChime('leave');
-      }
-
-      previousRoomPlayerIdsRef.current = nextIds;
+previousRoomPlayerIdsRef.current = nextIds;
 
       setRoom(nextRoom);
       roomRef.current = nextRoom;
@@ -595,44 +527,6 @@ export default function App() {
     setNotificationPrefs(data.preferences || notificationPrefs);
     setOnlineUsers(data.onlineUsers || []);
   }
-
-
-  function playRoomPresenceChime(type) {
-    try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      const context = new AudioContext();
-      const now = context.currentTime;
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      const filter = context.createBiquadFilter();
-
-      oscillator.type = 'sine';
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(1100, now);
-
-      const startFreq = type === 'leave' ? 360 : 460;
-      const endFreq = type === 'leave' ? 230 : 620;
-
-      oscillator.frequency.setValueAtTime(startFreq, now);
-      oscillator.frequency.exponentialRampToValueAtTime(endFreq, now + 0.16);
-
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.075, now + 0.018);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
-
-      oscillator.connect(filter);
-      filter.connect(gain);
-      gain.connect(context.destination);
-
-      oscillator.start(now);
-      oscillator.stop(now + 0.26);
-
-      setTimeout(() => context.close(), 340);
-    } catch {
-      // Browser may block audio until user interaction.
-    }
-  }
-
   function playNotificationSound() {
     const volume = Number(notificationPrefs.soundVolume ?? 0.5);
     if (volume <= 0) return;
@@ -1121,36 +1015,7 @@ export default function App() {
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveDragItem(null)}
     >
-      <SafeOverlayBoundary>
-        {user && (
-          <PresenceNotificationsDropdown
-            currentUser={user}
-            onlineUsers={Array.isArray(onlineUsers) ? onlineUsers : []}
-            currentRoomId={room?.roomId || ''}
-            pendingRoomInvite={pendingRoomInvite || null}
-            notifications={Array.isArray(visibleNotifications) ? visibleNotifications : []}
-            preferences={notificationPrefs || {}}
-            tradeStatuses={tradeStatuses || {}}
-            unseenCount={Number(unseenNotificationCount || 0)}
-            onRefreshNotifications={loadNotifications || (() => {})}
-            onMarkRead={markNotificationRead || (() => {})}
-            onMarkAllRead={markAllNotificationsRead || (() => {})}
-            onSavePreferences={saveNotificationPreferences || (() => {})}
-            onCheckTrade={checkTradeNotification || (() => {})}
-            onAcceptRoomInvite={acceptRoomInvite || (() => {})}
-            onDeclineRoomInvite={declineRoomInvite || (() => {})}
-            onInvitePlayer={invitePlayerToRoom || (() => {})}
-            onCancelInvite={cancelPendingRoomInvite || (() => {})}
-          />
-        )}
-
-        <AppUpdateNotice />
-      </SafeOverlayBoundary>
-
-
-
-
-      <main className="app-shell">
+<main className="app-shell">
         <header className="topbar">
           <div>
             <h1>VelkTrade</h1>
