@@ -230,6 +230,7 @@ async function invitePlayerToRoom(username) {
     setView('trade');
   }
 
+
   const visibleNotifications = notifications || [];
   const tradeStatuses = {};
   const unseenNotificationCount = 0;
@@ -271,8 +272,6 @@ const isAdmin = Boolean(user?.isAdmin);
     return ageMs < fiveMinutesMs;
   }
 
-  const visibleNotifications = notifications.filter(notification => shouldKeepNotificationVisible(notification));
-  const unseenNotificationCount = visibleNotifications.filter(notification => !notification.seen).length;
 
   const myOfferIds = useMemo(
     () => normalizeIds(room && user ? room.offers?.[user.id] || [] : []),
@@ -1068,7 +1067,7 @@ previousRoomPlayerIdsRef.current = nextIds;
           onCheckTrade={checkTradeNotification || (() => {})}
           onAcceptRoomInvite={acceptRoomInvite || (() => {})}
           onDeclineRoomInvite={declineRoomInvite || (() => {})}
-          onInvitePlayer={invitePlayerToRoom}
+          onInvitePlayer={invitePlayerToRoom || (() => {})}
         />
       )}
 

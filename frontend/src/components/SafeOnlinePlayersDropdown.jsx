@@ -18,52 +18,35 @@ function isDeveloperPlayer(player) {
 }
 
 function isAdminPlayer(player) {
-  return Boolean(
-    isDeveloperPlayer(player) ||
-    player?.isAdmin ||
-    player?.is_admin ||
-    player?.highestBadge === 'admin'
-  );
+  return Boolean(isDeveloperPlayer(player) || player?.isAdmin || player?.is_admin || player?.highestBadge === 'admin');
 }
 
-function isTrustedPlayer(player) {
+function isVerifiedPlayer(player) {
   return Boolean(
-    player?.isTrusted ||
     player?.isVerified ||
     player?.is_verified ||
-    player?.highestBadge === 'trusted' ||
-    player?.highestBadge === 'verified'
+    player?.isTrusted ||
+    player?.highestBadge === 'verified' ||
+    player?.highestBadge === 'trusted'
   );
 }
 
 function statusLabel(player) {
   const status = player?.status || 'online';
-
   if (status === 'trade') return 'In trade room';
   if (status === 'bazaar') return 'Viewing Bazaar';
-
   if (status === 'away') {
     const ms = Number(player?.awayForMs || (player?.statusSince ? Date.now() - Number(player.statusSince) : 0));
     const mins = Math.max(1, Math.floor(ms / 60000));
     return `Away for ${mins}m`;
   }
-
   return 'Online';
 }
 
 function RoleIcon({ player }) {
-  if (isDeveloperPlayer(player)) {
-    return <span className="role-icon-badge developer-icon" title="Developer">🖥️</span>;
-  }
-
-  if (isAdminPlayer(player)) {
-    return <span className="role-icon-badge admin-icon" title="Admin">🛡️</span>;
-  }
-
-  if (isTrustedPlayer(player)) {
-    return <span className="role-icon-badge trusted-icon" title="Trusted">✓</span>;
-  }
-
+  if (isDeveloperPlayer(player)) return <span className="role-icon-badge developer-icon" title="Developer">🖥️</span>;
+  if (isAdminPlayer(player)) return <span className="role-icon-badge admin-icon" title="Admin">🛡️</span>;
+  if (isVerifiedPlayer(player)) return <span className="role-icon-badge verified-icon" title="Verified">✓</span>;
   return null;
 }
 
@@ -117,13 +100,10 @@ export default function SafeOnlinePlayersDropdown({
       .sort((a, b) => {
         const developerDiff = Number(isDeveloperPlayer(b)) - Number(isDeveloperPlayer(a));
         if (developerDiff) return developerDiff;
-
         const adminDiff = Number(isAdminPlayer(b)) - Number(isAdminPlayer(a));
         if (adminDiff) return adminDiff;
-
-        const trustedDiff = Number(isTrustedPlayer(b)) - Number(isTrustedPlayer(a));
-        if (trustedDiff) return trustedDiff;
-
+        const verifiedDiff = Number(isVerifiedPlayer(b)) - Number(isVerifiedPlayer(a));
+        if (verifiedDiff) return verifiedDiff;
         return String(a?.username || '').localeCompare(String(b?.username || ''));
       });
   }, [sourceUsers, currentUser]);
@@ -136,7 +116,7 @@ export default function SafeOnlinePlayersDropdown({
   }
 
   return (
-    <div className="safe-online-dropdown">
+    <div className="safe-online-dropdown rewritten-online-dropdown">
       <button
         type="button"
         className="safe-online-toggle"
