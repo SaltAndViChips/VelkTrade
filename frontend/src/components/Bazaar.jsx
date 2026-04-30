@@ -176,7 +176,7 @@ export default function Bazaar({ currentUser }) {
               <div className="bazaar-item-body">
                 <h3>{item.title}</h3>
 
-                {currentUser?.isAdmin && item.ownerUsername && (
+                {item.ownerUsername && (
                   <p className="bazaar-admin-owner">
                     Owner: <strong>{item.ownerUsername}</strong>
                     {item.ownerVerified && <span className="verified-badge mini" title="Verified user">✓</span>}
