@@ -218,6 +218,7 @@ function BuyRequestsTab({ requests, currentUser, onRefresh }) {
 export default function Trades({ trades, buyRequests = [], currentUser, focusedTradeId, onFocusedTradeHandled, onRefresh, onCounter }) {
   const [activeTab, setActiveTab] = useState('trades');
   const [filter, setFilter] = useState('all');
+  const [verifiedFilter, setVerifiedFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
 
@@ -247,11 +248,20 @@ export default function Trades({ trades, buyRequests = [], currentUser, focusedT
 
     return trades.filter(trade => {
       const matchesStatus = filter === 'all' || trade.status === filter;
+      const otherUserVerified = Number(trade.fromUser) === Number(currentUser.id)
+        ? Boolean(trade.toVerified)
+        : Boolean(trade.fromVerified);
+
+      const matchesVerified =
+        verifiedFilter === 'all' ||
+        (verifiedFilter === 'verified' && otherUserVerified) ||
+        (verifiedFilter === 'nonverified' && !otherUserVerified);
+
       const matchesSearch = !cleanSearch || tradeSearchText(trade).includes(cleanSearch);
 
-      return matchesStatus && matchesSearch;
+      return matchesStatus && matchesVerified && matchesSearch;
     });
-  }, [filter, search, trades]);
+  }, [filter, verifiedFilter, search, trades, currentUser]);
 
   async function action(path) {
     setError('');
@@ -310,6 +320,12 @@ export default function Trades({ trades, buyRequests = [], currentUser, focusedT
                 </button>
               ))}
             </div>
+
+            <div className="segmented-control compact verified-filter">
+              <button className={verifiedFilter === 'all' ? 'active' : ''} onClick={() => setVerifiedFilter('all')}>All Users</button>
+              <button className={verifiedFilter === 'verified' ? 'active' : ''} onClick={() => setVerifiedFilter('verified')}>Verified</button>
+              <button className={verifiedFilter === 'nonverified' ? 'active' : ''} onClick={() => setVerifiedFilter('nonverified')}>Non-Verified</button>
+            </div>
           </div>
 
           <p className="muted tidy-count">
@@ -328,7 +344,9 @@ export default function Trades({ trades, buyRequests = [], currentUser, focusedT
                 <div className="tidy-card-header">
                   <div>
                     <strong>Trade #{trade.id}</strong>
-                    <small>With {otherName(trade)} · Room {trade.roomId}</small>
+                    <small>
+                      With {otherName(trade)} {((Number(trade.fromUser) === Number(currentUser.id) ? trade.toVerified : trade.fromVerified)) && <span className="verified-badge mini" title="Verified user">✓</span>} · Room {trade.roomId}
+                    </small>
                   </div>
 
                   <span className={`status-pill status-${trade.status}`}>{trade.status}</span>

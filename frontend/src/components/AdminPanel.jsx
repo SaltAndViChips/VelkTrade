@@ -271,6 +271,21 @@ export default function AdminPanel({ onJoinRoom }) {
     setNewPassword('');
   }
 
+  async function setVerifiedFlag(username, isVerified) {
+    setMessage('');
+
+    const data = await api('/api/admin/set-verified', {
+      method: 'POST',
+      body: JSON.stringify({
+        username,
+        isVerified
+      })
+    });
+
+    setMessage(data.message || 'Verified flag updated.');
+    await loadAdminData();
+  }
+
   async function setAdminFlag(username, isAdmin) {
     setMessage('');
 
@@ -363,6 +378,7 @@ export default function AdminPanel({ onJoinRoom }) {
 
                   <div className="inline-controls">
                     {user.online ? <span className="online-status">Online</span> : <span className="offline-status">Offline</span>}
+                    {user.isVerified && <span className="verified-badge" title="Verified user">✓</span>}
                     {user.isAdmin && <span className="status-pill">admin</span>}
                   </div>
                 </div>
@@ -375,6 +391,16 @@ export default function AdminPanel({ onJoinRoom }) {
                   ) : (
                     <button onClick={() => setAdminFlag(user.username, true)}>
                       Make Admin
+                    </button>
+                  )}
+
+                  {user.isVerified ? (
+                    <button className="ghost" onClick={() => setVerifiedFlag(user.username, false)}>
+                      Remove Verified
+                    </button>
+                  ) : (
+                    <button className="ghost" onClick={() => setVerifiedFlag(user.username, true)}>
+                      Verify
                     </button>
                   )}
 

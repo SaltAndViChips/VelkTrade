@@ -1,31 +1,27 @@
-function normalizeUsername(username) {
-  return String(username || '').trim();
+function normalizeUsername(value) {
+  return String(value || '').trim();
 }
 
-function isSaltUsername(username) {
-  return normalizeUsername(username).toLowerCase() === 'salt';
-}
-
-function boolFromDb(value) {
-  return value === true || value === 'true' || value === 't' || value === 1 || value === '1';
+function isSaltUsername(value) {
+  return normalizeUsername(value).toLowerCase() === 'salt';
 }
 
 function isAdminUser(user) {
-  return isSaltUsername(user?.username) || boolFromDb(user?.is_admin) || boolFromDb(user?.isAdmin) || boolFromDb(user?.isadmin);
+  return Boolean(user?.is_admin || user?.isAdmin || isSaltUsername(user?.username));
 }
 
 function publicUser(user) {
   return {
     id: user.id,
     username: user.username,
-    isAdmin: isAdminUser(user)
+    isAdmin: Boolean(user.is_admin || user.isAdmin || isSaltUsername(user.username)),
+    isVerified: Boolean(user.is_verified || user.isVerified)
   };
 }
 
 module.exports = {
   normalizeUsername,
   isSaltUsername,
-  boolFromDb,
   isAdminUser,
   publicUser
 };

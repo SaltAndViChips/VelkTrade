@@ -124,6 +124,16 @@ export default function Notifications({
             Invite responses
           </label>
 
+
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={Boolean(draftPrefs.nonVerifiedNotifications)}
+              onChange={event => updatePref('nonVerifiedNotifications', event.target.checked)}
+            />
+            Notifications from non-verified users
+          </label>
+
           <label className="range-row">
             <span>Notification sound volume</span>
             <input

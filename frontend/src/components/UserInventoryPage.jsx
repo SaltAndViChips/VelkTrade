@@ -84,7 +84,7 @@ export default function UserInventoryPage({
           <div className="profile-header">
             <div>
               <h3>
-                {userRecord.username}'s Inventory{' '}
+                {userRecord.username}'s Inventory {userRecord.isVerified && <span className="verified-badge" title="Verified user">✓</span>} {userRecord.isVerified && <span className="verified-badge" title="Verified user">✓</span>} {' '}
                 {userRecord.online ? (
                   <span className="online-status">Online</span>
                 ) : (

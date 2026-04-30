@@ -67,7 +67,8 @@ const DEFAULT_NOTIFICATION_PREFS = {
   room_invites: true,
   invite_responses: true,
   sound_volume: 0.5,
-  flash_tab: true
+  flash_tab: true,
+  non_verified_notifications: false
 };
 
 function isUserOnline(userId) {
@@ -124,7 +125,8 @@ async function ensureNotificationPrefs(userId) {
       room_invites,
       invite_responses,
       sound_volume,
-      flash_tab
+      flash_tab,
+      non_verified_notifications
      FROM notification_preferences
      WHERE user_id = ?`,
     [userId]
@@ -136,8 +138,33 @@ async function ensureNotificationPrefs(userId) {
     roomInvites: prefs?.room_invites ?? DEFAULT_NOTIFICATION_PREFS.room_invites,
     inviteResponses: prefs?.invite_responses ?? DEFAULT_NOTIFICATION_PREFS.invite_responses,
     soundVolume: Number(prefs?.sound_volume ?? DEFAULT_NOTIFICATION_PREFS.sound_volume),
-    flashTab: prefs?.flash_tab ?? DEFAULT_NOTIFICATION_PREFS.flash_tab
+    flashTab: prefs?.flash_tab ?? DEFAULT_NOTIFICATION_PREFS.flash_tab,
+    nonVerifiedNotifications: prefs?.non_verified_notifications ?? DEFAULT_NOTIFICATION_PREFS.non_verified_notifications
   };
+}
+
+
+async function shouldSendNotificationFromSender({ recipientId, payload }) {
+  const senderId = Number(payload?.fromUserId || 0);
+
+  if (!senderId || Number(senderId) === Number(recipientId)) {
+    return true;
+  }
+
+  const prefs = await ensureNotificationPrefs(recipientId);
+
+  if (prefs.nonVerifiedNotifications) {
+    return true;
+  }
+
+  const sender = await get(
+    `SELECT id, is_verified
+     FROM users
+     WHERE id = ?`,
+    [senderId]
+  );
+
+  return Boolean(sender?.is_verified);
 }
 
 function prefKeyForNotificationType(type) {
@@ -151,6 +178,12 @@ function prefKeyForNotificationType(type) {
 
 async function createNotification({ userId, type, title, message, payload = {} }) {
   const prefs = await ensureNotificationPrefs(userId);
+  const allowedBySenderVerification = await shouldSendNotificationFromSender({ recipientId: userId, payload });
+
+  if (!allowedBySenderVerification) {
+    return null;
+  }
+
   const prefKey = prefKeyForNotificationType(type);
 
   if (prefKey && prefs[prefKey] === false) {
@@ -313,7 +346,7 @@ async function hydrateAuthUser(user) {
   if (!user?.id) return user;
 
   const dbUser = await get(
-    `SELECT id, username, is_admin, bio
+    `SELECT id, username, is_admin, is_verified, bio
      FROM users
      WHERE id = ?`,
     [user.id]
@@ -365,6 +398,8 @@ function normalizeRawTrade(row) {
     toUser: Number(row.toUser ?? row.touser),
     fromUsername: row.fromUsername ?? row.fromusername,
     toUsername: row.toUsername ?? row.tousername,
+    fromVerified: Boolean(row.fromVerified ?? row.fromverified),
+    toVerified: Boolean(row.toVerified ?? row.toverified),
     fromItems: safeParse(row.fromItems ?? row.fromitems, []),
     toItems: safeParse(row.toItems ?? row.toitems, []),
     chatHistory: safeParse(row.chatHistory ?? row.chathistory, []),
@@ -414,7 +449,9 @@ async function getTradeById(tradeId) {
       t.status,
       t.createdAt AS "createdAt",
       from_user.username AS "fromUsername",
-      to_user.username AS "toUsername"
+      from_user.is_verified AS "fromVerified",
+      to_user.username AS "toUsername",
+      to_user.is_verified AS "toVerified"
     FROM trades t
     JOIN users AS from_user ON from_user.id = t.fromUser
     JOIN users AS to_user ON to_user.id = t.toUser
@@ -640,7 +677,7 @@ app.post('/api/login', async (req, res) => {
   const cleanUsername = normalizeUsername(req.body.username);
 
   const user = await get(
-    `SELECT id, username, password, is_admin, bio
+    `SELECT id, username, password, is_admin, is_verified, bio
      FROM users
      WHERE LOWER(username) = LOWER(?)`,
     [cleanUsername]
@@ -666,7 +703,7 @@ app.post('/api/login', async (req, res) => {
 
 app.get('/api/me', authMiddleware, async (req, res) => {
   const user = await get(
-    `SELECT id, username, is_admin, bio
+    `SELECT id, username, is_admin, is_verified, bio
      FROM users
      WHERE id = ?`,
     [req.user.id]
@@ -689,7 +726,7 @@ app.put('/api/me/profile', authMiddleware, async (req, res) => {
   );
 
   const user = await get(
-    `SELECT id, username, is_admin, bio
+    `SELECT id, username, is_admin, is_verified, bio
      FROM users
      WHERE id = ?`,
     [req.user.id]
@@ -703,7 +740,7 @@ app.put('/api/me/profile', authMiddleware, async (req, res) => {
 
 app.get('/api/profile/:username', optionalAuth, async (req, res) => {
   const profileUser = await get(
-    `SELECT id, username, is_admin, bio
+    `SELECT id, username, is_admin, is_verified, bio
      FROM users
      WHERE LOWER(username) = LOWER(?)`,
     [normalizeUsername(req.params.username)]
@@ -740,6 +777,7 @@ app.get('/api/profile/:username', optionalAuth, async (req, res) => {
       id: profileUser.id,
       username: profileUser.username,
       bio: profileUser.bio || '',
+      isVerified: Boolean(profileUser.is_verified),
       online: isUserOnline(profileUser.id)
     },
     items
@@ -913,7 +951,7 @@ app.get('/api/inventory/:username', optionalAuth, async (req, res) => {
     [req.user?.id || 0, user.id]
   );
 
-  res.json({ user: { ...user, bio: user.bio || '', online: isUserOnline(user.id) }, items });
+  res.json({ user: { ...user, bio: user.bio || '', isVerified: Boolean(user.is_verified), online: isUserOnline(user.id) }, items });
 });
 
 app.get('/api/trades', authMiddleware, async (req, res) => {
@@ -929,7 +967,9 @@ app.get('/api/trades', authMiddleware, async (req, res) => {
       t.status,
       t.createdAt AS "createdAt",
       from_user.username AS "fromUsername",
-      to_user.username AS "toUsername"
+      from_user.is_verified AS "fromVerified",
+      to_user.username AS "toUsername",
+      to_user.is_verified AS "toVerified"
     FROM trades t
     JOIN users AS from_user ON from_user.id = t.fromUser
     JOIN users AS to_user ON to_user.id = t.toUser
@@ -970,6 +1010,7 @@ app.post('/api/trades/offers', authMiddleware, async (req, res) => {
       message: `${req.user.username} sent you an offline trade request.`,
       payload: {
         tradeId: result.lastID,
+        fromUserId: req.user.id,
         fromUsername: req.user.username
       }
     });
@@ -981,6 +1022,7 @@ app.post('/api/trades/offers', authMiddleware, async (req, res) => {
       message: `${req.user.username} sent you an offline trade request.`,
       payload: {
         tradeId: result.lastID,
+        fromUserId: req.user.id,
         fromUsername: req.user.username
       }
     });
@@ -1099,13 +1141,13 @@ app.get('/api/admin/rooms', authMiddleware, requireAdmin, async (req, res) => {
 
 app.get('/api/admin/users', authMiddleware, requireAdmin, async (req, res) => {
   const rows = await all(
-    `SELECT id, username, is_admin, bio
+    `SELECT id, username, is_admin, is_verified, bio
      FROM users
      ORDER BY LOWER(username) ASC`
   );
 
   res.json({
-    users: rows.map(user => ({ ...publicUser(user), bio: user.bio || '', online: typeof isUserOnline === 'function' ? isUserOnline(user.id) : false }))
+    users: rows.map(user => ({ ...publicUser(user), bio: user.bio || '', isVerified: Boolean(user.is_verified), online: typeof isUserOnline === 'function' ? isUserOnline(user.id) : false }))
   });
 });
 
@@ -1116,7 +1158,7 @@ app.post('/api/admin/set-admin', authMiddleware, requireAdmin, async (req, res) 
   if (!cleanUsername) return res.status(400).json({ error: 'Username required' });
 
   const target = await get(
-    `SELECT id, username, is_admin
+    `SELECT id, username, is_admin, is_verified
      FROM users
      WHERE LOWER(username) = LOWER(?)`,
     [cleanUsername]
@@ -1131,7 +1173,7 @@ app.post('/api/admin/set-admin', authMiddleware, requireAdmin, async (req, res) 
   await run('UPDATE users SET is_admin = ? WHERE id = ?', [Boolean(isAdmin), target.id]);
 
   const updated = await get(
-    `SELECT id, username, is_admin
+    `SELECT id, username, is_admin, is_verified
      FROM users
      WHERE id = ?`,
     [target.id]
@@ -1157,7 +1199,9 @@ app.get('/api/admin/trades', authMiddleware, requireAdmin, async (req, res) => {
       t.status,
       t.createdAt AS "createdAt",
       from_user.username AS "fromUsername",
-      to_user.username AS "toUsername"
+      from_user.is_verified AS "fromVerified",
+      to_user.username AS "toUsername",
+      to_user.is_verified AS "toVerified"
     FROM trades t
     JOIN users AS from_user ON from_user.id = t.fromUser
     JOIN users AS to_user ON to_user.id = t.toUser
@@ -1165,6 +1209,38 @@ app.get('/api/admin/trades', authMiddleware, requireAdmin, async (req, res) => {
   );
 
   res.json({ trades: await enrichTradeRows(rows) });
+});
+
+
+app.post('/api/admin/set-verified', authMiddleware, requireAdmin, async (req, res) => {
+  const { username, isVerified } = req.body;
+  const cleanUsername = normalizeUsername(username);
+
+  if (!cleanUsername) return res.status(400).json({ error: 'Username required' });
+
+  const target = await get(
+    `SELECT id, username, is_verified
+     FROM users
+     WHERE LOWER(username) = LOWER(?)`,
+    [cleanUsername]
+  );
+
+  if (!target) return res.status(404).json({ error: 'User not found' });
+
+  await run('UPDATE users SET is_verified = ? WHERE id = ?', [Boolean(isVerified), target.id]);
+
+  const updated = await get(
+    `SELECT id, username, is_admin, is_verified
+     FROM users
+     WHERE id = ?`,
+    [target.id]
+  );
+
+  res.json({
+    ok: true,
+    user: publicUser(updated),
+    message: `${updated.username} is ${Boolean(updated.is_verified) ? 'now verified' : 'no longer verified'}`
+  });
 });
 
 app.post('/api/admin/reset-password', authMiddleware, requireAdmin, async (req, res) => {
@@ -1214,15 +1290,16 @@ app.put('/api/notification-preferences', authMiddleware, async (req, res) => {
 
   await run(
     `INSERT INTO notification_preferences
-      (user_id, offline_trades, counters, room_invites, invite_responses, sound_volume, flash_tab)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+      (user_id, offline_trades, counters, room_invites, invite_responses, sound_volume, flash_tab, non_verified_notifications)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (user_id) DO UPDATE SET
       offline_trades = EXCLUDED.offline_trades,
       counters = EXCLUDED.counters,
       room_invites = EXCLUDED.room_invites,
       invite_responses = EXCLUDED.invite_responses,
       sound_volume = EXCLUDED.sound_volume,
-      flash_tab = EXCLUDED.flash_tab`,
+      flash_tab = EXCLUDED.flash_tab,
+      non_verified_notifications = EXCLUDED.non_verified_notifications`,
     [
       req.user.id,
       Boolean(req.body.offlineTrades),
@@ -1230,7 +1307,8 @@ app.put('/api/notification-preferences', authMiddleware, async (req, res) => {
       Boolean(req.body.roomInvites),
       Boolean(req.body.inviteResponses),
       soundVolume,
-      Boolean(req.body.flashTab)
+      Boolean(req.body.flashTab),
+      Boolean(req.body.nonVerifiedNotifications)
     ]
   );
 

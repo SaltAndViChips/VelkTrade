@@ -55,6 +55,11 @@ async function initDb() {
   }
 
   await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS items (
       id SERIAL PRIMARY KEY,
       userId INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -114,8 +119,14 @@ async function initDb() {
       room_invites BOOLEAN DEFAULT TRUE,
       invite_responses BOOLEAN DEFAULT TRUE,
       sound_volume NUMERIC DEFAULT 0.5,
-      flash_tab BOOLEAN DEFAULT TRUE
+      flash_tab BOOLEAN DEFAULT TRUE,
+      non_verified_notifications BOOLEAN DEFAULT FALSE
     )
+  `);
+
+  await pool.query(`
+    ALTER TABLE notification_preferences
+    ADD COLUMN IF NOT EXISTS non_verified_notifications BOOLEAN DEFAULT FALSE
   `);
 
   await pool.query(`
