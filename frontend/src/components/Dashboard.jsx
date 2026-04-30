@@ -1,15 +1,38 @@
 import { useMemo, useState } from 'react';
 
-function shortDate(value) {
-  if (!value) return 'Now';
+const RANGE_OPTIONS = [
+  { key: 'weekly', label: 'Weekly' },
+  { key: 'monthly', label: 'Monthly' },
+  { key: 'ytd', label: 'YTD' },
+  { key: 'yearly', label: 'Yearly' }
+];
 
+function shortDate(value, range) {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Trade';
+  if (Number.isNaN(date.getTime())) return 'Now';
 
-  return date.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric'
-  });
+  if (range === 'yearly') {
+    return date.toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
+  }
+
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function getRangeStart(range, now = new Date()) {
+  const start = new Date(now);
+
+  if (range === 'weekly') {
+    start.setDate(now.getDate() - 7);
+  } else if (range === 'monthly') {
+    start.setMonth(now.getMonth() - 1);
+  } else if (range === 'ytd') {
+    start.setMonth(0, 1);
+    start.setHours(0, 0, 0, 0);
+  } else {
+    start.setFullYear(now.getFullYear() - 1);
+  }
+
+  return start;
 }
 
 function getTradeNetForUser(trade, userId) {
@@ -36,55 +59,97 @@ function getTradeNetForUser(trade, userId) {
   };
 }
 
-function buildChartPoints({ inventory, trades, user }) {
+function buildFiveBuckets(range) {
+  const now = new Date();
+  const start = getRangeStart(range, now);
+  const startMs = start.getTime();
+  const endMs = now.getTime();
+  const step = (endMs - startMs) / 4;
+
+  return Array.from({ length: 5 }, (_, index) => {
+    const date = new Date(startMs + step * index);
+
+    return {
+      date,
+      label: shortDate(date, range),
+      inventoryDelta: 0,
+      tradedCount: 0
+    };
+  });
+}
+
+function buildChartPoints({ inventory, trades, user, range }) {
+  const now = new Date();
+  const start = getRangeStart(range, now);
+  const buckets = buildFiveBuckets(range);
+
   const completedTrades = [...(trades || [])]
     .filter(trade => trade.status === 'completed')
     .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
 
-  if (completedTrades.length === 0) {
-    return [
-      {
-        label: 'Now',
-        inventoryCount: inventory.length,
-        tradedCount: 0
-      }
-    ];
-  }
+  const currentInventoryCount = inventory.length;
 
-  const totalInventoryDelta = completedTrades.reduce((sum, trade) => {
+  const totalInventoryDeltaAllTime = completedTrades.reduce((sum, trade) => {
     return sum + getTradeNetForUser(trade, user.id).inventoryDelta;
   }, 0);
 
-  let inventoryCount = Math.max(0, inventory.length - totalInventoryDelta);
-  let tradedCount = 0;
+  const inventoryBeforeAllCompleted = Math.max(0, currentInventoryCount - totalInventoryDeltaAllTime);
 
-  const points = [
-    {
-      label: 'Start',
-      inventoryCount,
-      tradedCount
-    }
-  ];
-
-  completedTrades.forEach(trade => {
-    const delta = getTradeNetForUser(trade, user.id);
-    inventoryCount = Math.max(0, inventoryCount + delta.inventoryDelta);
-    tradedCount += delta.tradedCount;
-
-    points.push({
-      label: shortDate(trade.createdAt),
-      inventoryCount,
-      tradedCount
-    });
+  const tradesBeforeRange = completedTrades.filter(trade => {
+    const date = new Date(trade.createdAt || 0);
+    return !Number.isNaN(date.getTime()) && date < start;
   });
 
-  return points;
+  let inventoryAtRangeStart = inventoryBeforeAllCompleted;
+
+  tradesBeforeRange.forEach(trade => {
+    inventoryAtRangeStart = Math.max(
+      0,
+      inventoryAtRangeStart + getTradeNetForUser(trade, user.id).inventoryDelta
+    );
+  });
+
+  const tradesInRange = completedTrades.filter(trade => {
+    const date = new Date(trade.createdAt || 0);
+    return !Number.isNaN(date.getTime()) && date >= start && date <= now;
+  });
+
+  const startMs = start.getTime();
+  const endMs = now.getTime();
+  const step = Math.max(1, (endMs - startMs) / 4);
+
+  tradesInRange.forEach(trade => {
+    const date = new Date(trade.createdAt || 0);
+    const bucketIndex = Math.min(4, Math.max(0, Math.round((date.getTime() - startMs) / step)));
+    const delta = getTradeNetForUser(trade, user.id);
+
+    buckets[bucketIndex].inventoryDelta += delta.inventoryDelta;
+    buckets[bucketIndex].tradedCount += delta.tradedCount;
+  });
+
+  let runningInventory = inventoryAtRangeStart;
+  let runningTraded = 0;
+
+  return buckets.map((bucket, index) => {
+    runningInventory = Math.max(0, runningInventory + bucket.inventoryDelta);
+    runningTraded += bucket.tradedCount;
+
+    return {
+      ...bucket,
+      index,
+      inventoryCount: runningInventory,
+      tradedCount: runningTraded
+    };
+  });
 }
 
 function StatLineChart({ inventory, trades, user }) {
+  const [range, setRange] = useState('monthly');
+  const [hoveredPoint, setHoveredPoint] = useState(null);
+
   const points = useMemo(
-    () => buildChartPoints({ inventory, trades, user }),
-    [inventory, trades, user]
+    () => buildChartPoints({ inventory, trades, user, range }),
+    [inventory, trades, user, range]
   );
 
   const max = Math.max(
@@ -94,16 +159,15 @@ function StatLineChart({ inventory, trades, user }) {
   );
 
   const width = 520;
-  const height = 260;
-  const padX = 46;
-  const padTop = 26;
-  const padBottom = 52;
+  const height = 280;
+  const padX = 48;
+  const padTop = 28;
+  const padBottom = 58;
   const chartWidth = width - padX * 2;
   const chartHeight = height - padTop - padBottom;
 
   function xFor(index) {
-    if (points.length === 1) return padX + chartWidth / 2;
-    return padX + (index / (points.length - 1)) * chartWidth;
+    return padX + (index / 4) * chartWidth;
   }
 
   function yFor(value) {
@@ -116,26 +180,105 @@ function StatLineChart({ inventory, trades, user }) {
 
   return (
     <section className="card chart-card">
-      <h3>Inventory & Trades Over Time</h3>
+      <div className="panel-title-row chart-title-row">
+        <div>
+          <h3>Inventory & Trades Over Time</h3>
+          <p className="muted">Five points across the selected period.</p>
+        </div>
 
-      <svg className="line-chart dashboard-time-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Inventory and traded items over time">
-        <line className="chart-axis" x1={padX} y1={height - padBottom} x2={width - padX} y2={height - padBottom} />
-        <line className="chart-axis" x1={padX} y1={padTop} x2={padX} y2={height - padBottom} />
+        <div className="segmented-control compact chart-range-tabs">
+          {RANGE_OPTIONS.map(option => (
+            <button
+              type="button"
+              key={option.key}
+              className={range === option.key ? 'active' : ''}
+              onClick={() => {
+                setRange(option.key);
+                setHoveredPoint(null);
+              }}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-        <polyline className="line-inventory" points={lineFor('inventoryCount')} />
-        <polyline className="line-traded" points={lineFor('tradedCount')} />
+      <div className="chart-hover-wrap">
+        <svg
+          className="line-chart dashboard-time-chart"
+          viewBox={`0 0 ${width} ${height}`}
+          role="img"
+          aria-label="Inventory and traded items over time"
+          onMouseLeave={() => setHoveredPoint(null)}
+        >
+          <line className="chart-axis" x1={padX} y1={height - padBottom} x2={width - padX} y2={height - padBottom} />
+          <line className="chart-axis" x1={padX} y1={padTop} x2={padX} y2={height - padBottom} />
 
-        {points.map((point, index) => (
-          <g key={`${point.label}-${index}`}>
-            <circle className="point-inventory" cx={xFor(index)} cy={yFor(point.inventoryCount)} r="4.5" />
-            <circle className="point-traded" cx={xFor(index)} cy={yFor(point.tradedCount)} r="4.5" />
+          {[0, 0.25, 0.5, 0.75, 1].map(mark => {
+            const y = padTop + chartHeight - mark * chartHeight;
+            const label = Math.round(mark * max);
 
-            {(index === 0 || index === points.length - 1 || points.length <= 5) && (
-              <text className="chart-label" x={xFor(index) - 18} y={height - 18}>{point.label}</text>
-            )}
-          </g>
-        ))}
-      </svg>
+            return (
+              <g key={mark}>
+                <line className="chart-grid-line" x1={padX} y1={y} x2={width - padX} y2={y} />
+                <text className="chart-y-label" x="8" y={y + 4}>{label}</text>
+              </g>
+            );
+          })}
+
+          <polyline className="line-inventory" points={lineFor('inventoryCount')} />
+          <polyline className="line-traded" points={lineFor('tradedCount')} />
+
+          {points.map((point, index) => {
+            const x = xFor(index);
+            const inventoryY = yFor(point.inventoryCount);
+            const tradedY = yFor(point.tradedCount);
+            const isHovered = hoveredPoint?.index === index;
+
+            return (
+              <g key={`${point.label}-${index}`}>
+                {isHovered && (
+                  <line className="chart-hover-line" x1={x} y1={padTop} x2={x} y2={height - padBottom} />
+                )}
+
+                <circle
+                  className={`point-inventory ${isHovered ? 'hovered' : ''}`}
+                  cx={x}
+                  cy={inventoryY}
+                  r={isHovered ? '6' : '4.5'}
+                  onMouseEnter={() => setHoveredPoint(point)}
+                />
+                <circle
+                  className={`point-traded ${isHovered ? 'hovered' : ''}`}
+                  cx={x}
+                  cy={tradedY}
+                  r={isHovered ? '6' : '4.5'}
+                  onMouseEnter={() => setHoveredPoint(point)}
+                />
+
+                <rect
+                  className="chart-hover-target"
+                  x={x - chartWidth / 10}
+                  y={padTop}
+                  width={chartWidth / 5}
+                  height={chartHeight}
+                  onMouseEnter={() => setHoveredPoint(point)}
+                />
+
+                <text className="chart-label" x={x - 18} y={height - 20}>{point.label}</text>
+              </g>
+            );
+          })}
+        </svg>
+
+        {hoveredPoint && (
+          <div className="chart-tooltip">
+            <strong>{hoveredPoint.label}</strong>
+            <span><i className="legend-dot inventory-dot" /> Inventory: {hoveredPoint.inventoryCount}</span>
+            <span><i className="legend-dot traded-dot" /> Traded: {hoveredPoint.tradedCount}</span>
+          </div>
+        )}
+      </div>
 
       <div className="chart-legend horizontal-legend">
         <span><i className="legend-dot inventory-dot" /> Inventory over time</span>
