@@ -2025,3 +2025,263 @@ svg .chart-hover-target {
 .bazaar-verified-owner {
   color: #ded8ff;
 }
+
+
+/* Bazaar full-image hover preview */
+
+.bazaar-item-card {
+  position: relative;
+  overflow: visible;
+}
+
+.bazaar-full-preview {
+  position: absolute;
+  z-index: 1500;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  width: min(420px, 78vw);
+  transform: translateX(-50%) scale(0.96);
+  transform-origin: bottom center;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #211c31, #11101a);
+  border: 1px solid var(--border-bright);
+  box-shadow: 0 24px 70px rgba(0,0,0,.72), 0 0 0 1px rgba(141,99,255,.18);
+  transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s ease;
+}
+
+.bazaar-full-preview img {
+  width: 100%;
+  max-height: 520px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #050509;
+  border: 1px solid rgba(111, 92, 168, 0.45);
+}
+
+.bazaar-full-preview strong {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.bazaar-full-preview em {
+  color: #ffe6a1;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.bazaar-full-preview span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #ded8ff;
+  font-size: 13px;
+}
+
+.bazaar-item-card:hover,
+.bazaar-item-card:focus-within {
+  z-index: 50;
+}
+
+.bazaar-item-card:hover .bazaar-full-preview,
+.bazaar-item-card:focus-within .bazaar-full-preview {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) scale(1);
+}
+
+@media (max-width: 720px) {
+  .bazaar-full-preview {
+    position: fixed;
+    left: 50%;
+    top: 72px;
+    bottom: auto;
+    width: min(440px, calc(100vw - 28px));
+    transform: translateX(-50%) scale(0.96);
+  }
+
+  .bazaar-item-card:hover .bazaar-full-preview,
+  .bazaar-item-card:focus-within .bazaar-full-preview {
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+
+/* New version update notifier */
+
+.app-update-notice {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 3000;
+  width: min(520px, calc(100vw - 36px));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border-bright);
+  background:
+    radial-gradient(circle at top left, rgba(141, 99, 255, 0.24), transparent 34%),
+    linear-gradient(180deg, #211c31, #11101a);
+  box-shadow:
+    0 24px 70px rgba(0,0,0,.62),
+    0 0 0 1px rgba(141, 99, 255, 0.16);
+  color: var(--text);
+}
+
+.app-update-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: white;
+  background: linear-gradient(180deg, var(--purple), var(--purple-dark));
+  border: 1px solid rgba(222, 216, 255, 0.55);
+  box-shadow: 0 0 22px rgba(141, 99, 255, 0.32);
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.app-update-notice strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #fff;
+}
+
+.app-update-notice p {
+  margin: 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.app-update-actions {
+  justify-content: end;
+  flex-wrap: nowrap;
+}
+
+@media (max-width: 760px) {
+  .app-update-notice {
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+    width: auto;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .app-update-actions {
+    grid-column: 1 / -1;
+    justify-content: stretch;
+  }
+
+  .app-update-actions button {
+    flex: 1;
+  }
+}
+
+
+/* Bazaar duplicate-rendering fix + reliable full-image hover preview */
+
+.bazaar-item-card {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.bazaar-image-wrap {
+  aspect-ratio: 1 / 1;
+  background: #07070a;
+  overflow: hidden;
+}
+
+.bazaar-image-wrap > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* The full preview must never occupy normal card layout space. */
+.bazaar-full-preview {
+  position: absolute !important;
+  z-index: 5000;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  width: min(440px, 82vw);
+  display: grid !important;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #211c31, #11101a);
+  border: 1px solid var(--border-bright);
+  box-shadow: 0 24px 70px rgba(0,0,0,.72), 0 0 0 1px rgba(141,99,255,.18);
+  pointer-events: none;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transform: translateX(-50%) scale(0.96);
+  transform-origin: bottom center;
+  transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s ease;
+}
+
+.bazaar-full-preview img {
+  width: 100%;
+  max-height: 560px;
+  object-fit: contain;
+  display: block;
+  border-radius: 10px;
+  background: #050509;
+  border: 1px solid rgba(111, 92, 168, 0.45);
+}
+
+.bazaar-full-preview strong {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.bazaar-full-preview em {
+  color: #ffe6a1;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.bazaar-full-preview span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #ded8ff;
+  font-size: 13px;
+}
+
+.bazaar-item-card:hover,
+.bazaar-item-card:focus-within {
+  z-index: 100;
+}
+
+.bazaar-item-card:hover > .bazaar-full-preview,
+.bazaar-item-card:focus-within > .bazaar-full-preview {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateX(-50%) scale(1);
+}
+
+@media (max-width: 720px) {
+  .bazaar-full-preview {
+    position: fixed !important;
+    left: 50%;
+    top: 72px;
+    bottom: auto;
+    width: min(440px, calc(100vw - 28px));
+    transform: translateX(-50%) scale(0.96);
+  }
+
+  .bazaar-item-card:hover > .bazaar-full-preview,
+  .bazaar-item-card:focus-within > .bazaar-full-preview {
+    transform: translateX(-50%) scale(1);
+  }
+}

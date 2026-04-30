@@ -165,10 +165,7 @@ export default function Bazaar({ currentUser }) {
 
       <div className="bazaar-grid">
         {items.map(item => {
-          const otherInterestCount = Math.max(
-            0,
-            Number(item.interestCount || 0) - (item.viewerInterested ? 1 : 0)
-          );
+          const verifiedInterestCount = Number(item.interestCount || 0);
 
           return (
             <article className="bazaar-item-card" key={item.id}>
@@ -194,17 +191,8 @@ export default function Bazaar({ currentUser }) {
                   </span>
                 )}
 
-                <div className="bazaar-full-preview">
-                  <img src={item.image} alt={item.title} />
-                  <strong>{item.title}</strong>
-                  <em>{formatNumber(item.priceAmount)} IC</em>
-                  {item.ownerVerified && (
-                    <span><span className="verified-badge mini" title="Verified user">✓</span> Verified seller</span>
-                  )}
-                </div>
-
                 <div className="bazaar-interest-row">
-                  <span>{otherInterestCount} verified user{otherInterestCount === 1 ? '' : 's'} interested</span>
+                  <span>{verifiedInterestCount} verified user{verifiedInterestCount === 1 ? '' : 's'} interested</span>
                   {item.viewerInterested && <span className="status-pill">you are interested</span>}
                 </div>
 
@@ -220,6 +208,15 @@ export default function Bazaar({ currentUser }) {
                       ? 'Remove Interest'
                       : 'Interested'}
                 </button>
+              </div>
+
+              <div className="bazaar-full-preview" aria-hidden="true">
+                <img src={item.image} alt="" />
+                <strong>{item.title}</strong>
+                <em>{formatNumber(item.priceAmount)} IC</em>
+                {item.ownerVerified && (
+                  <span><span className="verified-badge mini" title="Verified user">✓</span> Verified seller</span>
+                )}
               </div>
             </article>
           );
