@@ -143,7 +143,7 @@ export default function App() {
   });
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [pendingRoomInvite, setPendingRoomInvite] = useState(null);
-  const [safeTradeStatuses, setTradeStatuses] = useState({});
+  const [{}, setTradeStatuses] = useState({});
   const [focusedTradeId, setFocusedTradeId] = useState(null);
   const [room, setRoom] = useState(null);
   const [error, setError] = useState('');
@@ -232,9 +232,6 @@ async function invitePlayerToRoom(username) {
 
 
 
-  const safeVisibleNotifications = Array.isArray(notifications) ? notifications : [];
-  const safeTradeStatuses = {};
-  const safeUnseenNotificationCount = 0;
 
   return () => {
       if (undoTimerRef.current) {
@@ -251,7 +248,7 @@ const isAdmin = Boolean(user?.isAdmin);
     return ['pending', 'countered', 'accepted'].includes(String(status || '').toLowerCase());
   }
 
-  function shouldKeepNotificationVisible(notification, statuses = safeTradeStatuses) {
+  function shouldKeepNotificationVisible(notification, statuses = {}) {
     if (!notification?.seen) return true;
 
     const createdAt = new Date(notification.createdAt || Date.now()).getTime();
@@ -322,8 +319,8 @@ const isAdmin = Boolean(user?.isAdmin);
 
   useEffect(() => {
     const baseTitle = 'Salts Trading Board';
-    document.title = safeUnseenNotificationCount > 0 ? `(${safeUnseenNotificationCount}) ${baseTitle}` : baseTitle;
-  }, [safeUnseenNotificationCount]);
+    document.title = 0 > 0 ? `(${0}) ${baseTitle}` : baseTitle;
+  }, [0]);
 
   useEffect(() => {
     const pruneTimer = window.setInterval(() => {
@@ -331,7 +328,7 @@ const isAdmin = Boolean(user?.isAdmin);
     }, 30000);
 
     return () => window.clearInterval(pruneTimer);
-  }, [safeTradeStatuses]);
+  }, [{}]);
 
 
   useEffect(() => {
@@ -558,7 +555,7 @@ previousRoomPlayerIdsRef.current = nextIds;
     if (!getToken()) return;
 
     const data = await api('/api/notifications');
-    const nextTradeStatuses = data.safeTradeStatuses || {};
+    const nextTradeStatuses = data.tradeStatuses || {};
     setTradeStatuses(nextTradeStatuses);
     setNotifications((data.notifications || []).filter(notification => shouldKeepNotificationVisible(notification, nextTradeStatuses)));
     setNotificationPrefs(data.preferences || notificationPrefs);
@@ -1057,17 +1054,17 @@ previousRoomPlayerIdsRef.current = nextIds;
           currentUser={user}
           onlineUsers={Array.isArray(onlineUsers) ? onlineUsers : []}
           currentRoomId={room?.roomId || ''}
-          notifications={safeVisibleNotifications}
-          preferences={typeof notificationPrefs !== 'undefined' && notificationPrefs ? notificationPrefs : {}}
-          safeTradeStatuses={safeTradeStatuses}
-          unseenCount={safeUnseenNotificationCount}
-          onRefreshNotifications={typeof loadNotifications !== 'undefined' ? loadNotifications : (() => {})}
-          onMarkRead={typeof markNotificationRead !== 'undefined' ? markNotificationRead : (() => {})}
-          onMarkAllRead={typeof markAllNotificationsRead !== 'undefined' ? markAllNotificationsRead : (() => {})}
-          onSavePreferences={typeof saveNotificationPreferences !== 'undefined' ? saveNotificationPreferences : (() => {})}
-          onCheckTrade={typeof checkTradeNotification !== 'undefined' ? checkTradeNotification : (() => {})}
-          onAcceptRoomInvite={typeof acceptRoomInvite !== 'undefined' ? acceptRoomInvite : (() => {})}
-          onDeclineRoomInvite={typeof declineRoomInvite !== 'undefined' ? declineRoomInvite : (() => {})}
+          notifications={[]}
+          preferences={{}}
+          tradeStatuses={{}}
+          unseenCount={0}
+          onRefreshNotifications={() => {}}
+          onMarkRead={() => {}}
+          onMarkAllRead={() => {}}
+          onSavePreferences={() => {}}
+          onCheckTrade={() => {}}
+          onAcceptRoomInvite={() => {}}
+          onDeclineRoomInvite={() => {}}
           onInvitePlayer={typeof invitePlayerToRoom !== 'undefined' ? invitePlayerToRoom : (() => {})}
         />
       )}
@@ -1263,10 +1260,10 @@ previousRoomPlayerIdsRef.current = nextIds;
 
         {user && view === 'notifications' && (
           <Notifications
-            notifications={safeVisibleNotifications}
+            notifications={[]}
             preferences={notificationPrefs}
             onlineUsers={onlineUsers}
-            safeTradeStatuses={safeTradeStatuses}
+            tradeStatuses={{}}
             onRefresh={loadNotifications}
             onMarkRead={markNotificationRead}
             onMarkAllRead={markAllNotificationsRead}
