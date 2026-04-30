@@ -22,9 +22,9 @@ import Trades from './components/Trades';
 import TradeOfferPanel from './components/TradeOfferPanel';
 import UserInventoryPage from './components/UserInventoryPage';
 import Bazaar from './components/Bazaar';
+import Notifications from './components/Notifications';
 import AppUpdateNotice from './components/AppUpdateNotice';
 import OnlinePlayersSidebar from './components/OnlinePlayersSidebar';
-import Notifications from './components/Notifications';
 
 function parseDraggedItemId(active) {
   const dataItemId = active?.data?.current?.itemId;
@@ -970,17 +970,6 @@ export default function App() {
 
   if (!user && view === 'login') {
     return (
-    <>
-      {user && (
-        <OnlinePlayersSidebar
-          currentUser={user}
-          onlineUsers={onlineUsers}
-          currentRoomId={room?.roomId}
-          onInvitePlayer={invitePlayerToRoom}
-        />
-      )}
-
-      <AppUpdateNotice />
       <main className="app-shell">
         {loginRequiredMessage && <p className="error">{loginRequiredMessage}</p>}
         <AuthForm onLogin={setUser} />
@@ -996,6 +985,18 @@ export default function App() {
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveDragItem(null)}
     >
+      {user && (
+        <OnlinePlayersSidebar
+          currentUser={user}
+          onlineUsers={onlineUsers}
+          currentRoomId={room?.roomId}
+          onInvitePlayer={invitePlayerToRoom}
+        />
+      )}
+
+      <AppUpdateNotice />
+
+
       <main className="app-shell">
         <header className="topbar">
           <div>
