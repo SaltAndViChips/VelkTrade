@@ -1,45 +1,146 @@
 import { useMemo, useState } from 'react';
 
-function StatLineChart({ inventory, trades }) {
-  const points = useMemo(() => {
-    const itemCount = inventory.length;
-    const tradedCount = trades.filter(trade => trade.status === 'completed').length;
+function shortDate(value) {
+  if (!value) return 'Now';
 
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Trade';
+
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric'
+  });
+}
+
+function getTradeNetForUser(trade, userId) {
+  const fromCount = Array.isArray(trade.fromItems) ? trade.fromItems.length : 0;
+  const toCount = Array.isArray(trade.toItems) ? trade.toItems.length : 0;
+
+  if (Number(trade.fromUser) === Number(userId)) {
+    return {
+      inventoryDelta: toCount - fromCount,
+      tradedCount: fromCount + toCount
+    };
+  }
+
+  if (Number(trade.toUser) === Number(userId)) {
+    return {
+      inventoryDelta: fromCount - toCount,
+      tradedCount: fromCount + toCount
+    };
+  }
+
+  return {
+    inventoryDelta: 0,
+    tradedCount: 0
+  };
+}
+
+function buildChartPoints({ inventory, trades, user }) {
+  const completedTrades = [...(trades || [])]
+    .filter(trade => trade.status === 'completed')
+    .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+
+  if (completedTrades.length === 0) {
     return [
-      { label: 'Inventory', value: itemCount },
-      { label: 'Traded', value: tradedCount }
+      {
+        label: 'Now',
+        inventoryCount: inventory.length,
+        tradedCount: 0
+      }
     ];
-  }, [inventory, trades]);
+  }
 
-  const max = Math.max(1, ...points.map(point => point.value));
-  const coords = points
-    .map((point, index) => {
-      const x = 40 + index * 180;
-      const y = 170 - (point.value / max) * 120;
-      return `${x},${y}`;
-    })
-    .join(' ');
+  const totalInventoryDelta = completedTrades.reduce((sum, trade) => {
+    return sum + getTradeNetForUser(trade, user.id).inventoryDelta;
+  }, 0);
+
+  let inventoryCount = Math.max(0, inventory.length - totalInventoryDelta);
+  let tradedCount = 0;
+
+  const points = [
+    {
+      label: 'Start',
+      inventoryCount,
+      tradedCount
+    }
+  ];
+
+  completedTrades.forEach(trade => {
+    const delta = getTradeNetForUser(trade, user.id);
+    inventoryCount = Math.max(0, inventoryCount + delta.inventoryDelta);
+    tradedCount += delta.tradedCount;
+
+    points.push({
+      label: shortDate(trade.createdAt),
+      inventoryCount,
+      tradedCount
+    });
+  });
+
+  return points;
+}
+
+function StatLineChart({ inventory, trades, user }) {
+  const points = useMemo(
+    () => buildChartPoints({ inventory, trades, user }),
+    [inventory, trades, user]
+  );
+
+  const max = Math.max(
+    1,
+    ...points.map(point => point.inventoryCount),
+    ...points.map(point => point.tradedCount)
+  );
+
+  const width = 520;
+  const height = 260;
+  const padX = 46;
+  const padTop = 26;
+  const padBottom = 52;
+  const chartWidth = width - padX * 2;
+  const chartHeight = height - padTop - padBottom;
+
+  function xFor(index) {
+    if (points.length === 1) return padX + chartWidth / 2;
+    return padX + (index / (points.length - 1)) * chartWidth;
+  }
+
+  function yFor(value) {
+    return padTop + chartHeight - (value / max) * chartHeight;
+  }
+
+  function lineFor(key) {
+    return points.map((point, index) => `${xFor(index)},${yFor(point[key])}`).join(' ');
+  }
 
   return (
     <section className="card chart-card">
-      <h3>Items</h3>
-      <svg className="line-chart" viewBox="0 0 260 210" role="img" aria-label="Items chart">
-        <line x1="30" y1="180" x2="240" y2="180" />
-        <line x1="30" y1="30" x2="30" y2="180" />
-        <polyline points={coords} />
-        {points.map((point, index) => {
-          const x = 40 + index * 180;
-          const y = 170 - (point.value / max) * 120;
+      <h3>Inventory & Trades Over Time</h3>
 
-          return (
-            <g key={point.label}>
-              <circle cx={x} cy={y} r="5" />
-              <text x={x - 20} y="202">{point.label}</text>
-              <text x={x - 4} y={y - 10}>{point.value}</text>
-            </g>
-          );
-        })}
+      <svg className="line-chart dashboard-time-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Inventory and traded items over time">
+        <line className="chart-axis" x1={padX} y1={height - padBottom} x2={width - padX} y2={height - padBottom} />
+        <line className="chart-axis" x1={padX} y1={padTop} x2={padX} y2={height - padBottom} />
+
+        <polyline className="line-inventory" points={lineFor('inventoryCount')} />
+        <polyline className="line-traded" points={lineFor('tradedCount')} />
+
+        {points.map((point, index) => (
+          <g key={`${point.label}-${index}`}>
+            <circle className="point-inventory" cx={xFor(index)} cy={yFor(point.inventoryCount)} r="4.5" />
+            <circle className="point-traded" cx={xFor(index)} cy={yFor(point.tradedCount)} r="4.5" />
+
+            {(index === 0 || index === points.length - 1 || points.length <= 5) && (
+              <text className="chart-label" x={xFor(index) - 18} y={height - 18}>{point.label}</text>
+            )}
+          </g>
+        ))}
       </svg>
+
+      <div className="chart-legend horizontal-legend">
+        <span><i className="legend-dot inventory-dot" /> Inventory over time</span>
+        <span><i className="legend-dot traded-dot" /> Traded items over time</span>
+      </div>
     </section>
   );
 }
@@ -59,7 +160,8 @@ function TradesPieChart({ trades }) {
     ];
   }, [trades]);
 
-  const total = Math.max(1, counts.reduce((sum, item) => sum + item.value, 0));
+  const rawTotal = counts.reduce((sum, item) => sum + item.value, 0);
+  const total = Math.max(1, rawTotal);
   let offset = 25;
 
   return (
@@ -69,7 +171,7 @@ function TradesPieChart({ trades }) {
       <div className="pie-wrap">
         <svg className="pie-chart" viewBox="0 0 42 42" role="img" aria-label="Trade status chart">
           {counts.map(item => {
-            const length = total === 0 ? 0 : (item.value / total) * 100;
+            const length = rawTotal === 0 ? 100 / counts.length : (item.value / total) * 100;
             const dash = `${length} ${100 - length}`;
             const currentOffset = offset;
             offset -= length;
@@ -140,7 +242,7 @@ export default function Dashboard({
   return (
     <section className="dashboard-layout">
       <div className="charts-panel">
-        <StatLineChart inventory={inventory} trades={trades} />
+        <StatLineChart inventory={inventory} trades={trades} user={user} />
         <TradesPieChart trades={trades} />
       </div>
 

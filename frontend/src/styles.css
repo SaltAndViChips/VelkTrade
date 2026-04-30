@@ -904,3 +904,95 @@ p {
     right: 6px;
   }
 }
+
+
+/* Dashboard two-line time chart */
+
+.dashboard-time-chart {
+  max-height: 260px;
+}
+
+.line-chart .chart-axis {
+  stroke: #50476b;
+  stroke-width: 2;
+}
+
+.line-chart .line-inventory,
+.line-chart .line-traded {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.line-chart .line-inventory {
+  stroke: var(--purple);
+}
+
+.line-chart .line-traded {
+  stroke: var(--green);
+}
+
+.line-chart .point-inventory {
+  fill: #b99dff;
+}
+
+.line-chart .point-traded {
+  fill: var(--green);
+}
+
+.line-chart .chart-label {
+  fill: var(--muted);
+  font-size: 12px;
+}
+
+.horizontal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.horizontal-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+  border-radius: 999px;
+}
+
+.inventory-dot {
+  background: var(--purple);
+}
+
+.traded-dot {
+  background: var(--green);
+}
+
+/* Stable pie hover: no scaling/warping */
+
+.pie-chart {
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+
+.pie-slice {
+  transform: none !important;
+  transform-origin: center;
+  transition: opacity 0.16s ease, stroke-width 0.16s ease, filter 0.16s ease;
+}
+
+.pie-slice.hovered {
+  transform: none !important;
+  stroke-width: 11.5;
+  filter: brightness(1.2);
+}
+
+.pie-slice.dimmed {
+  opacity: 0.22;
+  transform: none !important;
+}
