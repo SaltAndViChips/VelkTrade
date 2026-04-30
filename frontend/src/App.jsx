@@ -172,7 +172,6 @@ export default function App() {
   const undoTimerRef = useRef(null);
   const previousRoomPlayerIdsRef = useRef([]);
   const awayTimerRef = useRef(null);
-  const previousRoomPlayerIdsRef = useRef([]);
 
   function setView(nextView) {
     if (nextView !== 'userProfile') {
