@@ -23,7 +23,6 @@ export default function UserInventoryPage({
   currentUsername,
   loginRequiredMessage,
   onLoad,
-  onBack,
   onStartTrade,
   onLoginRequired,
   onToggleBuyRequest
@@ -34,8 +33,6 @@ export default function UserInventoryPage({
         <div>
           <h2>User Inventory</h2>
         </div>
-
-        {onBack && <button className="ghost" onClick={onBack}>Back</button>}
       </div>
 
       {loginRequiredMessage && <p className="error">{loginRequiredMessage}</p>}
