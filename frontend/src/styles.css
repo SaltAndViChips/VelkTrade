@@ -828,3 +828,79 @@ p {
     width: 100%;
   }
 }
+
+
+/* Compact undo delete bar */
+
+.undo-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  width: fit-content;
+  max-width: min(760px, calc(100vw - 28px));
+  z-index: 10000;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: linear-gradient(180deg, #211c31, #11101a);
+  border: 1px solid var(--border-bright);
+  border-radius: 999px;
+  padding: 8px 10px 8px 14px;
+  box-shadow: 0 18px 50px rgba(0,0,0,.62), 0 0 0 1px rgba(141,99,255,.18);
+}
+
+.undo-toast span {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+  max-width: 360px;
+}
+
+.undo-toast span strong {
+  color: var(--text);
+}
+
+.undo-toast button {
+  border-radius: 999px;
+  padding: 7px 12px;
+  white-space: nowrap;
+}
+
+.undo-toast .undo-dismiss {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.price-edit-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.price-edit-actions button {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .undo-toast {
+    width: min(420px, calc(100vw - 24px));
+    display: grid;
+    grid-template-columns: 1fr;
+    border-radius: 18px;
+  }
+
+  .undo-toast span {
+    max-width: 100%;
+  }
+
+  .undo-toast .undo-dismiss {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+  }
+}

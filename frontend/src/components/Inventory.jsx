@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 
 function parseBulkUrls(value) {
@@ -12,19 +12,32 @@ function parseBulkUrls(value) {
   );
 }
 
+function addThousandsCommas(numberText) {
+  const [whole, decimal] = String(numberText).replace(/,/g, '').split('.');
+  const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return decimal !== undefined ? `${withCommas}.${decimal}` : withCommas;
+}
+
 function formatPriceDisplay(price) {
   const clean = String(price || '').trim();
   if (!clean) return '';
 
-  if (/^\d+(\.\d+)?\s*([kmb])?$/i.test(clean)) {
-    return `${clean} IC`;
+  const withoutDollar = clean.replace(/^\$\s*/, '').trim();
+  const withoutIc = withoutDollar.replace(/\bic\b/ig, '').trim();
+
+  if (/^\d+(\.\d+)?$/.test(withoutIc.replace(/,/g, ''))) {
+    return `${addThousandsCommas(withoutIc)} IC`;
   }
 
-  if (/\bic\b/i.test(clean)) {
-    return clean.replace(/\bic\b/i, 'IC');
+  if (/^\d+(\.\d+)?\s*[kmb]$/i.test(withoutIc)) {
+    return `${withoutIc} IC`;
   }
 
-  return clean.replace(/^\$\s*/, '');
+  if (/\bic\b/i.test(withoutDollar)) {
+    return withoutDollar.replace(/\bic\b/i, 'IC');
+  }
+
+  return withoutDollar;
 }
 
 function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem, onUpdatePrice }) {
@@ -32,6 +45,12 @@ function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem, onU
   const [price, setPrice] = useState(formatPriceDisplay(item.price || ''));
 
   const displayPrice = formatPriceDisplay(item.price);
+
+  useEffect(() => {
+    if (!editingPrice) {
+      setPrice(formatPriceDisplay(item.price || ''));
+    }
+  }, [item.price, editingPrice]);
 
   const {
     attributes,
@@ -84,18 +103,35 @@ function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem, onU
           <input
             value={price}
             onChange={event => setPrice(event.target.value)}
-            placeholder="150 IC / 1.5k IC / Offer"
+            placeholder="1,000 IC / 1.5k IC / Offer"
             maxLength={80}
             onPointerDown={event => event.stopPropagation()}
             onClick={event => event.stopPropagation()}
           />
-          <button
-            type="submit"
-            className="mini-action"
-            onPointerDown={event => event.stopPropagation()}
-          >
-            Save
-          </button>
+
+          <div className="inline-controls price-edit-actions">
+            <button
+              type="submit"
+              className="mini-action"
+              onPointerDown={event => event.stopPropagation()}
+            >
+              Save
+            </button>
+
+            <button
+              type="button"
+              className="ghost mini-action"
+              onPointerDown={event => event.stopPropagation()}
+              onClick={event => {
+                event.preventDefault();
+                event.stopPropagation();
+                setPrice(formatPriceDisplay(item.price || ''));
+                setEditingPrice(false);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
         </form>
       )}
 
@@ -116,7 +152,7 @@ function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem, onU
           </button>
         )}
 
-        {onUpdatePrice && (
+        {onUpdatePrice && !editingPrice && (
           <button
             type="button"
             className="mini-action"
@@ -124,7 +160,7 @@ function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem, onU
             onClick={event => {
               event.preventDefault();
               event.stopPropagation();
-              setEditingPrice(open => !open);
+              setEditingPrice(true);
             }}
           >
             IC Price

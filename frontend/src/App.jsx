@@ -116,11 +116,13 @@ export default function App() {
 
   const [bioDraft, setBioDraft] = useState('');
   const [bioMessage, setBioMessage] = useState('');
+  const [undoDelete, setUndoDelete] = useState(null);
 
   const userRef = useRef(null);
   const roomRef = useRef(null);
   const socketRef = useRef(null);
   const joinedInitialRoomRef = useRef(false);
+  const undoTimerRef = useRef(null);
 
   function setView(nextView) {
     if (nextView !== 'userProfile') {
@@ -137,6 +139,14 @@ export default function App() {
   useEffect(() => {
     roomRef.current = room;
   }, [room]);
+
+  useEffect(() => {
+    return () => {
+      if (undoTimerRef.current) {
+        window.clearTimeout(undoTimerRef.current);
+      }
+    };
+  }, []);
 
   const isAdmin = Boolean(user?.isAdmin);
 
@@ -406,10 +416,52 @@ export default function App() {
   }
 
   async function deleteItem(itemId) {
-    await api(`/api/items/${itemId}`, {
+    const item = inventory.find(entry => Number(entry.id) === Number(itemId));
+
+    const result = await api(`/api/items/${itemId}`, {
       method: 'DELETE'
     });
 
+    const deletedItem = result.item || item;
+
+    await refreshInventory(user.username);
+    notifyRoomInventoryUpdated();
+
+    if (undoTimerRef.current) {
+      window.clearTimeout(undoTimerRef.current);
+    }
+
+    setUndoDelete({
+      item: deletedItem,
+      expiresAt: Date.now() + 15000
+    });
+
+    undoTimerRef.current = window.setTimeout(() => {
+      setUndoDelete(null);
+      undoTimerRef.current = null;
+    }, 15000);
+  }
+
+  async function undoDeleteItem() {
+    if (!undoDelete?.item) return;
+
+    const item = undoDelete.item;
+
+    if (undoTimerRef.current) {
+      window.clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+
+    await api('/api/items/restore', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: item.title,
+        image: item.image,
+        price: item.price || ''
+      })
+    });
+
+    setUndoDelete(null);
     await refreshInventory(user.username);
     notifyRoomInventoryUpdated();
   }
@@ -783,6 +835,32 @@ export default function App() {
           </>
         )}
       </main>
+
+
+      {undoDelete && (
+        <div className="undo-toast">
+          <span>Removed <strong>{undoDelete.item?.title || 'item'}</strong></span>
+
+          <button type="button" onClick={undoDeleteItem}>
+            Undo {undoDelete.item?.title || 'Item'}
+          </button>
+
+          <button
+            type="button"
+            className="ghost undo-dismiss"
+            aria-label="Dismiss undo"
+            onClick={() => {
+              if (undoTimerRef.current) {
+                window.clearTimeout(undoTimerRef.current);
+                undoTimerRef.current = null;
+              }
+              setUndoDelete(null);
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <DragOverlay dropAnimation={null}>
         {activeDragItem ? (

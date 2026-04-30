@@ -49,25 +49,31 @@ function cleanBio(value) {
   return String(value || '').trim().slice(0, 1000);
 }
 
+function addThousandsCommas(numberText) {
+  const [whole, decimal] = String(numberText).replace(/,/g, '').split('.');
+  const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return decimal !== undefined ? `${withCommas}.${decimal}` : withCommas;
+}
+
 function cleanPrice(value) {
   const raw = String(value || '').trim().slice(0, 80);
   if (!raw) return '';
 
-  // Normalize explicit dollar-style entries into IC wording.
   const withoutDollar = raw.replace(/^\$\s*/, '').trim();
+  const withoutIc = withoutDollar.replace(/\bic\b/ig, '').trim();
 
-  // If the player entered a plain number / abbreviated number, display it as IC.
-  // Examples: 150 -> 150 IC, 1.5k -> 1.5k IC, 2m -> 2m IC
-  if (/^\d+(\.\d+)?\s*([kmb])?$/i.test(withoutDollar)) {
-    return `${withoutDollar} IC`;
+  if (/^\d+(\.\d+)?$/.test(withoutIc.replace(/,/g, ''))) {
+    return `${addThousandsCommas(withoutIc)} IC`;
   }
 
-  // If IC is already present, preserve it.
+  if (/^\d+(\.\d+)?\s*[kmb]$/i.test(withoutIc)) {
+    return `${withoutIc} IC`;
+  }
+
   if (/\bIC\b/i.test(withoutDollar)) {
     return withoutDollar.replace(/\bic\b/i, 'IC');
   }
 
-  // Leave non-numeric terms flexible, such as "Offer", "Negotiable", etc.
   return withoutDollar;
 }
 
@@ -444,6 +450,33 @@ app.post('/api/items', authMiddleware, async (req, res) => {
   });
 });
 
+
+app.post('/api/items/restore', authMiddleware, async (req, res) => {
+  const title = String(req.body.title || '').trim().slice(0, 200);
+  const image = String(req.body.image || '').trim();
+  const price = cleanPrice(req.body.price);
+
+  if (!title || !image) {
+    return res.status(400).json({ error: 'Title and image are required to restore an item' });
+  }
+
+  const result = await run(
+    'INSERT INTO items (userId, title, image, price) VALUES (?, ?, ?, ?) RETURNING id',
+    [req.user.id, title, image, price]
+  );
+
+  res.json({
+    ok: true,
+    item: {
+      id: result.lastID,
+      userId: req.user.id,
+      title,
+      image,
+      price
+    }
+  });
+});
+
 app.patch('/api/items/:id', authMiddleware, async (req, res) => {
   const item = await get('SELECT * FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
   if (!item) return res.status(404).json({ error: 'Item not found' });
@@ -484,7 +517,7 @@ app.delete('/api/items/:id', authMiddleware, async (req, res) => {
   if (!item) return res.status(404).json({ error: 'Item not found' });
 
   await run('DELETE FROM items WHERE id = ? AND userId = ?', [req.params.id, req.user.id]);
-  res.json({ ok: true });
+  res.json({ ok: true, item });
 });
 
 app.post('/api/items/:id/buy-request', authMiddleware, async (req, res) => {
