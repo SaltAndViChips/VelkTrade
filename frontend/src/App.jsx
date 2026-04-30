@@ -1111,7 +1111,7 @@ export default function App() {
           />
         )}
 
-        {user && view === 'admin' && isAdmin && <AdminPanel />}
+        {user && view === 'admin' && isAdmin && <AdminPanel onJoinRoom={joinRoom} />}
 
         {user && view === 'trade' && (
           <>

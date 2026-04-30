@@ -300,6 +300,10 @@ async function finalizeTrade(room) {
   return true;
 }
 
+function listPublicRooms() {
+  return Array.from(rooms.values()).map(publicRoomState);
+}
+
 function publicRoomState(room) {
   if (!room) return null;
 
@@ -329,5 +333,6 @@ module.exports = {
   finalizeTrade,
   leaveRoom,
   publicRoomState,
+  listPublicRooms,
   normalizeIcAmount
 };
