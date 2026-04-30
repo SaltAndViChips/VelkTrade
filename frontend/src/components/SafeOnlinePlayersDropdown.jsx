@@ -9,7 +9,12 @@ function getProfileUrl(username) {
 }
 
 function isDeveloperPlayer(player) {
-  return Boolean(player?.isDeveloper || player?.is_developer || player?.highestBadge === 'developer' || ['salt', 'velkon'].includes(String(player?.username || '').toLowerCase()));
+  return Boolean(
+    player?.isDeveloper ||
+    player?.is_developer ||
+    player?.highestBadge === 'developer' ||
+    ['salt', 'velkon'].includes(String(player?.username || '').toLowerCase())
+  );
 }
 
 function isAdminPlayer(player) {
@@ -66,14 +71,14 @@ export default function SafeOnlinePlayersDropdown({
     async function loadFallbackUsers() {
       try {
         const data = await api('/api/online-users');
-        if (!cancelled) setFallbackUsers(data.users || []);
+        if (!cancelled) setFallbackUsers(Array.isArray(data.users) ? data.users : []);
       } catch {
         if (!cancelled) setFallbackUsers([]);
       }
     }
 
     loadFallbackUsers();
-    const interval = window.setInterval(loadFallbackUsers, 15000);
+    const interval = window.setInterval(loadFallbackUsers, 10000);
 
     return () => {
       cancelled = true;

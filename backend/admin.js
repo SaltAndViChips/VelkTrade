@@ -12,9 +12,7 @@ function isSaltUsername(value) {
 }
 
 function isProtectedDeveloperUser(userOrUsername) {
-  if (typeof userOrUsername === 'string') {
-    return isDeveloperUsername(userOrUsername);
-  }
+  if (typeof userOrUsername === 'string') return isDeveloperUsername(userOrUsername);
 
   return Boolean(
     userOrUsername?.is_developer ||
@@ -24,27 +22,29 @@ function isProtectedDeveloperUser(userOrUsername) {
 }
 
 function isAdminUser(user) {
-  return Boolean(
-    user?.is_admin ||
-    user?.isAdmin ||
-    isProtectedDeveloperUser(user)
-  );
+  return Boolean(user?.is_admin || user?.isAdmin || isProtectedDeveloperUser(user));
+}
+
+function roleForUser(user) {
+  const isDeveloper = isProtectedDeveloperUser(user);
+  const isAdmin = Boolean(user?.is_admin || user?.isAdmin || isDeveloper);
+  const isVerified = Boolean(user?.is_verified || user?.isVerified || user?.isTrusted);
+
+  return {
+    isDeveloper,
+    isAdmin,
+    isVerified,
+    isTrusted: isVerified,
+    highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'trusted' : 'none'
+  };
 }
 
 function publicUser(user) {
   if (!user) return null;
-
-  const isDeveloper = isProtectedDeveloperUser(user);
-  const isAdmin = Boolean(user.is_admin || user.isAdmin || isDeveloper);
-  const isVerified = Boolean(user.is_verified || user.isVerified);
-
   return {
     id: user.id,
     username: user.username,
-    isAdmin,
-    isVerified,
-    isDeveloper,
-    highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'trusted' : 'none'
+    ...roleForUser(user)
   };
 }
 
@@ -54,5 +54,6 @@ module.exports = {
   isDeveloperUsername,
   isProtectedDeveloperUser,
   isAdminUser,
+  roleForUser,
   publicUser
 };
