@@ -1021,6 +1021,17 @@ previousRoomPlayerIdsRef.current = nextIds;
           currentUser={user}
           onlineUsers={Array.isArray(onlineUsers) ? onlineUsers : []}
           currentRoomId={room?.roomId || ''}
+          notifications={Array.isArray(visibleNotifications) ? visibleNotifications : []}
+          preferences={notificationPrefs || {}}
+          tradeStatuses={tradeStatuses || {}}
+          unseenCount={Number(unseenNotificationCount || 0)}
+          onRefreshNotifications={loadNotifications || (() => {})}
+          onMarkRead={markNotificationRead || (() => {})}
+          onMarkAllRead={markAllNotificationsRead || (() => {})}
+          onSavePreferences={saveNotificationPreferences || (() => {})}
+          onCheckTrade={checkTradeNotification || (() => {})}
+          onAcceptRoomInvite={acceptRoomInvite || (() => {})}
+          onDeclineRoomInvite={declineRoomInvite || (() => {})}
           onInvitePlayer={invitePlayerToRoom || (() => {})}
         />
       )}
@@ -1088,25 +1099,7 @@ previousRoomPlayerIdsRef.current = nextIds;
 
         {user && view === 'inventory' && (
           <>
-            <section className="card profile-editor">
-              <h2>My Profile Bio</h2>
-              <form onSubmit={saveBio}>
-                <textarea
-                  className="trade-message-box"
-                  value={bioDraft}
-                  onChange={event => setBioDraft(event.target.value)}
-                  placeholder="Write a short bio for your public profile..."
-                  maxLength={1000}
-                />
-                <div className="inline-controls">
-                  <button type="submit">Save Bio</button>
-                  <span className="muted">{bioDraft.length}/1000</span>
-                </div>
-              </form>
-              {bioMessage && <p className="success">{bioMessage}</p>}
-            </section>
-
-            <section className="card inventory-profile-controls-card">
+<section className="card inventory-profile-controls-card">
               <div className="inventory-profile-header">
                 <div>
                   <h2>Profile Bio</h2>

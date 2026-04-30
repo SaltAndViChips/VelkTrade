@@ -3071,3 +3071,94 @@ svg .chart-hover-target {
 .safe-online-main .verified-badge {
   flex: 0 0 auto;
 }
+
+
+/* Online dropdown tabs + presence badges */
+
+.safe-online-toggle {
+  position: relative;
+}
+
+.safe-online-toggle > span {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 19px;
+  height: 19px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  padding: 0 5px;
+  background: #e15d71;
+  color: white;
+  font-size: 11px;
+  font-weight: 900;
+  border: 1px solid rgba(255,255,255,.55);
+}
+
+.safe-online-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.safe-online-tabs button {
+  min-height: 34px;
+  box-shadow: none;
+  background: rgba(8, 7, 12, 0.42);
+  border: 1px solid var(--border);
+}
+
+.safe-online-tabs button.active {
+  background: var(--purple-soft);
+  border-color: var(--border-bright);
+}
+
+.developer-badge,
+.trusted-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.developer-badge {
+  color: #e7ddff;
+  background: rgba(141, 99, 255, 0.30);
+  border: 1px solid rgba(177, 151, 255, 0.62);
+  box-shadow: 0 0 16px rgba(141, 99, 255, 0.24);
+}
+
+.trusted-badge {
+  color: #d9ffe5;
+  background: rgba(32, 94, 59, 0.28);
+  border: 1px solid rgba(98, 209, 138, 0.48);
+}
+
+.safe-online-main .developer-badge,
+.safe-online-main .admin-badge,
+.safe-online-main .trusted-badge {
+  flex: 0 0 auto;
+}
+
+.safe-notifications-tab .notifications-page {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.safe-notifications-tab .notification-card-actions,
+.safe-notifications-tab .inline-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.safe-notifications-tab button {
+  min-width: 110px;
+}

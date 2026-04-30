@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
+import Notifications from './Notifications';
 
 function getProfileUrl(username) {
   const base = import.meta.env.BASE_URL || '/';
@@ -15,14 +16,19 @@ function isAdminPlayer(player) {
   return Boolean(isDeveloperPlayer(player) || player?.isAdmin || player?.is_admin || player?.highestBadge === 'admin');
 }
 
-function isVerifiedPlayer(player) {
-  return Boolean(player?.isVerified || player?.is_verified || player?.highestBadge === 'verified');
+function isTrustedPlayer(player) {
+  return Boolean(player?.isTrusted || player?.isVerified || player?.is_verified || player?.highestBadge === 'trusted' || player?.highestBadge === 'verified');
 }
 
 function statusLabel(player) {
-  if (player?.status === 'trade') return 'In trade';
-  if (player?.status === 'bazaar') return 'Browsing the Bazaar';
-  if (player?.status === 'away') return 'Away';
+  const status = player?.status || 'online';
+  if (status === 'trade') return 'In trade room';
+  if (status === 'bazaar') return 'Viewing Bazaar';
+  if (status === 'away') {
+    const ms = Number(player?.awayForMs || (player?.statusSince ? Date.now() - Number(player.statusSince) : 0));
+    const mins = Math.max(1, Math.floor(ms / 60000));
+    return `Away for ${mins}m`;
+  }
   return 'Online';
 }
 
@@ -30,9 +36,21 @@ export default function SafeOnlinePlayersDropdown({
   currentUser,
   onlineUsers = [],
   currentRoomId = '',
+  notifications = [],
+  preferences = {},
+  tradeStatuses = {},
+  unseenCount = 0,
+  onRefreshNotifications = () => {},
+  onMarkRead = () => {},
+  onMarkAllRead = () => {},
+  onSavePreferences = () => {},
+  onCheckTrade = () => {},
+  onAcceptRoomInvite = () => {},
+  onDeclineRoomInvite = () => {},
   onInvitePlayer = () => {}
 }) {
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState('online');
   const [fallbackUsers, setFallbackUsers] = useState([]);
 
   useEffect(() => {
@@ -64,13 +82,10 @@ export default function SafeOnlinePlayersDropdown({
       .sort((a, b) => {
         const devDiff = Number(isDeveloperPlayer(b)) - Number(isDeveloperPlayer(a));
         if (devDiff) return devDiff;
-
         const adminDiff = Number(isAdminPlayer(b)) - Number(isAdminPlayer(a));
         if (adminDiff) return adminDiff;
-
-        const verifiedDiff = Number(isVerifiedPlayer(b)) - Number(isVerifiedPlayer(a));
-        if (verifiedDiff) return verifiedDiff;
-
+        const trustedDiff = Number(isTrustedPlayer(b)) - Number(isTrustedPlayer(a));
+        if (trustedDiff) return trustedDiff;
         return String(a?.username || '').localeCompare(String(b?.username || ''));
       });
   }, [sourceUsers, currentUser]);
@@ -84,52 +99,82 @@ export default function SafeOnlinePlayersDropdown({
 
   return (
     <div className="safe-online-dropdown">
-      <button type="button" className="safe-online-toggle" onClick={() => setOpen(value => !value)} title="Online players" aria-label="Online players">
+      <button type="button" className="safe-online-toggle" onClick={() => setOpen(value => !value)} title="Online players and notifications" aria-label="Online players and notifications">
         ≡
+        {Number(unseenCount) > 0 && <span>{unseenCount}</span>}
       </button>
 
       {open && (
         <section className="safe-online-panel">
-          <div className="safe-online-header">
-            <strong>Online Players</strong>
-            <span>{sortedUsers.length}</span>
+          <div className="safe-online-tabs">
+            <button type="button" className={tab === 'online' ? 'active' : ''} onClick={() => setTab('online')}>Online</button>
+            <button type="button" className={tab === 'notifications' ? 'active' : ''} onClick={() => setTab('notifications')}>
+              Notifications {Number(unseenCount) > 0 && <span className="mini-count">{unseenCount}</span>}
+            </button>
           </div>
 
-          {!currentRoomId && <p className="muted safe-online-hint">Join or create a room to invite online players.</p>}
-          {sortedUsers.length === 0 && <p className="muted tidy-empty">No other players online.</p>}
+          {tab === 'online' && (
+            <>
+              <div className="safe-online-header">
+                <strong>Online Players</strong>
+                <span>{sortedUsers.length}</span>
+              </div>
 
-          <div className="safe-online-list">
-            {sortedUsers.map(player => {
-              const developer = isDeveloperPlayer(player);
-              const admin = isAdminPlayer(player);
-              const verified = isVerifiedPlayer(player);
-              const away = player?.status === 'away';
+              {!currentRoomId && <p className="muted safe-online-hint">Join or create a room to invite online players.</p>}
+              {sortedUsers.length === 0 && <p className="muted tidy-empty">No other players online.</p>}
 
-              return (
-                <article className="safe-online-card" key={player.id || player.username}>
-                  <div className="safe-online-main">
-                    <span className={`online-dot ${away ? 'away' : ''}`} />
-                    <strong>{player.username}</strong>
+              <div className="safe-online-list">
+                {sortedUsers.map(player => {
+                  const developer = isDeveloperPlayer(player);
+                  const admin = isAdminPlayer(player);
+                  const trusted = isTrustedPlayer(player);
+                  const away = player?.status === 'away';
 
-                    {developer ? (
-                      <span className="developer-badge">Developer</span>
-                    ) : admin ? (
-                      <span className="admin-badge">Admin</span>
-                    ) : verified ? (
-                      <span className="verified-badge mini" title="Verified user">✓</span>
-                    ) : null}
+                  return (
+                    <article className="safe-online-card" key={player.id || player.username}>
+                      <div className="safe-online-main">
+                        <span className={`online-dot ${away ? 'away' : ''}`} />
+                        <strong>{player.username}</strong>
 
-                    <small>{statusLabel(player)}</small>
-                  </div>
+                        {developer ? (
+                          <span className="developer-badge">Developer</span>
+                        ) : admin ? (
+                          <span className="admin-badge">Admin</span>
+                        ) : trusted ? (
+                          <span className="trusted-badge">Trusted</span>
+                        ) : null}
 
-                  <div className="safe-online-actions">
-                    <button type="button" className="ghost" onClick={() => openProfile(player.username)}>Profile</button>
-                    <button type="button" disabled={!currentRoomId} onClick={() => onInvitePlayer(player.username)}>Invite</button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+                        <small>{statusLabel(player)}</small>
+                      </div>
+
+                      <div className="safe-online-actions">
+                        <button type="button" className="ghost" onClick={() => openProfile(player.username)}>Profile</button>
+                        <button type="button" disabled={!currentRoomId} onClick={() => onInvitePlayer(player.username)}>Invite</button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {tab === 'notifications' && (
+            <div className="safe-notifications-tab">
+              <Notifications
+                compact
+                notifications={Array.isArray(notifications) ? notifications : []}
+                preferences={preferences || {}}
+                tradeStatuses={tradeStatuses || {}}
+                onRefresh={onRefreshNotifications}
+                onMarkRead={onMarkRead}
+                onMarkAllRead={onMarkAllRead}
+                onSavePreferences={onSavePreferences}
+                onCheckTrade={onCheckTrade}
+                onAcceptRoomInvite={onAcceptRoomInvite}
+                onDeclineRoomInvite={onDeclineRoomInvite}
+              />
+            </div>
+          )}
         </section>
       )}
     </div>

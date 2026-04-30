@@ -137,9 +137,11 @@ function onlineUserList() {
   return Array.from(onlineUsers.values())
     .filter(user => user.showOnline !== false)
     .map(user => {
-      const isDeveloper = Boolean(user.isDeveloper || user.is_developer || isProtectedDeveloperAccount(user));
+      const isDeveloper = Boolean(user.isDeveloper || user.is_developer || isProtectedDeveloperAccount?.(user));
       const isAdmin = Boolean(isDeveloper || user.isAdmin || user.is_admin);
       const isVerified = Boolean(user.isVerified || user.is_verified);
+      const now = Date.now();
+      const since = user.statusSince || now;
 
       return {
         id: user.id,
@@ -147,8 +149,11 @@ function onlineUserList() {
         isDeveloper,
         isAdmin,
         isVerified,
-        highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'verified' : 'none',
-        status: user.status || 'online'
+        isTrusted: isVerified,
+        highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'trusted' : 'none',
+        status: user.status || 'online',
+        statusSince: since,
+        awayForMs: (user.status || 'online') === 'away' ? Math.max(0, now - since) : 0
       };
     });
 }
@@ -1717,8 +1722,10 @@ app.get('/api/online-users', authMiddleware, async (req, res) => {
         isDeveloper,
         isAdmin,
         isVerified,
-        highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'verified' : 'none',
-        status: 'online'
+        highestBadge: isDeveloper ? 'developer' : isAdmin ? 'admin' : isVerified ? 'trusted' : 'none',
+        isTrusted: isVerified,
+        status: 'online',
+        statusSince: row.last_seen_at ? new Date(row.last_seen_at).getTime() : Date.now()
       };
     })
   });
