@@ -32,6 +32,13 @@ function statusLabel(player) {
   return 'Online';
 }
 
+function RoleIcon({ player }) {
+  if (isDeveloperPlayer(player)) return <span className="role-icon-badge developer-icon" title="Developer">🖥️</span>;
+  if (isAdminPlayer(player)) return <span className="role-icon-badge admin-icon" title="Admin">🛡️</span>;
+  if (isTrustedPlayer(player)) return <span className="role-icon-badge trusted-icon" title="Trusted">✓</span>;
+  return null;
+}
+
 export default function SafeOnlinePlayersDropdown({
   currentUser,
   onlineUsers = [],
@@ -120,14 +127,10 @@ export default function SafeOnlinePlayersDropdown({
                 <span>{sortedUsers.length}</span>
               </div>
 
-              {!currentRoomId && <p className="muted safe-online-hint">Join or create a room to invite online players.</p>}
               {sortedUsers.length === 0 && <p className="muted tidy-empty">No other players online.</p>}
 
               <div className="safe-online-list">
                 {sortedUsers.map(player => {
-                  const developer = isDeveloperPlayer(player);
-                  const admin = isAdminPlayer(player);
-                  const trusted = isTrustedPlayer(player);
                   const away = player?.status === 'away';
 
                   return (
@@ -135,21 +138,13 @@ export default function SafeOnlinePlayersDropdown({
                       <div className="safe-online-main">
                         <span className={`online-dot ${away ? 'away' : ''}`} />
                         <strong>{player.username}</strong>
-
-                        {developer ? (
-                          <span className="role-icon-badge developer-icon" title="Developer">🖥️</span>
-                        ) : admin ? (
-                          <span className="role-icon-badge admin-icon" title="Admin">🛡️</span>
-                        ) : trusted ? (
-                          <span className="role-icon-badge trusted-icon" title="Verified">✓</span>
-                        ) : null}
-
+                        <RoleIcon player={player} />
                         <small>{statusLabel(player)}</small>
                       </div>
 
                       <div className="safe-online-actions">
                         <button type="button" className="ghost" onClick={() => openProfile(player.username)}>Profile</button>
-                        <button type="button" disabled={!currentRoomId} onClick={() => onInvitePlayer(player.username)}>Invite</button>
+                        <button type="button" onClick={() => onInvitePlayer(player.username)}>Invite</button>
                       </div>
                     </article>
                   );

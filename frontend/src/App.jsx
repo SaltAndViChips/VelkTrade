@@ -198,6 +198,41 @@ export default function App() {
   const tradeStatuses = {};
   const unseenNotificationCount = 0;
 
+
+async function invitePlayerToRoom(username) {
+    setError('');
+
+    let activeRoomId = room?.roomId;
+
+    if (!activeRoomId) {
+      const data = await api('/api/rooms', {
+        method: 'POST',
+        body: JSON.stringify({})
+      });
+
+      const nextRoom = data.room || data;
+      activeRoomId = nextRoom.roomId || nextRoom.id;
+
+      if (nextRoom) {
+        setRoom(nextRoom);
+        roomRef.current = nextRoom;
+      }
+
+      setView('trade');
+    }
+
+    const inviteData = await api(`/api/rooms/${activeRoomId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify({ username })
+    });
+
+    if (typeof setPendingRoomInvite === 'function') {
+      setPendingRoomInvite(inviteData.invite || { roomId: activeRoomId, toUsername: username });
+    }
+
+    setView('trade');
+  }
+
   return () => {
       if (undoTimerRef.current) {
         window.clearTimeout(undoTimerRef.current);
@@ -1032,7 +1067,7 @@ previousRoomPlayerIdsRef.current = nextIds;
           onCheckTrade={checkTradeNotification || (() => {})}
           onAcceptRoomInvite={acceptRoomInvite || (() => {})}
           onDeclineRoomInvite={declineRoomInvite || (() => {})}
-          onInvitePlayer={invitePlayerToRoom || (() => {})}
+          onInvitePlayer={invitePlayerToRoom}
         />
       )}
 

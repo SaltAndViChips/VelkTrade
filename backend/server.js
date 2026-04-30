@@ -149,7 +149,7 @@ function onlineUserList() {
   return Array.from(onlineUsers.values())
     .filter(user => user.showOnline !== false)
     .map(user => {
-      const isDeveloper = Boolean(user.isDeveloper || user.is_developer || isProtectedDeveloperAccount?.(user));
+      const isDeveloper = Boolean(user.isDeveloper || user.is_developer || isProtectedDeveloperAccount(user));
       const isAdmin = Boolean(isDeveloper || user.isAdmin || user.is_admin);
       const isVerified = Boolean(user.isVerified || user.is_verified);
       const now = Date.now();
@@ -1451,7 +1451,13 @@ app.post('/api/admin/set-admin', authMiddleware, requireAdmin, async (req, res) 
   );
 
   if (!target) return res.status(404).json({ error: 'User not found' });
-  if (isProtectedDeveloperAccount(target)) {
+
+
+  const protectedTarget = target || user;
+  if (protectedTarget && !canModifyDeveloperTarget(req.user, protectedTarget)) {
+    return res.status(403).json({ error: 'Only developers can modify developer accounts' });
+  }
+if (isProtectedDeveloperAccount(target)) {
     return res.status(403).json({ error: 'Developer accounts cannot be modified by admins' });
   }
 if (isSaltUsername(target.username) && isAdmin === false) {
@@ -1516,7 +1522,13 @@ app.post('/api/admin/set-verified', authMiddleware, requireAdmin, async (req, re
   if (!target) return res.status(404).json({ error: 'User not found' });
 
 
-  if (isProtectedDeveloperAccount(target)) {
+
+
+  const protectedTarget = target || user;
+  if (protectedTarget && !canModifyDeveloperTarget(req.user, protectedTarget)) {
+    return res.status(403).json({ error: 'Only developers can modify developer accounts' });
+  }
+if (isProtectedDeveloperAccount(target)) {
     return res.status(403).json({ error: 'Developer accounts cannot be modified by admins' });
   }
 await run('UPDATE users SET is_verified = ? WHERE id = ?', [Boolean(isVerified), target.id]);
@@ -1546,7 +1558,13 @@ app.post('/api/admin/reset-password', authMiddleware, requireAdmin, async (req, 
   if (!target) return res.status(404).json({ error: 'User not found' });
 
 
-  if (isProtectedDeveloperAccount(target)) {
+
+
+  const protectedTarget = target || user;
+  if (protectedTarget && !canModifyDeveloperTarget(req.user, protectedTarget)) {
+    return res.status(403).json({ error: 'Only developers can modify developer accounts' });
+  }
+if (isProtectedDeveloperAccount(target)) {
     return res.status(403).json({ error: 'Developer accounts cannot be modified by admins' });
   }
 const passwordHash = await bcrypt.hash(newPassword, 10);

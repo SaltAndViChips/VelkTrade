@@ -87,6 +87,18 @@ export default function Notifications({
 
       {settingsOpen && (
         <form className="notification-settings" onSubmit={savePrefs}>
+              <label className="toggle-row">
+                <input
+                  type="checkbox"
+                  checked={Boolean(localPrefs.allowUnverifiedNotifications)}
+                  onChange={event => setLocalPrefs({
+                    ...localPrefs,
+                    allowUnverifiedNotifications: event.target.checked
+                  })}
+                />
+                <span>Notifications from unverified users</span>
+              </label>
+
           <h3>Notification Settings</h3>
 
           <label className="toggle-row">
