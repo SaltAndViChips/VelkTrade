@@ -2709,3 +2709,156 @@ svg .chart-hover-target {
     min-width: 0;
   }
 }
+
+
+/* Expanded presence + invite lock */
+
+.online-dot.away {
+  background: #d7b55e;
+  box-shadow: 0 0 14px rgba(215, 181, 94, 0.58);
+}
+
+.presence-player-main .admin-badge,
+.presence-player-main .verified-badge {
+  flex: 0 0 auto;
+}
+
+.presence-player-main small {
+  width: 100%;
+  margin-left: 16px;
+  color: var(--muted);
+}
+
+.presence-pending-invite {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 11px;
+  background: rgba(95, 74, 28, 0.24);
+  border: 1px solid rgba(215, 181, 94, 0.36);
+}
+
+.presence-pending-invite span {
+  overflow-wrap: anywhere;
+  color: #fff3c2;
+}
+
+.trade-partner-name {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  .presence-pending-invite {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Compact inventory profile controls */
+
+.inventory-profile-controls-card {
+  display: grid;
+  gap: 12px;
+  background:
+    radial-gradient(circle at top left, rgba(141, 99, 255, 0.10), transparent 36%),
+    linear-gradient(180deg, #171522, #100f18);
+}
+
+.inventory-profile-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.inventory-profile-header h2 {
+  margin-bottom: 5px;
+}
+
+.profile-bio-display {
+  margin: 0;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.inventory-profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.bio-pencil-button {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.compact-status-toggle {
+  min-height: 34px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: none;
+  background: rgba(8, 7, 12, 0.42);
+  border: 1px solid var(--border);
+  color: #ded8ff;
+}
+
+.compact-status-toggle:hover {
+  border-color: var(--border-bright);
+  background: rgba(47, 35, 77, 0.72);
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  box-shadow: 0 0 12px currentColor;
+}
+
+.status-dot.on {
+  color: #62d18a;
+  background: #62d18a;
+}
+
+.status-dot.off {
+  color: #e15d71;
+  background: #e15d71;
+}
+
+.bio-edit-form {
+  display: grid;
+  gap: 10px;
+}
+
+.bio-edit-form textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+@media (max-width: 720px) {
+  .inventory-profile-header {
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-profile-actions {
+    justify-content: flex-start;
+  }
+}

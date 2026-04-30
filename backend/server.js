@@ -59,7 +59,8 @@ const io = new Server(server, {
 });
 
 
-const onlineUsers = new Map(); // userId -> { id, username, sockets:Set<string> }
+const onlineUsers = new Map();
+const pendingRoomInvites = new Map(); // userId -> { id, username, sockets:Set<string> }
 
 const DEFAULT_NOTIFICATION_PREFS = {
   offline_trades: true,
@@ -103,13 +104,19 @@ async function hydrateOnlinePresenceUser(userId, fallbackUser) {
 function onlineUserList() {
   return Array.from(onlineUsers.values())
     .filter(user => user.showOnline !== false)
-    .map(user => ({
-      id: user.id,
-      username: user.username,
-      isAdmin: Boolean(user.isAdmin || user.is_admin || String(user.username || '').toLowerCase() === 'salt'),
-      isVerified: Boolean(user.isVerified || user.is_verified),
-      status: user.status || 'online'
-    }));
+    .map(user => {
+      const isAdmin = Boolean(user.isAdmin || user.is_admin || String(user.username || '').toLowerCase() === 'salt');
+      const isVerified = Boolean(user.isVerified || user.is_verified);
+
+      return {
+        id: user.id,
+        username: user.username,
+        isAdmin,
+        isVerified,
+        highestBadge: isAdmin ? 'admin' : isVerified ? 'verified' : 'none',
+        status: user.status || 'online'
+      };
+    });
 }
 
 function socketRoomForUser(userId) {
@@ -816,6 +823,60 @@ async function createLoginTradeSummaryNotification(userId) {
       tradeSetKey: newestSetKey
     }
   });
+}
+
+
+
+function pendingRoomInviteKey(roomId, inviterId) {
+  return `${roomId}:${inviterId}`;
+}
+
+async function expirePendingRoomInvite({ roomId, inviterId, reason = 'expired' }) {
+  const key = pendingRoomInviteKey(roomId, inviterId);
+  const invite = pendingRoomInvites.get(key);
+
+  if (!invite) return null;
+
+  pendingRoomInvites.delete(key);
+
+  await createNotification({
+    userId: invite.toUserId,
+    type: 'room_invite_expired',
+    title: 'Room invite expired',
+    message: `${invite.fromUsername}'s room invite has ${reason === 'cancelled' ? 'been cancelled' : 'expired'}.`,
+    payload: {
+      roomId,
+      fromUserId: inviterId,
+      fromUsername: invite.fromUsername,
+      expired: true
+    }
+  });
+
+  return invite;
+}
+
+async function expireRoomInvitesForRoom(roomId, reason = 'expired') {
+  const invites = Array.from(pendingRoomInvites.values()).filter(invite => invite.roomId === roomId);
+
+  for (const invite of invites) {
+    await expirePendingRoomInvite({
+      roomId: invite.roomId,
+      inviterId: invite.fromUserId,
+      reason
+    });
+  }
+}
+
+async function expireRoomInvitesForUser(userId, reason = 'expired') {
+  const invites = Array.from(pendingRoomInvites.values()).filter(invite => Number(invite.fromUserId) === Number(userId));
+
+  for (const invite of invites) {
+    await expirePendingRoomInvite({
+      roomId: invite.roomId,
+      inviterId: invite.fromUserId,
+      reason
+    });
+  }
 }
 
 
@@ -1662,6 +1723,71 @@ app.delete('/api/bazaar/items/:id/interest', authMiddleware, async (req, res) =>
   }
 });
 
+
+app.post('/api/rooms/:roomId/invite', authMiddleware, async (req, res) => {
+  const roomId = req.params.roomId;
+  const targetUsername = normalizeUsername(req.body.username || req.body.targetUsername || req.body.toUsername);
+  const key = pendingRoomInviteKey(roomId, req.user.id);
+
+  if (!targetUsername) {
+    return res.status(400).json({ error: 'Username required' });
+  }
+
+  if (pendingRoomInvites.has(key)) {
+    const existingInvite = pendingRoomInvites.get(key);
+    return res.status(409).json({
+      error: `You already have a pending invite to ${existingInvite.toUsername}. Cancel it or wait for them to decline.`,
+      pendingInvite: existingInvite
+    });
+  }
+
+  const target = await get(
+    `SELECT id, username
+     FROM users
+     WHERE LOWER(username) = LOWER(?)`,
+    [targetUsername]
+  );
+
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  if (Number(target.id) === Number(req.user.id)) return res.status(400).json({ error: 'You cannot invite yourself' });
+
+  const invite = {
+    roomId,
+    fromUserId: req.user.id,
+    fromUsername: req.user.username,
+    toUserId: target.id,
+    toUsername: target.username,
+    createdAt: new Date().toISOString()
+  };
+
+  pendingRoomInvites.set(key, invite);
+
+  await createNotification({
+    userId: target.id,
+    type: 'room_invite',
+    title: 'Room invite',
+    message: `${req.user.username} invited you to room ${roomId}.`,
+    payload: {
+      roomId,
+      fromUserId: req.user.id,
+      fromUsername: req.user.username,
+      toUsername: target.username
+    }
+  });
+
+  res.json({ ok: true, invite });
+});
+
+app.post('/api/rooms/:roomId/invite/cancel', authMiddleware, async (req, res) => {
+  const invite = await expirePendingRoomInvite({
+    roomId: req.params.roomId,
+    inviterId: req.user.id,
+    reason: 'cancelled'
+  });
+
+  res.json({ ok: true, invite });
+});
+
 app.get('/api/notifications', authMiddleware, async (req, res) => {
   const prefs = await ensureNotificationPrefs(req.user.id);
   const rows = await all(
@@ -1771,6 +1897,21 @@ io.on('connection', socket => {
   socket.join(socketRoomForUser(userId));
   broadcastPresence();
 
+  socket.on('presence:set-status', status => {
+    const allowedStatuses = new Set(['online', 'trade', 'bazaar', 'away']);
+    const nextStatus = allowedStatuses.has(status) ? status : 'online';
+    const current = onlineUsers.get(userId);
+
+    if (!current) return;
+
+    onlineUsers.set(userId, {
+      ...current,
+      status: nextStatus
+    });
+
+    broadcastPresence();
+  });
+
   socket.on('disconnect', () => {
     const current = onlineUsers.get(userId);
 
@@ -1780,6 +1921,7 @@ io.on('connection', socket => {
 
     if (current.sockets.size === 0) {
       onlineUsers.delete(userId);
+      expireRoomInvitesForUser(userId, 'expired');
     } else {
       onlineUsers.set(userId, current);
     }
@@ -1875,6 +2017,15 @@ io.on('connection', socket => {
   socket.on('room:join', ({ roomId }) => {
     try {
       const room = joinRoom(roomId, socket.user);
+    if (room?.messages && !room.messages.some(message => message.type === 'system' && message.message === `${socket.user.username} joined the room.`)) {
+      room.messages.push({
+        id: Date.now() + Math.random(),
+        type: 'system',
+        username: 'System',
+        message: `${socket.user.username} joined the room.`,
+        createdAt: new Date().toISOString()
+      });
+    }
       socket.join(room.roomId);
       io.to(room.roomId).emit('room:update', publicRoomState(room));
       io.to(room.roomId).emit('inventory:refresh', { reason: 'room-join' });

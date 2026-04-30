@@ -143,6 +143,7 @@ export default function App() {
     flashTab: true
   });
   const [onlineUsers, setOnlineUsers] = useState([]);
+  const [pendingRoomInvite, setPendingRoomInvite] = useState(null);
   const [tradeStatuses, setTradeStatuses] = useState({});
   const [focusedTradeId, setFocusedTradeId] = useState(null);
   const [room, setRoom] = useState(null);
@@ -160,6 +161,7 @@ export default function App() {
   const [loginRequiredMessage, setLoginRequiredMessage] = useState('');
 
   const [bioDraft, setBioDraft] = useState('');
+  const [isEditingBio, setIsEditingBio] = useState(false);
   const [bioMessage, setBioMessage] = useState('');
   const [undoDelete, setUndoDelete] = useState(null);
 
@@ -168,6 +170,8 @@ export default function App() {
   const socketRef = useRef(null);
   const joinedInitialRoomRef = useRef(false);
   const undoTimerRef = useRef(null);
+  const previousRoomPlayerIdsRef = useRef([]);
+  const awayTimerRef = useRef(null);
   const previousRoomPlayerIdsRef = useRef([]);
 
   function setView(nextView) {
@@ -193,6 +197,62 @@ export default function App() {
       }
     };
   }, []);
+
+
+  function computePresenceStatus(nextView = view, nextRoom = room) {
+    if (document.hidden) return 'away';
+    if (nextRoom?.roomId || nextView === 'trade') return 'trade';
+    if (nextView === 'bazaar') return 'bazaar';
+    return 'online';
+  }
+
+  function emitPresenceStatus(status = computePresenceStatus()) {
+    if (!socket) return;
+    socket.emit('presence:set-status', status);
+  }
+
+  useEffect(() => {
+    emitPresenceStatus(computePresenceStatus());
+  }, [view, room?.roomId, socket]);
+
+  useEffect(() => {
+    function markAwayLater() {
+      if (awayTimerRef.current) {
+        window.clearTimeout(awayTimerRef.current);
+      }
+
+      awayTimerRef.current = window.setTimeout(() => {
+        emitPresenceStatus('away');
+      }, 5 * 60 * 1000);
+    }
+
+    function handleVisibilityChange() {
+      if (document.hidden) {
+        markAwayLater();
+      } else {
+        if (awayTimerRef.current) {
+          window.clearTimeout(awayTimerRef.current);
+        }
+
+        emitPresenceStatus(computePresenceStatus());
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+    window.addEventListener('blur', markAwayLater);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+      window.removeEventListener('blur', markAwayLater);
+
+      if (awayTimerRef.current) {
+        window.clearTimeout(awayTimerRef.current);
+      }
+    };
+  }, [socket, view, room?.roomId]);
+
 
   const isAdmin = Boolean(user?.isAdmin);
   function isTerminalTradeStatus(status) {
@@ -405,6 +465,7 @@ export default function App() {
       setRoom(null);
       roomRef.current = null;
       previousRoomPlayerIdsRef.current = [];
+      setPendingRoomInvite(null);
       previousRoomPlayerIdsRef.current = [];
       setView('dashboard');
       refreshAllForUser(userRef.current);
@@ -660,6 +721,7 @@ export default function App() {
     if (data.user) {
       setUser(data.user);
       setBioDraft(data.user.bio || '');
+      setIsEditingBio(false);
     }
 
     setBioMessage('Bio saved.');
@@ -1054,6 +1116,7 @@ export default function App() {
           currentUser={user}
           onlineUsers={onlineUsers}
           currentRoomId={room?.roomId}
+          pendingRoomInvite={pendingRoomInvite}
           notifications={visibleNotifications}
           preferences={notificationPrefs}
           tradeStatuses={tradeStatuses}
@@ -1066,6 +1129,7 @@ export default function App() {
           onAcceptRoomInvite={acceptRoomInvite}
           onDeclineRoomInvite={declineRoomInvite}
           onInvitePlayer={invitePlayerToRoom}
+          onCancelInvite={cancelPendingRoomInvite}
         />
       )}
 
@@ -1152,47 +1216,85 @@ export default function App() {
               {bioMessage && <p className="success">{bioMessage}</p>}
             </section>
 
-            <section className="card bazaar-visibility-card">
-              <div>
-                <h2>Bazaar Visibility</h2>
-                <p className="muted">
-                  Control whether your entire inventory can appear on the Bazaar.
-                </p>
+            <section className="card inventory-profile-controls-card">
+              <div className="inventory-profile-header">
+                <div>
+                  <h2>Profile Bio</h2>
+                  {!isEditingBio && (
+                    <p className="profile-bio-display">
+                      {user.bio || 'No bio set.'}
+                    </p>
+                  )}
+                </div>
+
+                <div className="inventory-profile-actions">
+                  <button
+                    type="button"
+                    className="bio-pencil-button ghost"
+                    title={isEditingBio ? 'Cancel editing bio' : 'Edit bio'}
+                    aria-label={isEditingBio ? 'Cancel editing bio' : 'Edit bio'}
+                    onClick={() => {
+                      if (isEditingBio) {
+                        setBioDraft(user.bio || '');
+                        setIsEditingBio(false);
+                      } else {
+                        setIsEditingBio(true);
+                      }
+                    }}
+                  >
+                    ✎
+                  </button>
+
+                  <button
+                    type="button"
+                    className="compact-status-toggle"
+                    onClick={() => updateBazaarInventoryVisibility(user.showBazaarInventory === false)}
+                    title={user.showBazaarInventory === false ? 'Show inventory on Bazaar' : 'Hide inventory from Bazaar'}
+                  >
+                    Bazaar <span className={user.showBazaarInventory === false ? 'status-dot off' : 'status-dot on'} />
+                  </button>
+
+                  <button
+                    type="button"
+                    className="compact-status-toggle"
+                    onClick={() => updateOnlineVisibility(user.showOnline === false)}
+                    title={user.showOnline === false ? 'Appear online' : 'Appear offline'}
+                  >
+                    Online <span className={user.showOnline === false ? 'status-dot off' : 'status-dot on'} />
+                  </button>
+                </div>
               </div>
 
-              <button
-                type="button"
-                className={user.showBazaarInventory === false ? 'ghost' : ''}
-                onClick={() => updateBazaarInventoryVisibility(user.showBazaarInventory === false)}
-              >
-                {user.showBazaarInventory === false ? 'Show My Inventory on Bazaar' : 'Hide My Inventory from Bazaar'}
-              </button>
+              {isEditingBio && (
+                <form
+                  className="bio-edit-form"
+                  onSubmit={event => {
+                    event.preventDefault();
+                    saveBio();
+                  }}
+                >
+                  <textarea
+                    value={bioDraft}
+                    onChange={event => setBioDraft(event.target.value)}
+                    placeholder="Add a short bio for your profile..."
+                    rows={3}
+                  />
 
-              <span className={user.showBazaarInventory === false ? 'bazaar-visibility-off' : 'bazaar-visibility-on'}>
-                Bazaar: {user.showBazaarInventory === false ? 'Off' : 'On'}
-              </span>
-            </section>
-
-
-            <section className="card online-visibility-card">
-              <div>
-                <h2>Online Visibility</h2>
-                <p className="muted">
-                  Control whether you appear in the online player list.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                className={user.showOnline === false ? 'ghost' : ''}
-                onClick={() => updateOnlineVisibility(user.showOnline === false)}
-              >
-                {user.showOnline === false ? 'Appear Online' : 'Appear Offline'}
-              </button>
-
-              <span className={user.showOnline === false ? 'bazaar-visibility-off' : 'bazaar-visibility-on'}>
-                Online: {user.showOnline === false ? 'Off' : 'On'}
-              </span>
+                  <div className="inline-controls">
+                    <button type="submit">Save Bio</button>
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={() => {
+                        setBioDraft(user.bio || '');
+                        setIsEditingBio(false);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
             </section>
 
             <Inventory
