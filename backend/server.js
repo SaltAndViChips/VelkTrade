@@ -1481,6 +1481,126 @@ app.post('/api/admin/reset-password', authMiddleware, requireAdmin, async (req, 
 
 
 
+
+async function getBazaarItemForInterest(itemId, userId) {
+  const item = await get(
+    `SELECT id, userId
+     FROM items
+     WHERE id = ?`,
+    [itemId]
+  );
+
+  if (!item) {
+    const error = new Error('Item not found');
+    error.status = 404;
+    throw error;
+  }
+
+  if (Number(item.userId) === Number(userId)) {
+    const error = new Error('You cannot mark interest in your own item');
+    error.status = 400;
+    throw error;
+  }
+
+  return item;
+}
+
+async function bazaarInterestExists(schema, itemId, userId) {
+  const itemColumn = schemaColumn(schema, schema.itemColumn);
+  const requesterColumn = schemaColumn(schema, schema.requesterColumn);
+
+  return get(
+    `SELECT 1
+     FROM ${schema.table}
+     WHERE ${itemColumn} = ? AND ${requesterColumn} = ?
+     LIMIT 1`,
+    [itemId, userId]
+  );
+}
+
+async function addBazaarInterest(itemId, user) {
+  const interestSchema = await getBazaarInterestSchema();
+
+  if (!interestSchema) {
+    const error = new Error('Buy request table is not available yet. Redeploy backend to run migrations.');
+    error.status = 500;
+    throw error;
+  }
+
+  const item = await getBazaarItemForInterest(itemId, user.id);
+  const existing = await bazaarInterestExists(interestSchema, itemId, user.id);
+
+  if (existing) {
+    return { ok: true, interested: true };
+  }
+
+  const itemColumn = schemaColumn(interestSchema, interestSchema.itemColumn);
+  const requesterColumn = schemaColumn(interestSchema, interestSchema.requesterColumn);
+  const ownerColumn = schemaColumn(interestSchema, interestSchema.ownerColumn);
+
+  if (ownerColumn) {
+    await run(
+      `INSERT INTO ${interestSchema.table} (${itemColumn}, ${requesterColumn}, ${ownerColumn})
+       VALUES (?, ?, ?)`,
+      [itemId, user.id, item.userId]
+    );
+  } else {
+    await run(
+      `INSERT INTO ${interestSchema.table} (${itemColumn}, ${requesterColumn})
+       VALUES (?, ?)`,
+      [itemId, user.id]
+    );
+  }
+
+  return { ok: true, interested: true };
+}
+
+async function removeBazaarInterest(itemId, user) {
+  const interestSchema = await getBazaarInterestSchema();
+
+  if (!interestSchema) {
+    return { ok: true, interested: false };
+  }
+
+  const itemColumn = schemaColumn(interestSchema, interestSchema.itemColumn);
+  const requesterColumn = schemaColumn(interestSchema, interestSchema.requesterColumn);
+
+  await run(
+    `DELETE FROM ${interestSchema.table}
+     WHERE ${itemColumn} = ? AND ${requesterColumn} = ?`,
+    [itemId, user.id]
+  );
+
+  return { ok: true, interested: false };
+}
+
+async function toggleBazaarInterest(itemId, user) {
+  const interestSchema = await getBazaarInterestSchema();
+
+  if (!interestSchema) {
+    const error = new Error('Buy request table is not available yet. Redeploy backend to run migrations.');
+    error.status = 500;
+    throw error;
+  }
+
+  await getBazaarItemForInterest(itemId, user.id);
+
+  const existing = await bazaarInterestExists(interestSchema, itemId, user.id);
+
+  if (existing) {
+    return removeBazaarInterest(itemId, user);
+  }
+
+  return addBazaarInterest(itemId, user);
+}
+
+async function handleBazaarInterestError(res, error) {
+  res.status(error.status || 500).json({
+    error: error.message || 'Could not update Bazaar interest'
+  });
+}
+
+
 app.get('/api/bazaar', authMiddleware, async (req, res) => {
   const search = String(req.query.search || '').trim().toLowerCase();
   const sort = String(req.query.sort || 'newest');
@@ -1599,76 +1719,32 @@ app.get('/api/bazaar', authMiddleware, async (req, res) => {
   });
 });
 
+
+app.get('/api/bazaar/items/:id/interest', authMiddleware, async (req, res) => {
+  try {
+    const result = await toggleBazaarInterest(req.params.id, req.user);
+    res.json(result);
+  } catch (error) {
+    await handleBazaarInterestError(res, error);
+  }
+});
+
 app.post('/api/bazaar/items/:id/interest', authMiddleware, async (req, res) => {
-  const interestSchema = await getBazaarInterestSchema();
-
-  if (!interestSchema) {
-    return res.status(500).json({ error: 'Buy request table is not available yet. Redeploy backend to run migrations.' });
+  try {
+    const result = await addBazaarInterest(req.params.id, req.user);
+    res.json(result);
+  } catch (error) {
+    await handleBazaarInterestError(res, error);
   }
-
-  const item = await get(
-    `SELECT id, userId
-     FROM items
-     WHERE id = ?`,
-    [req.params.id]
-  );
-
-  if (!item) {
-    return res.status(404).json({ error: 'Item not found' });
-  }
-
-  if (Number(item.userId) === Number(req.user.id)) {
-    return res.status(400).json({ error: 'You cannot mark interest in your own item' });
-  }
-
-  const itemColumn = schemaColumn(interestSchema, interestSchema.itemColumn);
-  const requesterColumn = schemaColumn(interestSchema, interestSchema.requesterColumn);
-  const ownerColumn = schemaColumn(interestSchema, interestSchema.ownerColumn);
-
-  const existing = await get(
-    `SELECT 1
-     FROM ${interestSchema.table}
-     WHERE ${itemColumn} = ? AND ${requesterColumn} = ?
-     LIMIT 1`,
-    [req.params.id, req.user.id]
-  );
-
-  if (!existing) {
-    if (ownerColumn) {
-      await run(
-        `INSERT INTO ${interestSchema.table} (${itemColumn}, ${requesterColumn}, ${ownerColumn})
-         VALUES (?, ?, ?)`,
-        [req.params.id, req.user.id, item.userId]
-      );
-    } else {
-      await run(
-        `INSERT INTO ${interestSchema.table} (${itemColumn}, ${requesterColumn})
-         VALUES (?, ?)`,
-        [req.params.id, req.user.id]
-      );
-    }
-  }
-
-  res.json({ ok: true });
 });
 
 app.delete('/api/bazaar/items/:id/interest', authMiddleware, async (req, res) => {
-  const interestSchema = await getBazaarInterestSchema();
-
-  if (!interestSchema) {
-    return res.json({ ok: true });
+  try {
+    const result = await removeBazaarInterest(req.params.id, req.user);
+    res.json(result);
+  } catch (error) {
+    await handleBazaarInterestError(res, error);
   }
-
-  const itemColumn = schemaColumn(interestSchema, interestSchema.itemColumn);
-  const requesterColumn = schemaColumn(interestSchema, interestSchema.requesterColumn);
-
-  await run(
-    `DELETE FROM ${interestSchema.table}
-     WHERE ${itemColumn} = ? AND ${requesterColumn} = ?`,
-    [req.params.id, req.user.id]
-  );
-
-  res.json({ ok: true });
 });
 
 app.get('/api/notifications', authMiddleware, async (req, res) => {

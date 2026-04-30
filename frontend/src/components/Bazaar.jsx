@@ -67,11 +67,10 @@ export default function Bazaar({ currentUser }) {
     setError('');
 
     try {
-      if (item.viewerInterested) {
-        await api(`/api/bazaar/items/${item.id}/interest`, { method: 'DELETE' });
-      } else {
-        await api(`/api/bazaar/items/${item.id}/interest`, { method: 'POST' });
-      }
+      await api(`/api/bazaar/items/${item.id}/interest`, {
+        method: item.viewerInterested ? 'DELETE' : 'POST',
+        body: JSON.stringify({})
+      });
 
       await loadBazaar();
     } catch (err) {
