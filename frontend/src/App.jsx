@@ -23,8 +23,8 @@ import TradeOfferPanel from './components/TradeOfferPanel';
 import UserInventoryPage from './components/UserInventoryPage';
 import Bazaar from './components/Bazaar';
 import Notifications from './components/Notifications';
+import PresenceNotificationsDropdown from './components/PresenceNotificationsDropdown';
 import AppUpdateNotice from './components/AppUpdateNotice';
-import OnlinePlayersSidebar from './components/OnlinePlayersSidebar';
 
 function parseDraggedItemId(active) {
   const dataItemId = active?.data?.current?.itemId;
@@ -168,6 +168,7 @@ export default function App() {
   const socketRef = useRef(null);
   const joinedInitialRoomRef = useRef(false);
   const undoTimerRef = useRef(null);
+  const previousRoomPlayerIdsRef = useRef([]);
 
   function setView(nextView) {
     if (nextView !== 'userProfile') {
@@ -321,6 +322,17 @@ export default function App() {
     });
 
     nextSocket.on('room:update', nextRoom => {
+      const previousIds = previousRoomPlayerIdsRef.current || [];
+      const nextIds = (nextRoom?.players || []).map(player => Number(player.id)).filter(Number.isFinite);
+
+      if (previousIds.length && nextIds.length > previousIds.length) {
+        playRoomPresenceChime('join');
+      } else if (previousIds.length && nextIds.length < previousIds.length) {
+        playRoomPresenceChime('leave');
+      }
+
+      previousRoomPlayerIdsRef.current = nextIds;
+
       setRoom(nextRoom);
       roomRef.current = nextRoom;
       setError('');
@@ -392,6 +404,8 @@ export default function App() {
     nextSocket.on('room:closed', () => {
       setRoom(null);
       roomRef.current = null;
+      previousRoomPlayerIdsRef.current = [];
+      previousRoomPlayerIdsRef.current = [];
       setView('dashboard');
       refreshAllForUser(userRef.current);
     });
@@ -511,6 +525,43 @@ export default function App() {
     setOnlineUsers(data.onlineUsers || []);
   }
 
+
+  function playRoomPresenceChime(type) {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const context = new AudioContext();
+      const now = context.currentTime;
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const filter = context.createBiquadFilter();
+
+      oscillator.type = 'sine';
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1100, now);
+
+      const startFreq = type === 'leave' ? 360 : 460;
+      const endFreq = type === 'leave' ? 230 : 620;
+
+      oscillator.frequency.setValueAtTime(startFreq, now);
+      oscillator.frequency.exponentialRampToValueAtTime(endFreq, now + 0.16);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.075, now + 0.018);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
+
+      oscillator.connect(filter);
+      filter.connect(gain);
+      gain.connect(context.destination);
+
+      oscillator.start(now);
+      oscillator.stop(now + 0.26);
+
+      setTimeout(() => context.close(), 340);
+    } catch {
+      // Browser may block audio until user interaction.
+    }
+  }
+
   function playNotificationSound() {
     const volume = Number(notificationPrefs.soundVolume ?? 0.5);
     if (volume <= 0) return;
@@ -614,6 +665,19 @@ export default function App() {
     setBioMessage('Bio saved.');
   }
 
+
+
+  async function updateOnlineVisibility(showOnline) {
+    const data = await api('/api/me/online-visibility', {
+      method: 'PUT',
+      body: JSON.stringify({ showOnline })
+    });
+
+    if (data.user) {
+      setUser(data.user);
+      setBioDraft(data.user.bio || '');
+    }
+  }
 
   async function updateBazaarInventoryVisibility(showBazaarInventory) {
     const data = await api('/api/me/bazaar-visibility', {
@@ -986,10 +1050,21 @@ export default function App() {
       onDragCancel={() => setActiveDragItem(null)}
     >
       {user && (
-        <OnlinePlayersSidebar
+        <PresenceNotificationsDropdown
           currentUser={user}
           onlineUsers={onlineUsers}
           currentRoomId={room?.roomId}
+          notifications={visibleNotifications}
+          preferences={notificationPrefs}
+          tradeStatuses={tradeStatuses}
+          unseenCount={unseenNotificationCount}
+          onRefreshNotifications={loadNotifications}
+          onMarkRead={markNotificationRead}
+          onMarkAllRead={markAllNotificationsRead}
+          onSavePreferences={saveNotificationPreferences}
+          onCheckTrade={checkTradeNotification}
+          onAcceptRoomInvite={acceptRoomInvite}
+          onDeclineRoomInvite={declineRoomInvite}
           onInvitePlayer={invitePlayerToRoom}
         />
       )}
@@ -1019,12 +1094,6 @@ export default function App() {
 
             {room && (
               <button className="ghost danger" onClick={leaveRoom}>Exit Room</button>
-            )}
-
-            {user && (
-              <button className="notification-bell-button" onClick={() => setView('notifications')} aria-label="Open notifications">
-                🔔 {unseenNotificationCount > 0 && <span>{unseenNotificationCount}</span>}
-              </button>
             )}
 
             {user && <button onClick={logout}>Logout</button>}
@@ -1101,6 +1170,28 @@ export default function App() {
 
               <span className={user.showBazaarInventory === false ? 'bazaar-visibility-off' : 'bazaar-visibility-on'}>
                 Bazaar: {user.showBazaarInventory === false ? 'Off' : 'On'}
+              </span>
+            </section>
+
+
+            <section className="card online-visibility-card">
+              <div>
+                <h2>Online Visibility</h2>
+                <p className="muted">
+                  Control whether you appear in the online player list.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className={user.showOnline === false ? 'ghost' : ''}
+                onClick={() => updateOnlineVisibility(user.showOnline === false)}
+              >
+                {user.showOnline === false ? 'Appear Online' : 'Appear Offline'}
+              </button>
+
+              <span className={user.showOnline === false ? 'bazaar-visibility-off' : 'bazaar-visibility-on'}>
+                Online: {user.showOnline === false ? 'Off' : 'On'}
               </span>
             </section>
 

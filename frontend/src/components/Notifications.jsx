@@ -25,6 +25,7 @@ function inviteStatusLabel(notification) {
 }
 
 export default function Notifications({
+  compact = false,
   notifications,
   preferences,
   onlineUsers,
@@ -68,7 +69,7 @@ export default function Notifications({
   }
 
   return (
-    <section className="card notifications-page">
+    <section className={compact ? "notifications-page compact-notifications" : "card notifications-page"}>
       <div className="panel-title-row">
         <div>
           <h2>Notifications</h2>

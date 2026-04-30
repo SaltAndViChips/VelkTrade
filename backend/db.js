@@ -70,6 +70,11 @@ async function initDb() {
   `);
 
   await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS show_online BOOLEAN DEFAULT TRUE
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS items (
       id SERIAL PRIMARY KEY,
       userId INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

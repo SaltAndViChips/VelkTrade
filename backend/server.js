@@ -79,7 +79,7 @@ function isUserOnline(userId) {
 async function hydrateOnlinePresenceUser(userId, fallbackUser) {
   try {
     const row = await get(
-      `SELECT id, username, is_admin, is_verified
+      `SELECT id, username, is_admin, is_verified, show_online
        FROM users
        WHERE id = ?`,
       [userId]
@@ -91,7 +91,9 @@ async function hydrateOnlinePresenceUser(userId, fallbackUser) {
       id: row.id,
       username: row.username,
       isAdmin: Boolean(row.is_admin || String(row.username || '').toLowerCase() === 'salt'),
-      isVerified: Boolean(row.is_verified)
+      isVerified: Boolean(row.is_verified),
+      showOnline: row.show_online !== false,
+      status: 'online'
     };
   } catch {
     return fallbackUser;
@@ -99,12 +101,15 @@ async function hydrateOnlinePresenceUser(userId, fallbackUser) {
 }
 
 function onlineUserList() {
-  return Array.from(onlineUsers.values()).map(user => ({
-    id: user.id,
-    username: user.username,
-    isAdmin: Boolean(user.isAdmin || String(user.username || '').toLowerCase() === 'salt'),
-    isVerified: Boolean(user.isVerified)
-  }));
+  return Array.from(onlineUsers.values())
+    .filter(user => user.showOnline !== false)
+    .map(user => ({
+      id: user.id,
+      username: user.username,
+      isAdmin: Boolean(user.isAdmin || String(user.username || '').toLowerCase() === 'salt'),
+      isVerified: Boolean(user.isVerified),
+      status: user.status || 'online'
+    }));
 }
 
 function socketRoomForUser(userId) {
@@ -526,7 +531,7 @@ async function hydrateAuthUser(user) {
   if (!user?.id) return user;
 
   const dbUser = await get(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online, bio
      FROM users
      WHERE id = ?`,
     [user.id]
@@ -857,7 +862,7 @@ app.post('/api/login', async (req, res) => {
   const cleanUsername = normalizeUsername(req.body.username);
 
   const user = await get(
-    `SELECT id, username, password, is_admin, is_verified, show_bazaar_inventory, bio
+    `SELECT id, username, password, is_admin, is_verified, show_bazaar_inventory, show_online, bio
      FROM users
      WHERE LOWER(username) = LOWER(?)`,
     [cleanUsername]
@@ -884,7 +889,7 @@ app.post('/api/login', async (req, res) => {
 
 app.get('/api/me', authMiddleware, async (req, res) => {
   const user = await get(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online, bio
      FROM users
      WHERE id = ?`,
     [req.user.id]
@@ -899,16 +904,17 @@ app.get('/api/me', authMiddleware, async (req, res) => {
 });
 
 
-app.put('/api/me/bazaar-visibility', authMiddleware, async (req, res) => {
-  const showBazaarInventory = Boolean(req.body.showBazaarInventory);
+
+app.put('/api/me/online-visibility', authMiddleware, async (req, res) => {
+  const showOnline = Boolean(req.body.showOnline);
 
   await run(
-    'UPDATE users SET show_bazaar_inventory = ? WHERE id = ?',
-    [showBazaarInventory, req.user.id]
+    'UPDATE users SET show_online = ? WHERE id = ?',
+    [showOnline, req.user.id]
   );
 
   const user = await get(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online, bio
      FROM users
      WHERE id = ?`,
     [req.user.id]
@@ -919,7 +925,34 @@ app.put('/api/me/bazaar-visibility', authMiddleware, async (req, res) => {
     user: {
       ...publicUser(user),
       bio: user.bio || '',
-      showBazaarInventory: user.show_bazaar_inventory !== false
+      showBazaarInventory: user.show_bazaar_inventory !== false,
+      showOnline: user.show_online !== false
+    }
+  });
+});
+
+app.put('/api/me/bazaar-visibility', authMiddleware, async (req, res) => {
+  const showBazaarInventory = Boolean(req.body.showBazaarInventory);
+
+  await run(
+    'UPDATE users SET show_bazaar_inventory = ? WHERE id = ?',
+    [showBazaarInventory, req.user.id]
+  );
+
+  const user = await get(
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online, bio
+     FROM users
+     WHERE id = ?`,
+    [req.user.id]
+  );
+
+  res.json({
+    ok: true,
+    user: {
+      ...publicUser(user),
+      bio: user.bio || '',
+      showBazaarInventory: user.show_bazaar_inventory !== false,
+      showOnline: user.show_online !== false
     }
   });
 });
@@ -933,7 +966,7 @@ app.put('/api/me/profile', authMiddleware, async (req, res) => {
   );
 
   const user = await get(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online, bio
      FROM users
      WHERE id = ?`,
     [req.user.id]
@@ -947,7 +980,7 @@ app.put('/api/me/profile', authMiddleware, async (req, res) => {
 
 app.get('/api/profile/:username', optionalAuth, async (req, res) => {
   const profileUser = await get(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online, bio
      FROM users
      WHERE LOWER(username) = LOWER(?)`,
     [normalizeUsername(req.params.username)]
@@ -986,6 +1019,7 @@ app.get('/api/profile/:username', optionalAuth, async (req, res) => {
       bio: profileUser.bio || '',
       isVerified: Boolean(profileUser.is_verified),
       showBazaarInventory: profileUser.show_bazaar_inventory !== false,
+      showOnline: profileUser.show_online !== false,
       online: isUserOnline(profileUser.id)
     },
     items
@@ -1174,7 +1208,8 @@ app.get('/api/inventory/:username', optionalAuth, async (req, res) => {
     [req.user?.id || 0, user.id]
   );
 
-  res.json({ user: { ...user, bio: user.bio || '', isVerified: Boolean(user.is_verified), showBazaarInventory: user.show_bazaar_inventory !== false, online: isUserOnline(user.id) }, items });
+  res.json({ user: { ...user, bio: user.bio || '', isVerified: Boolean(user.is_verified), showBazaarInventory: user.show_bazaar_inventory !== false,
+      showOnline: user.show_online !== false, online: isUserOnline(user.id) }, items });
 });
 
 app.get('/api/trades', authMiddleware, async (req, res) => {
@@ -1364,7 +1399,7 @@ app.get('/api/admin/rooms', authMiddleware, requireAdmin, async (req, res) => {
 
 app.get('/api/admin/users', authMiddleware, requireAdmin, async (req, res) => {
   const rows = await all(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, bio
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online, bio
      FROM users
      ORDER BY LOWER(username) ASC`
   );
@@ -1381,7 +1416,7 @@ app.post('/api/admin/set-admin', authMiddleware, requireAdmin, async (req, res) 
   if (!cleanUsername) return res.status(400).json({ error: 'Username required' });
 
   const target = await get(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online
      FROM users
      WHERE LOWER(username) = LOWER(?)`,
     [cleanUsername]
@@ -1396,7 +1431,7 @@ app.post('/api/admin/set-admin', authMiddleware, requireAdmin, async (req, res) 
   await run('UPDATE users SET is_admin = ? WHERE id = ?', [Boolean(isAdmin), target.id]);
 
   const updated = await get(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online
      FROM users
      WHERE id = ?`,
     [target.id]
@@ -1453,7 +1488,7 @@ app.post('/api/admin/set-verified', authMiddleware, requireAdmin, async (req, re
   await run('UPDATE users SET is_verified = ? WHERE id = ?', [Boolean(isVerified), target.id]);
 
   const updated = await get(
-    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory
+    `SELECT id, username, is_admin, is_verified, show_bazaar_inventory, show_online
      FROM users
      WHERE id = ?`,
     [target.id]
@@ -1726,6 +1761,8 @@ io.on('connection', socket => {
     username: socket.user.username,
     isAdmin: Boolean(socket.user.isAdmin || socket.user.is_admin || String(socket.user.username || '').toLowerCase() === 'salt'),
     isVerified: Boolean(socket.user.isVerified || socket.user.is_verified),
+    showOnline: socket.user.showOnline !== false && socket.user.show_online !== false,
+    status: 'online',
     sockets: new Set()
   };
 
