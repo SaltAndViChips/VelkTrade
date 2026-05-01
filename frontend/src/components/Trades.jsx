@@ -3,28 +3,56 @@ import { api } from '../api';
 
 const FILTERS = ['all', 'pending', 'countered', 'accepted', 'completed', 'declined'];
 
+function vtText(value, fallback = '') {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) return value.map(entry => vtText(entry)).filter(Boolean).join(', ');
+  if (typeof value === 'object') {
+    if (typeof value.title === 'string') return value.title;
+    if (typeof value.name === 'string') return value.name;
+    if (typeof value.username === 'string') return value.username;
+    if (typeof value.message === 'string') return value.message;
+    if (typeof value.value === 'string' || typeof value.value === 'number') return String(value.value);
+    try {
+      const json = JSON.stringify(value);
+      return json && json !== '{}' ? json : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+}
+
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function addThousandsCommas(numberText) {
+  const [whole, decimal] = String(numberText).replace(/,/g, '').split('.');
+  const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return decimal !== undefined ? `${withCommas}.${decimal}` : withCommas;
+}
+
 function formatPriceDisplay(price) {
-  const clean = String(price || '').trim();
+  const clean = vtText(price).trim();
   if (!clean) return '';
 
-  if (/^\d+(\.\d+)?\s*([kmb])?$/i.test(clean)) {
-    return `${clean} IC`;
-  }
+  const withoutDollar = clean.replace(/^\$\s*/, '').trim();
+  const withoutIc = withoutDollar.replace(/\bic\b/ig, '').trim();
 
-  if (/\bic\b/i.test(clean)) {
-    return clean.replace(/\bic\b/i, 'IC');
-  }
-
-  return clean.replace(/^\$\s*/, '');
+  if (/^\d+(\.\d+)?$/.test(withoutIc.replace(/,/g, ''))) return `${addThousandsCommas(withoutIc)} IC`;
+  if (/^\d+(\.\d+)?\s*[kmb]$/i.test(withoutIc)) return `${withoutIc} IC`;
+  if (/\bic\b/i.test(withoutDollar)) return withoutDollar.replace(/\bic\b/i, 'IC');
+  return withoutDollar;
 }
 
 function getTradeMeta(trade) {
-  const metaMessage = (trade.chatHistory || []).find(message => message.type === 'trade-meta');
-
+  const metaMessage = safeArray(trade.chatHistory).find(message => message?.type === 'trade-meta');
   if (!metaMessage?.message) return { icOffers: {} };
 
   try {
-    return JSON.parse(metaMessage.message);
+    const parsed = typeof metaMessage.message === 'string' ? JSON.parse(metaMessage.message) : metaMessage.message;
+    return parsed && typeof parsed === 'object' ? parsed : { icOffers: {} };
   } catch {
     return { icOffers: {} };
   }
@@ -32,49 +60,55 @@ function getTradeMeta(trade) {
 
 function getIcForUser(trade, userId) {
   const meta = getTradeMeta(trade);
-  return meta.icOffers?.[userId] || '';
+  return vtText(meta.icOffers?.[userId]);
 }
 
 function MiniTradeItem({ item }) {
-  const displayPrice = formatPriceDisplay(item.price);
+  const title = vtText(item?.title || item?.name, `Item ${vtText(item?.id)}`);
+  const image = vtText(item?.image);
+  const displayPrice = formatPriceDisplay(item?.price);
 
   return (
-    <div className="mini-trade-item">
-      <img src={item.image} alt={item.title} />
-      <span>{item.title}</span>
-      {displayPrice && <strong className="item-price">{displayPrice}</strong>}
-
-      <div className="item-full-preview">
-        <img src={item.image} alt={item.title} />
-        <strong>{item.title}</strong>
-        {displayPrice && <em>{displayPrice}</em>}
-      </div>
+    <div
+      className="mini-trade-item vt-unified-item-card"
+      data-item-id={item?.id || ''}
+      data-id={item?.id || ''}
+      data-title={title}
+      data-price={displayPrice}
+      data-owner-id={item?.userId || item?.userid || item?.ownerId || item?.owner_id || ''}
+      data-owner-username={item?.ownerUsername || item?.owner_username || item?.username || ''}
+    >
+      {image && <img src={image} alt={title} />}
+      <span className="item-title">{title}</span>
+      {displayPrice && <span className="sr-only item-price">{displayPrice}</span>}
     </div>
   );
 }
 
 function IcTradeItem({ amount }) {
-  if (!amount) return null;
+  const display = vtText(amount);
+  if (!display) return null;
 
   return (
     <div className="mini-trade-item ic-offer-card">
       <div className="ic-token">IC</div>
-      <span>{amount}</span>
+      <span>{display}</span>
     </div>
   );
 }
 
 function ItemStrip({ label, items, icAmount }) {
-  const hasContent = Boolean(icAmount) || Boolean(items?.length);
+  const list = safeArray(items);
+  const hasContent = Boolean(icAmount) || Boolean(list.length);
 
   return (
     <div className="trade-item-strip tidy-item-strip">
-      <strong>{label}</strong>
+      <strong>{vtText(label)}</strong>
 
-      <div className="mini-trade-grid">
+      <div className="mini-trade-grid trade-items-grid vt-unified-mosaic-grid">
         {icAmount && <IcTradeItem amount={icAmount} />}
-        {items?.length ? items.map(item => (
-          <MiniTradeItem key={item.id} item={item} />
+        {list.length ? list.map((item, index) => (
+          <MiniTradeItem key={item?.id || item?.image || index} item={item} />
         )) : !icAmount ? <span className="muted">No items</span> : null}
       </div>
 
@@ -85,13 +119,13 @@ function ItemStrip({ label, items, icAmount }) {
 
 function tradeSearchText(trade) {
   const itemNames = [
-    ...(trade.fromItemDetails || []).map(item => `${item.title || ''} ${formatPriceDisplay(item.price) || ''}`),
-    ...(trade.toItemDetails || []).map(item => `${item.title || ''} ${formatPriceDisplay(item.price) || ''}`)
+    ...safeArray(trade.fromItemDetails).map(item => `${vtText(item?.title)} ${formatPriceDisplay(item?.price)}`),
+    ...safeArray(trade.toItemDetails).map(item => `${vtText(item?.title)} ${formatPriceDisplay(item?.price)}`)
   ];
 
-  const chatText = (trade.chatHistory || [])
-    .filter(message => message.type !== 'trade-meta')
-    .map(message => `${message.username || ''} ${message.message || ''}`)
+  const chatText = safeArray(trade.chatHistory)
+    .filter(message => message?.type !== 'trade-meta')
+    .map(message => `${vtText(message?.username)} ${vtText(message?.message)}`)
     .join(' ');
 
   return [
@@ -101,15 +135,12 @@ function tradeSearchText(trade) {
     trade.fromUsername,
     trade.toUsername,
     trade.createdAt,
-    ...Object.values(getTradeMeta(trade).icOffers || {}),
-    ...(trade.fromItems || []),
-    ...(trade.toItems || []),
+    ...Object.values(getTradeMeta(trade).icOffers || {}).map(vtText),
+    ...safeArray(trade.fromItems).map(vtText),
+    ...safeArray(trade.toItems).map(vtText),
     ...itemNames,
     chatText
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
+  ].map(v => vtText(v)).filter(Boolean).join(' ').toLowerCase();
 }
 
 function buyRequestSearchText(request) {
@@ -121,20 +152,17 @@ function buyRequestSearchText(request) {
     request.requesterUsername,
     request.ownerUsername,
     request.createdAt
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
+  ].map(v => vtText(v)).filter(Boolean).join(' ').toLowerCase();
 }
 
-function BuyRequestsTab({ requests, currentUser, onRefresh }) {
+function BuyRequestsTab({ requests = [], currentUser, onRefresh }) {
   const [search, setSearch] = useState('');
   const [scope, setScope] = useState('all');
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
 
-    return requests.filter(request => {
+    return safeArray(requests).filter(request => {
       const isOnMyItem = Number(request.ownerId) === Number(currentUser.id);
       const isMadeByMe = Number(request.requesterId) === Number(currentUser.id);
 
@@ -144,7 +172,6 @@ function BuyRequestsTab({ requests, currentUser, onRefresh }) {
         (scope === 'made-by-me' && isMadeByMe);
 
       const matchesSearch = !needle || buyRequestSearchText(request).includes(needle);
-
       return matchesScope && matchesSearch;
     });
   }, [requests, search, scope, currentUser]);
@@ -152,11 +179,7 @@ function BuyRequestsTab({ requests, currentUser, onRefresh }) {
   return (
     <section className="tidy-tab-panel">
       <div className="tidy-toolbar">
-        <input
-          value={search}
-          onChange={event => setSearch(event.target.value)}
-          placeholder="Search buy requests by item, user, IC price..."
-        />
+        <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search buy requests by item, user, IC price..." />
 
         <div className="segmented-control compact">
           <button className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>All</button>
@@ -167,20 +190,21 @@ function BuyRequestsTab({ requests, currentUser, onRefresh }) {
         <button onClick={onRefresh}>Refresh</button>
       </div>
 
-      <p className="muted tidy-count">Showing {filtered.length} of {requests.length} buy requests.</p>
-
+      <p className="muted tidy-count">Showing {filtered.length} of {safeArray(requests).length} buy requests.</p>
       {filtered.length === 0 && <p className="muted tidy-empty">No buy requests match this filter/search.</p>}
 
       <div className="tidy-list">
-        {filtered.map(request => {
+        {filtered.map((request, index) => {
           const displayPrice = formatPriceDisplay(request.itemPrice);
+          const title = vtText(request.itemTitle, 'Item');
+          const image = vtText(request.itemImage);
 
           return (
-            <article className="tidy-trade-card" key={request.id}>
+            <article className="tidy-trade-card" key={request.id || index}>
               <div className="tidy-card-header">
                 <div>
-                  <strong>Buy Request #{request.id}</strong>
-                  <small>{request.createdAt}</small>
+                  <strong>Buy Request #{vtText(request.id, index + 1)}</strong>
+                  <small>{vtText(request.createdAt)}</small>
                 </div>
 
                 <span className="status-pill">
@@ -189,22 +213,25 @@ function BuyRequestsTab({ requests, currentUser, onRefresh }) {
               </div>
 
               <div className="tidy-buy-request-body">
-                <div className="mini-trade-grid">
-                  <div className="mini-trade-item">
-                    <img src={request.itemImage} alt={request.itemTitle} />
-                    <span>{request.itemTitle}</span>
-                    {displayPrice && <strong className="item-price">{displayPrice}</strong>}
-                    <div className="item-full-preview">
-                      <img src={request.itemImage} alt={request.itemTitle} />
-                      <strong>{request.itemTitle}</strong>
-                      {displayPrice && <em>{displayPrice}</em>}
-                    </div>
+                <div className="mini-trade-grid trade-items-grid vt-unified-mosaic-grid">
+                  <div
+                    className="mini-trade-item vt-unified-item-card"
+                    data-item-id={request.itemId || ''}
+                    data-id={request.itemId || ''}
+                    data-title={title}
+                    data-price={displayPrice}
+                    data-owner-id={request.ownerId || ''}
+                    data-owner-username={request.ownerUsername || ''}
+                  >
+                    {image && <img src={image} alt={title} />}
+                    <span className="item-title">{title}</span>
+                    {displayPrice && <span className="sr-only item-price">{displayPrice}</span>}
                   </div>
                 </div>
 
                 <div className="tidy-meta-grid">
-                  <span><strong>Requester</strong>{request.requesterUsername}</span>
-                  <span><strong>Owner</strong>{request.ownerUsername}</span>
+                  <span><strong>Requester</strong>{vtText(request.requesterUsername)}</span>
+                  <span><strong>Owner</strong>{vtText(request.ownerUsername)}</span>
                 </div>
               </div>
             </article>
@@ -215,13 +242,11 @@ function BuyRequestsTab({ requests, currentUser, onRefresh }) {
   );
 }
 
-export default function Trades({ trades, buyRequests = [], currentUser, focusedTradeId, onFocusedTradeHandled, onRefresh, onCounter }) {
+export default function Trades({ trades = [], buyRequests = [], currentUser, focusedTradeId, onFocusedTradeHandled, onRefresh, onCounter }) {
   const [activeTab, setActiveTab] = useState('trades');
   const [filter, setFilter] = useState('all');
-  const [verifiedFilter, setVerifiedFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
-
   const focusedTradeRef = useRef(null);
 
   useEffect(() => {
@@ -232,11 +257,7 @@ export default function Trades({ trades, buyRequests = [], currentUser, focusedT
     setSearch('');
 
     const timer = window.setTimeout(() => {
-      focusedTradeRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center'
-      });
-
+      focusedTradeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       onFocusedTradeHandled?.();
     }, 120);
 
@@ -246,36 +267,26 @@ export default function Trades({ trades, buyRequests = [], currentUser, focusedT
   const filtered = useMemo(() => {
     const cleanSearch = search.trim().toLowerCase();
 
-    return trades.filter(trade => {
-      const matchesStatus = filter === 'all' || trade.status === filter;
-      const otherUserVerified = Number(trade.fromUser) === Number(currentUser.id)
-        ? Boolean(trade.toVerified)
-        : Boolean(trade.fromVerified);
-
-      const matchesVerified =
-        verifiedFilter === 'all' ||
-        (verifiedFilter === 'verified' && otherUserVerified) ||
-        (verifiedFilter === 'nonverified' && !otherUserVerified);
-
+    return safeArray(trades).filter(trade => {
+      const matchesStatus = filter === 'all' || vtText(trade.status) === filter;
       const matchesSearch = !cleanSearch || tradeSearchText(trade).includes(cleanSearch);
-
-      return matchesStatus && matchesVerified && matchesSearch;
+      return matchesStatus && matchesSearch;
     });
-  }, [filter, verifiedFilter, search, trades, currentUser]);
+  }, [filter, search, trades]);
 
   async function action(path) {
     setError('');
 
     try {
       await api(path, { method: 'POST' });
-      await onRefresh();
+      await onRefresh?.();
     } catch (err) {
-      setError(err.message);
+      setError(vtText(err?.message, 'Action failed.'));
     }
   }
 
   function otherName(trade) {
-    return Number(trade.fromUser) === Number(currentUser.id) ? trade.toUsername : trade.fromUsername;
+    return Number(trade.fromUser) === Number(currentUser.id) ? vtText(trade.toUsername, 'Unknown') : vtText(trade.fromUsername, 'Unknown');
   }
 
   return (
@@ -291,111 +302,84 @@ export default function Trades({ trades, buyRequests = [], currentUser, focusedT
       {error && <p className="error">{error}</p>}
 
       <div className="segmented-control trades-tabs">
-        <button className={activeTab === 'trades' ? 'active' : ''} onClick={() => setActiveTab('trades')}>
-          Trade Offers
-        </button>
-        <button className={activeTab === 'buy-requests' ? 'active' : ''} onClick={() => setActiveTab('buy-requests')}>
-          Buy Requests
-        </button>
+        <button className={activeTab === 'trades' ? 'active' : ''} onClick={() => setActiveTab('trades')}>Trade Offers</button>
+        <button className={activeTab === 'buy-requests' ? 'active' : ''} onClick={() => setActiveTab('buy-requests')}>Buy Requests</button>
       </div>
 
-      {activeTab === 'buy-requests' && (
-        <BuyRequestsTab requests={buyRequests} currentUser={currentUser} onRefresh={onRefresh} />
-      )}
+      {activeTab === 'buy-requests' && <BuyRequestsTab requests={buyRequests} currentUser={currentUser} onRefresh={onRefresh} />}
 
       {activeTab === 'trades' && (
         <section className="tidy-tab-panel">
           <div className="tidy-toolbar">
-            <input
-              value={search}
-              onChange={event => setSearch(event.target.value)}
-              placeholder="Search trades by user, item, IC, status, room, chat..."
-              aria-label="Search trades"
-            />
+            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search trades by user, item, IC, status, room, chat..." aria-label="Search trades" />
 
             <div className="segmented-control compact status-filter">
               {FILTERS.map(item => (
-                <button key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)}>
-                  {item}
-                </button>
+                <button key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)}>{item}</button>
               ))}
-            </div>
-
-            <div className="segmented-control compact verified-filter">
-              <button className={verifiedFilter === 'all' ? 'active' : ''} onClick={() => setVerifiedFilter('all')}>All Users</button>
-              <button className={verifiedFilter === 'verified' ? 'active' : ''} onClick={() => setVerifiedFilter('verified')}>Verified</button>
-              <button className={verifiedFilter === 'nonverified' ? 'active' : ''} onClick={() => setVerifiedFilter('nonverified')}>Non-Verified</button>
             </div>
           </div>
 
-          <p className="muted tidy-count">
-            Showing {filtered.length} of {trades.length} trades.
-          </p>
-
+          <p className="muted tidy-count">Showing {filtered.length} of {safeArray(trades).length} trades.</p>
           {filtered.length === 0 && <p className="muted tidy-empty">No trades match this filter/search.</p>}
 
           <div className="tidy-list">
-            {filtered.map(trade => (
-              <article
-                ref={Number(focusedTradeId) === Number(trade.id) ? focusedTradeRef : null}
-                className={`tidy-trade-card ${Number(focusedTradeId) === Number(trade.id) ? 'focused-trade-card' : ''}`}
-                key={trade.id}
-              >
-                <div className="tidy-card-header">
-                  <div>
-                    <strong>Trade #{trade.id}</strong>
-                    <small>
-                      With {otherName(trade)} {((Number(trade.fromUser) === Number(currentUser.id) ? trade.toVerified : trade.fromVerified)) && <span className="verified-badge mini" title="Verified user">✓</span>} · Room {trade.roomId}
-                    </small>
+            {filtered.map((trade, index) => {
+              const status = vtText(trade.status, 'pending');
+              const id = vtText(trade.id, index + 1);
+              const fromUsername = vtText(trade.fromUsername, 'Unknown');
+              const toUsername = vtText(trade.toUsername, 'Unknown');
+              const chat = safeArray(trade.chatHistory).filter(message => message?.type !== 'trade-meta');
+
+              return (
+                <article
+                  ref={Number(focusedTradeId) === Number(trade.id) ? focusedTradeRef : null}
+                  className={`tidy-trade-card ${Number(focusedTradeId) === Number(trade.id) ? 'focused-trade-card' : ''}`}
+                  key={id}
+                >
+                  <div className="tidy-card-header">
+                    <div>
+                      <strong>Trade #{id}</strong>
+                      <small>With {otherName(trade)} · Room {vtText(trade.roomId)}</small>
+                    </div>
+                    <span className={`status-pill status-${status}`}>{status}</span>
                   </div>
 
-                  <span className={`status-pill status-${trade.status}`}>{trade.status}</span>
-                </div>
+                  <small className="muted">{vtText(trade.createdAt)}</small>
 
-                <small className="muted">{trade.createdAt}</small>
+                  <div className="tidy-trade-grid">
+                    <ItemStrip label={`${fromUsername} offers`} items={safeArray(trade.fromItemDetails)} icAmount={getIcForUser(trade, trade.fromUser)} />
+                    <ItemStrip label={`${toUsername} offers/requested`} items={safeArray(trade.toItemDetails)} icAmount={getIcForUser(trade, trade.toUser)} />
+                  </div>
 
-                <div className="tidy-trade-grid">
-                  <ItemStrip
-                    label={`${trade.fromUsername} offers`}
-                    items={trade.fromItemDetails || []}
-                    icAmount={getIcForUser(trade, trade.fromUser)}
-                  />
-                  <ItemStrip
-                    label={`${trade.toUsername} offers/requested`}
-                    items={trade.toItemDetails || []}
-                    icAmount={getIcForUser(trade, trade.toUser)}
-                  />
-                </div>
-
-                <details className="tidy-details">
-                  <summary>Chat / message history ({(trade.chatHistory || []).filter(message => message.type !== 'trade-meta').length})</summary>
-                  <div className="history-chat">
-                    {(trade.chatHistory || [])
-                      .filter(message => message.type !== 'trade-meta')
-                      .map(message => (
-                        <p key={message.id}><strong>{message.username}:</strong> {message.message}</p>
+                  <details className="tidy-details">
+                    <summary>Chat / message history ({chat.length})</summary>
+                    <div className="history-chat">
+                      {chat.map((message, messageIndex) => (
+                        <p key={vtText(message?.id, messageIndex)}><strong>{vtText(message?.username, 'User')}:</strong> {vtText(message?.message)}</p>
                       ))}
+                    </div>
+                  </details>
+
+                  <div className="tidy-card-actions">
+                    {['pending', 'countered'].includes(status) && (
+                      <>
+                        <button onClick={() => action(`/api/trades/${trade.id}/accept`)}>Accept</button>
+                        <button className="ghost" onClick={() => onCounter?.(trade)}>Counter</button>
+                        <button className="danger" onClick={() => action(`/api/trades/${trade.id}/decline`)}>Decline</button>
+                      </>
+                    )}
+
+                    {status === 'accepted' && (
+                      <>
+                        <button onClick={() => action(`/api/trades/${trade.id}/confirm`)}>Confirm / Complete</button>
+                        <button className="danger" onClick={() => action(`/api/trades/${trade.id}/decline`)}>Decline</button>
+                      </>
+                    )}
                   </div>
-                </details>
-
-                <div className="tidy-card-actions">
-                  {['pending', 'countered'].includes(trade.status) && (
-                    <>
-                      <button onClick={() => action(`/api/trades/${trade.id}/accept`)}>Accept</button>
-                      <button className="ghost" onClick={() => onCounter(trade)}>Counter</button>
-                      <button className="danger" onClick={() => action(`/api/trades/${trade.id}/decline`)}>Decline</button>
-                    </>
-                  )}
-
-                  {trade.status === 'accepted' && (
-                    <>
-                      <button onClick={() => action(`/api/trades/${trade.id}/confirm`)}>Confirm / Complete</button>
-                      <button className="danger" onClick={() => action(`/api/trades/${trade.id}/decline`)}>Decline</button>
-                    </>
-                  )}
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         </section>
       )}

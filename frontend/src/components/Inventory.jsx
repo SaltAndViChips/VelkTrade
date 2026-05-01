@@ -1,15 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
+import { api } from '../api';
+
+function vtText(value, fallback = '') {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) return value.map(entry => vtText(entry)).filter(Boolean).join(', ');
+  if (typeof value === 'object') {
+    if (typeof value.title === 'string') return value.title;
+    if (typeof value.name === 'string') return value.name;
+    if (typeof value.username === 'string') return value.username;
+    if (typeof value.message === 'string') return value.message;
+    try {
+      const json = JSON.stringify(value);
+      return json && json !== '{}' ? json : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+}
 
 function parseBulkUrls(value) {
-  return Array.from(
-    new Set(
-      String(value || '')
-        .split(/[\s,]+/)
-        .map(part => part.trim())
-        .filter(Boolean)
-    )
-  );
+  return Array.from(new Set(String(value || '').split(/[\s,]+/).map(part => part.trim()).filter(Boolean)));
 }
 
 function addThousandsCommas(numberText) {
@@ -19,50 +32,103 @@ function addThousandsCommas(numberText) {
 }
 
 function formatPriceDisplay(price) {
-  const clean = String(price || '').trim();
+  const clean = vtText(price).trim();
   if (!clean) return '';
 
   const withoutDollar = clean.replace(/^\$\s*/, '').trim();
   const withoutIc = withoutDollar.replace(/\bic\b/ig, '').trim();
 
-  if (/^\d+(\.\d+)?$/.test(withoutIc.replace(/,/g, ''))) {
-    return `${addThousandsCommas(withoutIc)} IC`;
-  }
-
-  if (/^\d+(\.\d+)?\s*[kmb]$/i.test(withoutIc)) {
-    return `${withoutIc} IC`;
-  }
-
-  if (/\bic\b/i.test(withoutDollar)) {
-    return withoutDollar.replace(/\bic\b/i, 'IC');
-  }
-
+  if (/^\d+(\.\d+)?$/.test(withoutIc.replace(/,/g, ''))) return `${addThousandsCommas(withoutIc)} IC`;
+  if (/^\d+(\.\d+)?\s*[kmb]$/i.test(withoutIc)) return `${withoutIc} IC`;
+  if (/\bic\b/i.test(withoutDollar)) return withoutDollar.replace(/\bic\b/i, 'IC');
   return withoutDollar;
 }
 
-function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem, onUpdatePrice }) {
-  const [editingPrice, setEditingPrice] = useState(false);
-  const [price, setPrice] = useState(formatPriceDisplay(item.price || ''));
+async function saveOnlineVisibility(nextValue) {
+  const body = JSON.stringify({ showOnline: nextValue, show_online: nextValue, online: nextValue, enabled: nextValue });
+  const attempts = [
+    ['/api/me/online', 'PUT'],
+    ['/api/profile/online', 'PUT'],
+    ['/api/users/me/online', 'PUT'],
+    ['/api/inventory/online', 'PUT'],
+    ['/api/me/online', 'POST'],
+    ['/api/profile/online', 'POST'],
+    ['/api/users/me/online', 'POST'],
+    ['/api/inventory/online', 'POST']
+  ];
 
-  const displayPrice = formatPriceDisplay(item.price);
+  let lastError;
+  for (const [path, method] of attempts) {
+    try {
+      return await api(path, { method, body });
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('Online toggle endpoint failed.');
+}
+
+function OnlineInventoryToggle() {
+  const [online, setOnline] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
-    if (!editingPrice) {
-      setPrice(formatPriceDisplay(item.price || ''));
-    }
-  }, [item.price, editingPrice]);
+    let active = true;
+    api('/api/me')
+      .then(data => {
+        if (!active) return;
+        const user = data.user || data;
+        const next = user.showOnline ?? user.show_online ?? user.online ?? true;
+        setOnline(next !== false);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
 
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    isDragging
-  } = useDraggable({
-    id: `inventory-item-${item.id}`,
-    data: {
-      itemId: item.id,
-      source: 'inventory'
+  async function toggle() {
+    const next = !online;
+    setOnline(next);
+    setBusy(true);
+    setMessage('');
+
+    try {
+      const data = await saveOnlineVisibility(next);
+      const returned = data.showOnline ?? data.show_online ?? data.online ?? next;
+      setOnline(returned !== false);
+      setMessage(next ? 'Online enabled.' : 'Online disabled.');
+    } catch (error) {
+      setOnline(!next);
+      setMessage(error.message || 'Could not update online visibility.');
+    } finally {
+      setBusy(false);
     }
+  }
+
+  return (
+    <div className="inventory-online-toggle-row">
+      <button
+        type="button"
+        className={`inventory-pill-toggle ${online ? 'is-on' : 'is-off'}`}
+        onClick={toggle}
+        disabled={busy}
+      >
+        <span className="toggle-dot" />
+        Online {online ? 'On' : 'Off'}
+      </button>
+      {message && <small className="muted">{message}</small>}
+    </div>
+  );
+}
+
+function DraggableItem({ item, onDoubleClickItem }) {
+  const title = vtText(item.title, 'Item');
+  const image = vtText(item.image);
+  const displayPrice = formatPriceDisplay(item.price);
+
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `inventory-item-${item.id}`,
+    data: { itemId: item.id, source: 'inventory' }
   });
 
   function handleDoubleClick(event) {
@@ -71,131 +137,56 @@ function DraggableItem({ item, onDeleteItem, onDoubleClickItem, onOfferItem, onU
     onDoubleClickItem?.(item.id);
   }
 
-  async function savePrice(event) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    await onUpdatePrice?.(item.id, price);
-    setEditingPrice(false);
-  }
-
   return (
     <div
       ref={setNodeRef}
-      className={`item-card ${isDragging ? 'is-dragging' : ''}`}
+      className={`item-card vt-unified-item-card ${isDragging ? 'is-dragging' : ''}`}
+      data-item-id={item.id}
+      data-id={item.id}
+      data-title={title}
+      data-price={displayPrice}
+      data-owner-id={item.userId || item.userid || item.ownerId || item.owner_id || ''}
+      data-owner-username={item.ownerUsername || item.owner_username || item.username || ''}
       onDoubleClick={handleDoubleClick}
       {...attributes}
       {...listeners}
     >
-      <img src={item.image} alt={item.title} draggable="false" />
-      <span>{item.title}</span>
+      {image && <img src={image} alt={title} draggable="false" />}
+      <span className="item-title">{title}</span>
+      {displayPrice && <span className="sr-only item-price">{displayPrice}</span>}
+    </div>
+  );
+}
 
-      {displayPrice ? <strong className="item-price">{displayPrice}</strong> : <small className="muted">No IC price set</small>}
+function ReadOnlyItem({ item }) {
+  const title = vtText(item.title, 'Item');
+  const image = vtText(item.image);
+  const displayPrice = formatPriceDisplay(item.price);
 
-      <div className="item-full-preview">
-        <img src={item.image} alt={item.title} />
-        <strong>{item.title}</strong>
-        {displayPrice && <em>{displayPrice}</em>}
-      </div>
-
-      {editingPrice && (
-        <form className="price-edit-form" onSubmit={savePrice}>
-          <input
-            value={price}
-            onChange={event => setPrice(event.target.value)}
-            placeholder="1,000 IC / 1.5k IC / Offer"
-            maxLength={80}
-            onPointerDown={event => event.stopPropagation()}
-            onClick={event => event.stopPropagation()}
-          />
-
-          <div className="inline-controls price-edit-actions">
-            <button
-              type="submit"
-              className="mini-action"
-              onPointerDown={event => event.stopPropagation()}
-            >
-              Save
-            </button>
-
-            <button
-              type="button"
-              className="ghost mini-action"
-              onPointerDown={event => event.stopPropagation()}
-              onClick={event => {
-                event.preventDefault();
-                event.stopPropagation();
-                setPrice(formatPriceDisplay(item.price || ''));
-                setEditingPrice(false);
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
-
-      <div className="item-card-actions">
-        {onOfferItem && (
-          <button
-            type="button"
-            className="mini-action"
-            title="Add this item to your live trade offer"
-            onPointerDown={event => event.stopPropagation()}
-            onClick={event => {
-              event.preventDefault();
-              event.stopPropagation();
-              onOfferItem(item.id);
-            }}
-          >
-            Offer
-          </button>
-        )}
-
-        {onUpdatePrice && !editingPrice && (
-          <button
-            type="button"
-            className="mini-action"
-            onPointerDown={event => event.stopPropagation()}
-            onClick={event => {
-              event.preventDefault();
-              event.stopPropagation();
-              setEditingPrice(true);
-            }}
-          >
-            IC Price
-          </button>
-        )}
-
-        {onDeleteItem && (
-          <button
-            type="button"
-            className="mini-danger"
-            onPointerDown={event => event.stopPropagation()}
-            onClick={event => {
-              event.preventDefault();
-              event.stopPropagation();
-              onDeleteItem(item.id);
-            }}
-          >
-            Remove
-          </button>
-        )}
-      </div>
+  return (
+    <div
+      className="item-card readonly vt-unified-item-card"
+      data-item-id={item.id}
+      data-id={item.id}
+      data-title={title}
+      data-price={displayPrice}
+      data-owner-id={item.userId || item.userid || item.ownerId || item.owner_id || ''}
+      data-owner-username={item.ownerUsername || item.owner_username || item.username || ''}
+    >
+      {image && <img src={image} alt={title} />}
+      <span className="item-title">{title}</span>
+      {displayPrice && <span className="sr-only item-price">{displayPrice}</span>}
     </div>
   );
 }
 
 export default function Inventory({
   title,
-  items,
+  items = [],
   droppableId,
   readOnly = false,
   onAddImgurItem,
-  onDeleteItem,
   onDoubleClickItem,
-  onOfferItem,
-  onUpdatePrice,
   usernameValue,
   onUsernameChange,
   onSearch
@@ -210,23 +201,18 @@ export default function Inventory({
 
   const { setNodeRef, isOver } = useDroppable({
     id: droppableId || 'readonly',
-    data: {
-      zone: droppableId || 'readonly'
-    }
+    data: { zone: droppableId || 'readonly' }
   });
 
   async function submitItem(event) {
     event.preventDefault();
-
     if (!imgurUrl.trim()) return;
-
-    await onAddImgurItem(imgurUrl.trim());
+    await onAddImgurItem?.(imgurUrl.trim());
     setImgurUrl('');
   }
 
   async function submitBulkItems(event) {
     event.preventDefault();
-
     if (!parsedBulkUrls.length || !onAddImgurItem) return;
 
     setBulkBusy(true);
@@ -254,18 +240,19 @@ export default function Inventory({
     }
   }
 
+  const isMyInventory = !readOnly && /my inventory|your inventory/i.test(vtText(title));
+
   return (
-    <section className="card">
-      <h2>{title}</h2>
+    <section className="card inventory-card-section">
+      <div className="inventory-title-row">
+        <h2>{vtText(title, 'Inventory')}</h2>
+        {isMyInventory && <OnlineInventoryToggle />}
+      </div>
 
       {!readOnly && onAddImgurItem && (
         <>
-          <form className="inline-controls" onSubmit={submitItem}>
-            <input
-              value={imgurUrl}
-              onChange={event => setImgurUrl(event.target.value)}
-              placeholder="https://imgur.com/6hUs12E"
-            />
+          <form className="inline-controls inventory-add-form" onSubmit={submitItem}>
+            <input value={imgurUrl} onChange={event => setImgurUrl(event.target.value)} placeholder="https://imgur.com/6hUs12E" />
             <button type="submit">Add Item</button>
             <button type="button" className="ghost" onClick={() => setBulkOpen(open => !open)}>
               {bulkOpen ? '▼' : '▶'} Bulk Add
@@ -286,9 +273,7 @@ export default function Inventory({
                 <button type="submit" disabled={bulkBusy || parsedBulkUrls.length === 0}>
                   {bulkBusy ? 'Adding...' : `Add ${parsedBulkUrls.length} Item${parsedBulkUrls.length === 1 ? '' : 's'}`}
                 </button>
-                <button type="button" className="ghost" onClick={() => setBulkText('')} disabled={bulkBusy}>
-                  Clear
-                </button>
+                <button type="button" className="ghost" onClick={() => setBulkText('')} disabled={bulkBusy}>Clear</button>
               </div>
 
               {bulkStatus && <p className={bulkStatus.includes('Failed') ? 'error' : 'success'}>{bulkStatus}</p>}
@@ -297,46 +282,21 @@ export default function Inventory({
         </>
       )}
 
-      {readOnly && (
+      {readOnly && onSearch && (
         <div className="inline-controls">
-          <input
-            value={usernameValue}
-            onChange={event => onUsernameChange(event.target.value)}
-            placeholder="Username"
-          />
+          <input value={usernameValue || ''} onChange={event => onUsernameChange?.(event.target.value)} placeholder="Username" />
           <button type="button" onClick={onSearch}>View</button>
         </div>
       )}
 
-      <div ref={setNodeRef} className={`item-grid drop-zone ${isOver ? 'drop-zone-active' : ''}`}>
+      <div ref={setNodeRef} className={`item-grid inventory-grid vt-unified-mosaic-grid drop-zone ${isOver ? 'drop-zone-active' : ''}`}>
         {items.length === 0 && <p className="muted">No items here.</p>}
 
-        {items.map(item => {
-          const displayPrice = formatPriceDisplay(item.price);
-
-          return readOnly ? (
-            <div key={item.id} className="item-card readonly">
-              <img src={item.image} alt={item.title} />
-              <span>{item.title}</span>
-              {displayPrice ? <strong className="item-price">{displayPrice}</strong> : <small className="muted">No IC price set</small>}
-
-              <div className="item-full-preview">
-                <img src={item.image} alt={item.title} />
-                <strong>{item.title}</strong>
-                {displayPrice && <em>{displayPrice}</em>}
-              </div>
-            </div>
-          ) : (
-            <DraggableItem
-              key={item.id}
-              item={item}
-              onDeleteItem={onDeleteItem}
-              onDoubleClickItem={onDoubleClickItem}
-              onOfferItem={onOfferItem}
-              onUpdatePrice={onUpdatePrice}
-            />
-          );
-        })}
+        {items.map(item => readOnly ? (
+          <ReadOnlyItem key={item.id || item.image || vtText(item.title)} item={item} />
+        ) : (
+          <DraggableItem key={item.id || item.image || vtText(item.title)} item={item} onDoubleClickItem={onDoubleClickItem} />
+        ))}
       </div>
     </section>
   );

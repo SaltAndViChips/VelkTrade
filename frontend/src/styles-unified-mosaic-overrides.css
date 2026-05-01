@@ -420,3 +420,81 @@ body,
     height: min(55vh, 520px);
   }
 }
+
+
+/* Final direct cleanup: no top-level item buttons or hover previews */
+.vt-unified-item-card button,
+.vt-unified-item-card .item-card-actions,
+.vt-unified-item-card .price-edit-form,
+.vt-unified-item-card .item-full-preview,
+.item-card .item-card-actions,
+.item-card .price-edit-form,
+.item-card .item-full-preview,
+.mini-trade-item .item-full-preview {
+  display: none !important;
+}
+
+.vt-unified-item-card .item-price,
+.vt-unified-item-card > small,
+.vt-unified-item-card > .muted {
+  display: none !important;
+}
+
+.inventory-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.inventory-online-toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.inventory-pill-toggle {
+  min-height: 34px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 6px 12px !important;
+  border-radius: 999px !important;
+  font-size: 13px !important;
+  box-shadow: none !important;
+}
+
+.inventory-pill-toggle .toggle-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #df5d6d;
+  box-shadow: 0 0 10px rgba(223, 93, 109, .55);
+}
+
+.inventory-pill-toggle.is-on .toggle-dot {
+  background: #62d18a;
+  box-shadow: 0 0 10px rgba(98, 209, 138, .55);
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.vt-item-popout-actions {
+  grid-template-columns: 1fr !important;
+}
+
+.vt-item-popout-actions button {
+  letter-spacing: .01em;
+}
