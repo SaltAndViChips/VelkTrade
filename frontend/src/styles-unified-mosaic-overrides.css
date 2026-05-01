@@ -892,3 +892,36 @@ body,
     justify-self: stretch !important;
   }
 }
+
+
+/* =========================================================
+   Duplicate legacy popup suppression
+   ========================================================= */
+
+/* Old/off-side item popups do not get this marker. Hide them when the new
+   centered popup is present so only one popup can appear. */
+body:has(.vt-item-popout-backdrop[data-vt-centered-popup="true"])
+  .vt-item-popout-backdrop:not([data-vt-centered-popup="true"]) {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+/* Hide common legacy modal layers/classes if an older item UI still opens. */
+body:has(.vt-item-popout-backdrop[data-vt-centered-popup="true"])
+  :is(.item-modal, .item-popup, .item-detail-modal, .item-preview-modal, .legacy-item-popout, .legacy-item-modal, .vt-hidden-legacy-item-popup):not(.vt-item-popout):not(.vt-item-popout-backdrop) {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+/* The active centered popup is the only item popup layer allowed to receive input. */
+.vt-item-popout-backdrop[data-vt-centered-popup="true"] {
+  display: flex !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+}
+
+.vt-item-popout-backdrop[data-vt-centered-popup="true"] .vt-item-popout {
+  pointer-events: auto !important;
+  visibility: visible !important;
+}

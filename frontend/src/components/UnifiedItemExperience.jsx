@@ -579,7 +579,19 @@ export default function UnifiedItemExperience({ currentUser }) {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
+    const handlerToken = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ = handlerToken;
+
     window.__VELKTRADE_OPEN_ITEM_POPUP__ = parsed => {
+      document
+        .querySelectorAll('.item-modal, .item-popup, .item-detail-modal, .item-preview-modal, .legacy-item-popout, .legacy-item-modal')
+        .forEach(node => {
+          if (!node.closest('.vt-item-popout-backdrop[data-vt-centered-popup="true"]')) {
+            node.setAttribute('aria-hidden', 'true');
+            node.classList.add('vt-hidden-legacy-item-popup');
+          }
+        });
+
       setItem(parsed);
       setPrice(formatIcPrice(parsed.price || ''));
       setMessage('');
@@ -629,6 +641,7 @@ export default function UnifiedItemExperience({ currentUser }) {
     observer.observe(document.body, { childList: true, subtree: true });
 
     function handleItemClick(event) {
+      if (window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ !== handlerToken) return;
       if (isIgnoredClickTarget(event.target)) return;
 
       const card = nearestItemCard(event.target);
@@ -639,6 +652,8 @@ export default function UnifiedItemExperience({ currentUser }) {
 
       event.preventDefault();
       event.stopPropagation();
+      event.nativeEvent?.stopImmediatePropagation?.();
+      event.stopImmediatePropagation?.();
 
       window.__VELKTRADE_OPEN_ITEM_POPUP__?.(parsed);
     }
@@ -670,8 +685,9 @@ export default function UnifiedItemExperience({ currentUser }) {
       observer.disconnect();
       document.removeEventListener('click', handleItemClick, true);
       document.removeEventListener('click', handleTopOnlineClick, true);
-      if (window.__VELKTRADE_OPEN_ITEM_POPUP__) {
+      if (window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ === handlerToken) {
         delete window.__VELKTRADE_OPEN_ITEM_POPUP__;
+        delete window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__;
       }
     };
   }, []);
