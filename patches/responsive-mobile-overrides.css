@@ -1,0 +1,545 @@
+/* =========================================================
+   Responsive item previews + mobile/tablet accessibility pass
+   ========================================================= */
+
+html,
+body,
+#root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+.app,
+.dashboard,
+.page,
+main,
+section,
+.card,
+.panel,
+.admin-panel,
+.inventory,
+.trade-room,
+.profile-page,
+.bazaar-page {
+  min-width: 0;
+  max-width: 100%;
+}
+
+img {
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+button {
+  min-height: 38px;
+}
+
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+/* Admin trade details: centered, responsive, readable */
+.admin-trades-card,
+.admin-trade-list,
+.admin-trade-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.admin-trade-card {
+  display: block;
+}
+
+.admin-trade-summary {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-trade-summary strong,
+.admin-trade-summary em {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.admin-trade-details {
+  width: min(1180px, calc(100% - 20px));
+  max-width: 1180px;
+  min-width: 0;
+  margin: 16px auto 0;
+  padding: clamp(10px, 2vw, 18px);
+  display: flex !important;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
+  overflow: visible;
+}
+
+.admin-trade-meta,
+.admin-trade-side,
+.admin-trade-chat,
+.admin-raw-trade-details {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.admin-trade-meta {
+  display: grid;
+  gap: 7px;
+}
+
+.admin-trade-meta p,
+.admin-trade-side h3,
+.admin-trade-chat h3,
+.admin-raw-trade-details summary,
+.admin-raw-trade-details pre {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Larger full-image item preview cards.
+   Desktop/browser: 4-5 across.
+   Tablet: 3-4 across.
+   Mobile: 2 across. */
+.admin-trade-side ul {
+  width: 100%;
+  max-width: 100%;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-trade-side li {
+  width: 100%;
+  min-width: 0;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  grid-template-rows: auto auto;
+  align-items: start;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top left, rgba(141, 99, 255, 0.08), transparent 42%),
+    rgba(8, 7, 12, 0.46);
+  border: 1px solid var(--border);
+}
+
+.admin-trade-image-frame {
+  width: 100%;
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.34);
+  border: 1px solid var(--border-bright);
+}
+
+.admin-trade-item-thumb,
+.admin-trade-image-button .admin-trade-item-thumb {
+  width: 100% !important;
+  height: 220px !important;
+  max-width: 100% !important;
+  max-height: none !important;
+  object-fit: contain !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: rgba(0, 0, 0, 0.20);
+  cursor: default !important;
+}
+
+/* Disable all previous hover/focus/click zoom behavior */
+.admin-trade-item-thumb:hover,
+.admin-trade-item-thumb:focus,
+.admin-trade-image-button:hover .admin-trade-item-thumb,
+.admin-trade-image-button:focus .admin-trade-item-thumb {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  width: 100% !important;
+  height: 220px !important;
+  max-width: 100% !important;
+  max-height: none !important;
+  transform: none !important;
+  z-index: auto !important;
+  padding: 0 !important;
+  background: rgba(0, 0, 0, 0.20) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  cursor: default !important;
+}
+
+.admin-trade-image-button {
+  width: 100% !important;
+  height: auto !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: default !important;
+  pointer-events: none;
+}
+
+.admin-image-preview-backdrop,
+.admin-image-preview-modal {
+  display: none !important;
+}
+
+.admin-trade-side li span {
+  min-width: 0;
+  display: block;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.25;
+  font-weight: 900;
+  font-size: clamp(14px, 1.7vw, 17px);
+  color: #f2efff;
+}
+
+.admin-trade-side li em {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+
+.admin-ic-line {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: #fff3c2;
+  background: rgba(95, 74, 28, 0.30);
+  border: 1px solid rgba(215, 181, 94, 0.48);
+  font-weight: 900;
+}
+
+.admin-chat-log {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-chat-log li {
+  min-width: 0;
+  width: 100%;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(8, 7, 12, 0.42);
+  border: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+
+.admin-chat-log small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.admin-raw-trade-details {
+  padding: 12px;
+}
+
+.admin-raw-trade-details pre {
+  max-width: 100%;
+  max-height: 340px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Tablet: 3-4 item cards */
+@media (max-width: 1180px) {
+  .admin-trade-details {
+    width: min(100%, calc(100% - 16px));
+  }
+
+  .admin-trade-side ul {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  }
+
+  .admin-trade-image-frame {
+    min-height: 200px;
+  }
+
+  .admin-trade-item-thumb,
+  .admin-trade-item-thumb:hover,
+  .admin-trade-item-thumb:focus,
+  .admin-trade-image-button .admin-trade-item-thumb {
+    height: 200px !important;
+  }
+}
+
+/* Tablet/mobile sitewide layout */
+@media (max-width: 900px) {
+  body {
+    font-size: 15px;
+  }
+
+  .app,
+  .dashboard,
+  main,
+  .page {
+    width: 100%;
+    padding-left: clamp(10px, 3vw, 18px);
+    padding-right: clamp(10px, 3vw, 18px);
+  }
+
+  .card,
+  .panel,
+  .admin-tab-card,
+  .admin-user-card,
+  .admin-room-card,
+  .admin-trade-card,
+  .inventory-card,
+  .profile-card,
+  .bazaar-card {
+    border-radius: 16px;
+    padding: clamp(10px, 2.5vw, 16px);
+  }
+
+  .panel-title-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .admin-themed-tabs,
+  .tabs,
+  .nav-tabs {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .admin-filter-grid,
+  .filter-grid,
+  .inventory-controls,
+  .bazaar-controls {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-user-actions,
+  .inline-controls,
+  .notification-top-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .admin-user-actions button,
+  .inline-controls button {
+    width: 100%;
+  }
+
+  .trade-room,
+  .trade-layout,
+  .trade-columns,
+  .room-layout,
+  .inventory-grid,
+  .bazaar-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .unified-player-menu,
+  .presence-hub {
+    top: 10px;
+    right: 10px;
+  }
+
+  .unified-player-panel,
+  .presence-hub-panel,
+  .safe-online-panel {
+    width: calc(100vw - 20px) !important;
+    max-height: calc(100vh - 70px);
+  }
+}
+
+/* Mobile: two item cards */
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }
+
+  h1 {
+    font-size: clamp(22px, 7vw, 30px);
+  }
+
+  h2 {
+    font-size: clamp(18px, 5.5vw, 24px);
+  }
+
+  h3 {
+    font-size: clamp(16px, 4.8vw, 20px);
+  }
+
+  button {
+    min-height: 42px;
+  }
+
+  .app,
+  .dashboard,
+  main,
+  .page {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .admin-trade-details {
+    width: 100%;
+    margin-top: 12px;
+    padding: 8px;
+    gap: 12px;
+  }
+
+  .admin-trade-summary {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .admin-trade-summary em {
+    grid-column: 1 / -1;
+  }
+
+  .admin-trade-side ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px;
+  }
+
+  .admin-trade-side li {
+    padding: 9px;
+    gap: 8px;
+    border-radius: 14px;
+  }
+
+  .admin-trade-image-frame {
+    min-height: 145px;
+  }
+
+  .admin-trade-item-thumb,
+  .admin-trade-item-thumb:hover,
+  .admin-trade-item-thumb:focus,
+  .admin-trade-image-button .admin-trade-item-thumb {
+    height: 145px !important;
+  }
+
+  .admin-trade-side li span {
+    font-size: 13px;
+  }
+
+  .admin-trade-meta,
+  .admin-trade-side,
+  .admin-trade-chat,
+  .admin-raw-trade-details {
+    padding: 10px;
+    border-radius: 14px;
+  }
+
+  .unified-player-trigger,
+  .presence-hub-trigger,
+  .safe-online-toggle {
+    width: 42px;
+    height: 42px;
+  }
+
+  .unified-player-card,
+  .presence-player-row,
+  .safe-online-card {
+    padding: 10px;
+  }
+
+  .unified-player-actions,
+  .presence-player-actions,
+  .safe-online-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .unified-player-actions button,
+  .presence-player-actions button,
+  .safe-online-actions button {
+    width: 100%;
+  }
+
+  .inventory-item,
+  .item-card,
+  .bazaar-item,
+  .profile-item {
+    min-width: 0;
+  }
+
+  .inventory-grid,
+  .items-grid,
+  .bazaar-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px;
+  }
+
+  .modal,
+  .dialog,
+  .panel-modal {
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+  }
+}
+
+/* Very small phones */
+@media (max-width: 420px) {
+  .admin-trade-side ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .admin-trade-image-frame {
+    min-height: 118px;
+  }
+
+  .admin-trade-item-thumb,
+  .admin-trade-item-thumb:hover,
+  .admin-trade-item-thumb:focus,
+  .admin-trade-image-button .admin-trade-item-thumb {
+    height: 118px !important;
+  }
+
+  .admin-trade-side li span {
+    font-size: 12px;
+  }
+
+  .inventory-grid,
+  .items-grid,
+  .bazaar-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}

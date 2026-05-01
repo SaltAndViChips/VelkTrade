@@ -1,84 +1,86 @@
-# Realtime Trading App
+# VelkTrade responsive item previews + mobile layout + online toggle fix
 
-A realtime 1v1 item trading app built with React, Express, Socket.io, SQLite, and Imgur links.
+This is a repo-safe patch bundle. Run the included patch script from the repository root.
 
-## Features
+## What it changes
 
-- Register/login
-- Persistent user inventories
-- Add items by direct Imgur image URL
-- Fetch Imgur image title automatically
-- View another player inventory by username
-- Create and join realtime 1v1 trade rooms
-- Drag items into a trade offer
-- Offered items disappear from your visible trade inventory
-- Counter-offers reset accept/confirm status
-- Both users must accept first
-- Both users must confirm after accepting
-- Items transfer only after both users confirm
-- Trade history stored in SQLite
+### Responsive item previews
 
-## File structure
+Admin trade item previews are made readable by default:
 
-```txt
-trading-app/
-├─ backend/
-│  ├─ package.json
-│  ├─ server.js
-│  ├─ db.js
-│  ├─ auth.js
-│  ├─ imgur.js
-│  ├─ rooms.js
-│  └─ .env.example
-│
-├─ frontend/
-│  ├─ package.json
-│  ├─ index.html
-│  ├─ vite.config.js
-│  └─ src/
-│     ├─ main.jsx
-│     ├─ App.jsx
-│     ├─ api.js
-│     ├─ socket.js
-│     ├─ styles.css
-│     ├─ components/
-│     │  ├─ AuthForm.jsx
-│     │  ├─ Inventory.jsx
-│     │  ├─ RoomPanel.jsx
-│     │  └─ TradeBoard.jsx
-│     └─ tests/
-│        └─ tradeLogic.test.js
-└─ README.md
+- full image visible with `object-fit: contain`
+- desktop/browser: roughly 4–5 item cards across
+- tablet: roughly 3–4 item cards across
+- mobile: 2 item cards across
+- hover/click zoom is disabled so images do not jump around
+
+### Mobile/tablet accessibility
+
+Adds responsive CSS across the app:
+
+- no horizontal overflow
+- cards/forms/buttons resize properly
+- admin panels stack on phones
+- inventory/bazaar/item grids use 2 columns on mobile
+- trade-room sections stack
+- fixed player menu is viewport-safe
+
+### Online toggle fix
+
+Adds backend-compatible online visibility endpoints:
+
+- `PUT /api/me/online`
+- `POST /api/me/online`
+- `PATCH /api/me/online`
+- `PUT /api/profile/online`
+- `POST /api/profile/online`
+- `PATCH /api/profile/online`
+- `PUT /api/users/me/online`
+- `POST /api/users/me/online`
+- `PATCH /api/users/me/online`
+
+The route accepts any of these body fields:
+
+```json
+{
+  "showOnline": true,
+  "show_online": true,
+  "online": true,
+  "enabled": true
+}
 ```
 
-## Backend setup
+It saves to `users.show_online`.
+
+## Apply
+
+From your repo root:
 
 ```bash
-cd backend
-npm install
-cp .env.example .env
-npm run dev
+node scripts/apply-responsive-mobile-online-toggle-patch.mjs
 ```
 
-## Frontend setup
+Then run the Neon migration if needed:
 
-In a separate terminal:
+```sql
+ALTER TABLE users ADD COLUMN IF NOT EXISTS show_online BOOLEAN DEFAULT TRUE;
+```
+
+Or run the included file:
 
 ```bash
-cd frontend
-npm install
-npm run dev
+psql "$DATABASE_URL" -f database/neon-show-online.sql
 ```
 
-Open:
+Then:
 
-```txt
-http://localhost:5173
+```bash
+git add frontend/src/styles.css backend/server.js database/neon-show-online.sql scripts/apply-responsive-mobile-online-toggle-patch.mjs
+git commit -m "Improve responsive layout and fix online toggle"
+git push
 ```
 
-## GitHub Pages deploy
-
-The frontend can deploy to GitHub Pages:
+Deploy:
 
 ```bash
 cd frontend
@@ -86,23 +88,4 @@ npm run build
 npm run deploy
 ```
 
-The backend cannot run on GitHub Pages. Deploy the backend separately using Railway, Render, Fly.io, or a VPS.
-
-Set your production frontend API URL before deploying:
-
-```env
-VITE_API_URL=https://your-backend-url.com
-```
-
-## Trade behavior
-
-When an item is dragged into **Your Offer**, it disappears from your visible inventory immediately.
-
-However, it is not permanently transferred in the database until:
-
-1. Player A clicks **Accept Trade**
-2. Player B clicks **Accept Trade**
-3. Player A clicks **Confirm Trade**
-4. Player B clicks **Confirm Trade**
-
-Only then does the backend run a database transaction that transfers ownership.
+Redeploy Render backend after pushing.

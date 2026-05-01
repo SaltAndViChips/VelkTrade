@@ -13,6 +13,94 @@ const { createToken, authMiddleware } = require('./auth');
 const { fetchImgurItem, isImgurUrl } = require('./imgur');
 const { normalizeUsername, isSaltUsername, isDeveloperUsername, isProtectedDeveloperUser, isAdminUser, publicUser } = require('./admin');
 
+// === VelkTrade online toggle compatibility patch ===
+async function velktradeEnsureShowOnlineColumn() {
+  const attempts = [
+    async () => typeof run === 'function' && run('ALTER TABLE users ADD COLUMN IF NOT EXISTS show_online BOOLEAN DEFAULT TRUE'),
+    async () => typeof run === 'function' && run('ALTER TABLE users ADD COLUMN show_online BOOLEAN DEFAULT TRUE'),
+    async () => typeof query === 'function' && query('ALTER TABLE users ADD COLUMN IF NOT EXISTS show_online BOOLEAN DEFAULT TRUE'),
+    async () => typeof pool !== 'undefined' && pool?.query && pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS show_online BOOLEAN DEFAULT TRUE'),
+    async () => typeof db !== 'undefined' && db?.query && db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS show_online BOOLEAN DEFAULT TRUE')
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      const result = await attempt();
+      if (result !== false) return;
+    } catch {
+      // Duplicate-column or unsupported SQL is safe to ignore here.
+    }
+  }
+}
+
+async function velktradeSetShowOnline(userId, showOnline) {
+  const attempts = [
+    async () => typeof run === 'function' && run('UPDATE users SET show_online = $1 WHERE id = $2', [showOnline, userId]),
+    async () => typeof run === 'function' && run('UPDATE users SET show_online = ? WHERE id = ?', [showOnline, userId]),
+    async () => typeof query === 'function' && query('UPDATE users SET show_online = $1 WHERE id = $2', [showOnline, userId]),
+    async () => typeof pool !== 'undefined' && pool?.query && pool.query('UPDATE users SET show_online = $1 WHERE id = $2', [showOnline, userId]),
+    async () => typeof db !== 'undefined' && db?.query && db.query('UPDATE users SET show_online = $1 WHERE id = $2', [showOnline, userId])
+  ];
+
+  let lastError;
+  for (const attempt of attempts) {
+    try {
+      const result = await attempt();
+      if (result !== false) return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error('No database update helper was available for show_online.');
+}
+
+async function velktradeOnlineToggleVisibilityHandler(req, res) {
+  try {
+    const rawValue =
+      req.body?.showOnline ??
+      req.body?.show_online ??
+      req.body?.online ??
+      req.body?.enabled ??
+      true;
+
+    const showOnline = rawValue === true || rawValue === 'true' || rawValue === 1 || rawValue === '1';
+    const userId = req.user?.id || req.userId || req.session?.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    await velktradeEnsureShowOnlineColumn();
+    await velktradeSetShowOnline(userId, showOnline);
+
+    if (typeof onlineUsers !== 'undefined' && onlineUsers?.has?.(userId)) {
+      const current = onlineUsers.get(userId);
+      onlineUsers.set(userId, {
+        ...current,
+        showOnline,
+        show_online: showOnline
+      });
+
+      if (typeof broadcastPresence === 'function') {
+        broadcastPresence();
+      }
+    }
+
+    res.json({
+      ok: true,
+      showOnline,
+      show_online: showOnline,
+      online: showOnline
+    });
+  } catch (error) {
+    console.error('Online visibility toggle failed:', error);
+    res.status(500).json({ error: error.message || 'Failed to update online visibility' });
+  }
+}
+
+
+
 function isProtectedDeveloperAccount(value) {
   return isProtectedDeveloperUser(value);
 }
@@ -884,6 +972,18 @@ async function createLoginTradeSummaryNotification(userId) {
     }
   });
 }
+
+
+
+app.put('/api/me/online', authMiddleware, velktradeOnlineToggleVisibilityHandler);
+app.post('/api/me/online', authMiddleware, velktradeOnlineToggleVisibilityHandler);
+app.patch('/api/me/online', authMiddleware, velktradeOnlineToggleVisibilityHandler);
+app.put('/api/profile/online', authMiddleware, velktradeOnlineToggleVisibilityHandler);
+app.post('/api/profile/online', authMiddleware, velktradeOnlineToggleVisibilityHandler);
+app.patch('/api/profile/online', authMiddleware, velktradeOnlineToggleVisibilityHandler);
+app.put('/api/users/me/online', authMiddleware, velktradeOnlineToggleVisibilityHandler);
+app.post('/api/users/me/online', authMiddleware, velktradeOnlineToggleVisibilityHandler);
+app.patch('/api/users/me/online', authMiddleware, velktradeOnlineToggleVisibilityHandler);
 
 
 app.get('/api/health', async (req, res) => {

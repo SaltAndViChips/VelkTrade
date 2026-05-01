@@ -129,7 +129,7 @@ function getTradeSummary(trade) {
   return parts.length ? parts.join(' | ') : 'No items or IC';
 }
 
-function TradeItemList({ title, items, ic }) {
+function TradeItemList({ title, items, ic, onPreview }) {
   return (
     <div className="admin-trade-side">
       <h3>{title}</h3>
@@ -142,7 +142,19 @@ function TradeItemList({ title, items, ic }) {
         <ul>
           {items.map((item, index) => (
             <li key={`${title}-${item.id || index}`}>
-              {item.image && <img src={item.image} alt="" className="admin-trade-item-thumb" />}
+              {item.image && (
+                <button
+                  type="button"
+                  className="admin-trade-image-button"
+                  onClick={() => onPreview?.({
+                    src: item.image,
+                    title: item.title || item.name || `Item #${item.id || index + 1}`
+                  })}
+                  title="Preview item image"
+                >
+                  <img src={item.image} alt="" className="admin-trade-item-thumb" />
+                </button>
+              )}
               <span>{item.title || item.name || `Item #${item.id || index + 1}`}</span>
               {item.price && <em>{item.price}</em>}
             </li>
@@ -204,6 +216,7 @@ export default function AdminPanel({ currentUser, user }) {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [previewTradeImage, setPreviewTradeImage] = useState(null);
 
   async function loadAdminData() {
     setLoading(true);
@@ -493,8 +506,8 @@ export default function AdminPanel({ currentUser, user }) {
                         <p><strong>Status:</strong> {trade.status || 'Unknown'}</p>
                       </div>
 
-                      <TradeItemList title={`${trade.fromUsername || 'From'} offers`} items={fromItems} ic={fromIc} />
-                      <TradeItemList title={`${trade.toUsername || 'To'} offers`} items={toItems} ic={toIc} />
+                      <TradeItemList title={`${trade.fromUsername || 'From'} offers`} items={fromItems} ic={fromIc} onPreview={setPreviewTradeImage} />
+                      <TradeItemList title={`${trade.toUsername || 'To'} offers`} items={toItems} ic={toIc} onPreview={setPreviewTradeImage} />
 
                       <div className="admin-trade-chat">
                         <h3>Chat History</h3>
@@ -510,6 +523,26 @@ export default function AdminPanel({ currentUser, user }) {
           </div>
         </section>
       )}
+
+      {previewTradeImage && (
+        <div
+          className="admin-image-preview-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPreviewTradeImage(null)}
+        >
+          <div className="admin-image-preview-modal" onClick={event => event.stopPropagation()}>
+            <div className="admin-image-preview-header">
+              <strong>{previewTradeImage.title}</strong>
+              <button type="button" className="ghost" onClick={() => setPreviewTradeImage(null)}>
+                Close
+              </button>
+            </div>
+            <img src={previewTradeImage.src} alt={previewTradeImage.title || 'Trade item preview'} />
+          </div>
+        </div>
+      )}
+
     </section>
   );
 }

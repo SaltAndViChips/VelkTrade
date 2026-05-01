@@ -1,0 +1,6 @@
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS show_online BOOLEAN DEFAULT TRUE;
+
+UPDATE users
+SET show_online = TRUE
+WHERE show_online IS NULL;
