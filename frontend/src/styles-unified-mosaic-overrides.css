@@ -42,14 +42,6 @@ body,
   align-items: stretch !important;
 }
 
-/* Broad fallback for pages whose classnames do not match known grids */
-[class*="inventory" i]:has(> * img),
-[class*="profile" i]:has(> * img),
-[class*="bazaar" i]:has(> * img),
-[class*="trade" i]:has(> * img) {
-  min-width: 0;
-}
-
 /* Cards become mosaic tiles, not separate boxed listings */
 .inventory-grid > *,
 .inventory-items > *,
@@ -76,9 +68,10 @@ body,
   border: 1px solid rgba(142, 113, 255, 0.24) !important;
   box-shadow: none !important;
   padding: 0 !important;
+  cursor: zoom-in !important;
 }
 
-/* Hide inline action controls in Bazaar cards. Actions belong in the popout. */
+/* Hide top-level Bazaar and item action controls. Actions belong in the popout. */
 .bazaar-grid > * > button,
 .bazaar-items > * > button,
 .bazaar-list > * > button,
@@ -87,7 +80,17 @@ body,
 .bazaar-list > * .interested-button,
 .bazaar-grid > * [class*="interest" i],
 .bazaar-items > * [class*="interest" i],
-.bazaar-list > * [class*="interest" i] {
+.bazaar-list > * [class*="interest" i],
+.vt-unified-item-card > button,
+.vt-unified-item-card [class*="remove" i],
+.vt-unified-item-card [class*="interest" i] {
+  display: none !important;
+}
+
+/* Hide top-level prices/IC. Price appears only in the popout menu. */
+.vt-unified-item-card > :is(.price,.item-price,.bazaar-price),
+.vt-unified-item-card :is(.price,.item-price,.bazaar-price),
+.vt-hover-price {
   display: none !important;
 }
 
@@ -146,19 +149,21 @@ body,
   margin: 0 !important;
 }
 
-/* Remove old zoom/preview behavior */
+/* Remove old zoom/hover preview behavior */
 .admin-trade-item-thumb:hover,
 .admin-trade-item-thumb:focus,
 .admin-trade-image-button:hover .admin-trade-item-thumb,
 .admin-trade-image-button:focus .admin-trade-item-thumb,
 .inventory-grid img:hover,
 .bazaar-grid img:hover,
-.trade-items-grid img:hover {
+.trade-items-grid img:hover,
+.vt-unified-item-card img:hover {
   position: static !important;
   inset: auto !important;
   transform: none !important;
   z-index: auto !important;
   box-shadow: none !important;
+  padding: 0 !important;
 }
 
 .admin-image-preview-backdrop,
@@ -166,49 +171,10 @@ body,
   display: none !important;
 }
 
-/* Price hover/focus badge */
-.vt-hover-price,
-.inventory-grid > * :is(.price,.item-price,.bazaar-price),
-.inventory-items > * :is(.price,.item-price,.bazaar-price),
-.items-grid > * :is(.price,.item-price,.bazaar-price),
-.profile-items > * :is(.price,.item-price,.bazaar-price),
-.profile-inventory > * :is(.price,.item-price,.bazaar-price),
-.bazaar-grid > * :is(.price,.item-price,.bazaar-price),
-.bazaar-items > * :is(.price,.item-price,.bazaar-price),
-.bazaar-list > * :is(.price,.item-price,.bazaar-price) {
-  position: absolute !important;
-  left: 10px !important;
-  right: 10px !important;
-  bottom: 10px !important;
-  display: inline-flex !important;
-  justify-content: center !important;
-  align-items: center !important;
-  min-height: 34px !important;
-  padding: 7px 12px !important;
-  border-radius: 999px !important;
-  background: rgba(18, 12, 28, 0.94) !important;
-  border: 1px solid rgba(215, 181, 94, 0.55) !important;
-  color: #fff3c2 !important;
-  font-weight: 900 !important;
-  opacity: 0 !important;
-  transform: translateY(8px) !important;
-  transition: opacity 140ms ease, transform 140ms ease !important;
-  pointer-events: none !important;
-  z-index: 4 !important;
-}
-
-.vt-unified-item-card:hover .vt-hover-price,
-.vt-unified-item-card:focus-within .vt-hover-price,
-.inventory-grid > *:hover :is(.price,.item-price,.bazaar-price),
-.inventory-items > *:hover :is(.price,.item-price,.bazaar-price),
-.items-grid > *:hover :is(.price,.item-price,.bazaar-price),
-.profile-items > *:hover :is(.price,.item-price,.bazaar-price),
-.profile-inventory > *:hover :is(.price,.item-price,.bazaar-price),
-.bazaar-grid > *:hover :is(.price,.item-price,.bazaar-price),
-.bazaar-items > *:hover :is(.price,.item-price,.bazaar-price),
-.bazaar-list > *:hover :is(.price,.item-price,.bazaar-price) {
-  opacity: 1 !important;
-  transform: translateY(0) !important;
+/* Keep title readable without separate controls */
+.vt-unified-item-card :is(h3,h4,strong,.title,.item-title) {
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
 }
 
 /* Popout */
@@ -227,7 +193,7 @@ body,
   width: min(1180px, 96vw);
   max-height: 94vh;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(270px, 360px);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 370px);
   gap: 18px;
   padding: 16px;
   border-radius: 22px;
@@ -259,31 +225,69 @@ body,
   display: grid;
   align-content: start;
   gap: 12px;
-  padding: 12px;
+  padding: 14px;
   border-radius: 18px;
   background: rgba(5, 4, 10, 0.58);
   border: 1px solid rgba(142, 113, 255, 0.24);
 }
 
+.vt-item-popout-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.vt-item-popout-header h2,
 .vt-item-popout-menu h2,
 .vt-item-popout-menu p {
   margin: 0;
   overflow-wrap: anywhere;
 }
 
-.vt-item-popout-menu label {
+.vt-icon-button {
+  width: 38px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 999px !important;
+  background: rgba(255,255,255,.06) !important;
+  border: 1px solid rgba(142, 113, 255, 0.28) !important;
+  box-shadow: none !important;
+}
+
+.vt-price-editor {
   display: grid;
-  gap: 6px;
+  gap: 7px;
+}
+
+.vt-price-editor input {
+  width: 100%;
+  min-height: 42px;
 }
 
 .vt-item-popout-actions {
   display: grid;
-  gap: 8px;
+  gap: 9px;
 }
 
-.vt-item-popout-actions button,
-.vt-item-popout-menu input {
+.vt-item-popout-actions button {
   width: 100%;
+  min-height: 42px;
+  border-radius: 12px !important;
+  font-weight: 800 !important;
+  box-shadow: none !important;
+}
+
+.vt-primary-action {
+  background: linear-gradient(180deg, #8c5cff, #6737d2) !important;
+}
+
+.vt-secondary-action {
+  background: rgba(255,255,255,.045) !important;
+  border: 1px solid rgba(142, 113, 255, 0.34) !important;
 }
 
 .vt-danger-button {
@@ -295,6 +299,12 @@ body,
   font-size: 13px;
 }
 
+.vt-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .vt-interested-list {
   max-height: 180px;
   overflow: auto;
@@ -304,6 +314,11 @@ body,
   border-radius: 12px;
   background: rgba(0,0,0,.24);
   border: 1px solid rgba(142, 113, 255, 0.24);
+}
+
+.trade-render-guard-card {
+  margin: 24px auto;
+  max-width: 760px;
 }
 
 /* Responsive */

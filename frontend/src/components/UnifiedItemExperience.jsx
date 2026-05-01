@@ -101,31 +101,30 @@ const ITEM_CARD_SELECTOR = [
 function getLikelyItemCard(target) {
   if (!target?.closest) return null;
 
-  const image = target.closest('img');
-  if (!image) return null;
+  const directCard = target.closest(ITEM_CARD_SELECTOR);
+  if (directCard?.querySelector?.('img') && directCard.closest(ITEM_AREA_SELECTOR)) {
+    return directCard;
+  }
 
-  const area = image.closest(ITEM_AREA_SELECTOR);
+  const area = target.closest(ITEM_AREA_SELECTOR);
   if (!area) return null;
 
-  const explicit = image.closest(ITEM_CARD_SELECTOR);
-  if (explicit && explicit !== document.body) return explicit;
-
-  let current = image.parentElement;
+  let current = target;
   let depth = 0;
 
-  while (current && current !== area && current !== document.body && depth < 8) {
-    const className = vtText(current.className);
-    const hasItemClass = /item|card|tile|listing|entry|slot/i.test(className);
-    const hasText = current.textContent && current.textContent.trim().length > 0;
-    const imgCount = current.querySelectorAll?.('img')?.length || 0;
-
-    if ((hasItemClass || hasText) && imgCount <= 2) return current;
+  while (current && current !== area && current !== document.body && depth < 10) {
+    if (current.querySelector?.('img')) {
+      const className = vtText(current.className);
+      const hasItemClass = /item|card|tile|listing|entry|slot/i.test(className);
+      const hasOneMainImage = (current.querySelectorAll?.('img')?.length || 0) <= 3;
+      if (hasItemClass || hasOneMainImage) return current;
+    }
 
     current = current.parentElement;
     depth += 1;
   }
 
-  return image.parentElement;
+  return null;
 }
 
 function getText(element, selectors) {
@@ -184,6 +183,9 @@ function parseItem(element) {
     .replace(/\bI'?m interested\b/gi, '')
     .replace(/\bInterested\b/gi, '')
     .replace(/\bRemove interest\b/gi, '')
+    .replace(/\bRemove\b/gi, '')
+    .replace(/[\d,]+(?:\.\d+)?\s*IC/gi, '')
+    .replace(/\d+\s+verified users interested/gi, '')
     .trim() || 'Item';
 
   const price = extractPriceText(element);
@@ -255,12 +257,14 @@ function userDisplayName(user) {
   );
 }
 
-function isInteractiveElement(target) {
-  return Boolean(
-    target?.closest?.(
-      'button, a, input, textarea, select, label, summary, details, [role="button"]'
-    )
+function shouldIgnoreClick(target) {
+  const interactive = target?.closest?.(
+    'button, a, input, textarea, select, label, summary, details, [role="button"]'
   );
+
+  if (!interactive) return false;
+
+  return !interactive.closest?.('.vt-unified-item-card');
 }
 
 export default function UnifiedItemExperience({ currentUser }) {
@@ -285,12 +289,7 @@ export default function UnifiedItemExperience({ currentUser }) {
         card.classList.add('vt-unified-item-card');
 
         const priceText = extractPriceText(card);
-        if (priceText && !card.querySelector(':scope > .vt-hover-price')) {
-          const badge = document.createElement('span');
-          badge.className = 'vt-hover-price';
-          badge.textContent = priceText;
-          card.appendChild(badge);
-        }
+        card.dataset.vtPrice = priceText;
       });
     }
 
@@ -300,9 +299,7 @@ export default function UnifiedItemExperience({ currentUser }) {
     observer.observe(document.body, { childList: true, subtree: true });
 
     function handleClick(event) {
-      if (isInteractiveElement(event.target) && !event.target.closest('img')) {
-        return;
-      }
+      if (shouldIgnoreClick(event.target)) return;
 
       const card = getLikelyItemCard(event.target);
       if (!card) return;
@@ -435,7 +432,12 @@ export default function UnifiedItemExperience({ currentUser }) {
         </div>
 
         <aside className="vt-item-popout-menu">
-          <h2>{vtText(item.title, 'Item')}</h2>
+          <div className="vt-item-popout-header">
+            <h2>{vtText(item.title, 'Item')}</h2>
+            <button type="button" className="vt-icon-button" onClick={() => setItem(null)} aria-label="Close item menu">
+              ×
+            </button>
+          </div>
 
           {vtText(item.price) && (
             <p className="admin-ic-line">{vtText(item.price)}</p>
@@ -452,7 +454,7 @@ export default function UnifiedItemExperience({ currentUser }) {
           )}
 
           {canManage && (
-            <label>
+            <label className="vt-price-editor">
               <span>Edit price</span>
               <input
                 value={vtText(price)}
@@ -464,20 +466,32 @@ export default function UnifiedItemExperience({ currentUser }) {
 
           <div className="vt-item-popout-actions">
             {canManage && (
-              <button type="button" onClick={savePrice}>
+              <button type="button" className="vt-primary-action" onClick={savePrice}>
                 Save price
               </button>
             )}
 
             {canInterest && (
-              <button type="button" onClick={addInterest}>
+              <button type="button" className="vt-primary-action" onClick={addInterest}>
                 Interested
               </button>
             )}
 
             {canInterest && (
-              <button type="button" className="ghost" onClick={removeInterest}>
+              <button type="button" className="vt-secondary-action" onClick={removeInterest}>
                 Remove interest
+              </button>
+            )}
+
+            {canManage && (
+              <button type="button" className="vt-secondary-action" onClick={loadInterestedUsers}>
+                Show interested users
+              </button>
+            )}
+
+            {canManage && (
+              <button type="button" className="vt-primary-action" onClick={instantTrade}>
+                Instant trade / mark pending
               </button>
             )}
 
@@ -486,34 +500,16 @@ export default function UnifiedItemExperience({ currentUser }) {
                 Remove item/listing
               </button>
             )}
-
-            {canManage && (
-              <button type="button" onClick={loadInterestedUsers}>
-                Show interested users
-              </button>
-            )}
-
-            {canManage && (
-              <button type="button" onClick={instantTrade}>
-                Instant trade / mark pending
-              </button>
-            )}
-
-            <button type="button" className="ghost" onClick={() => setItem(null)}>
-              Close
-            </button>
           </div>
 
           {canManage && (
-            <label>
-              <span>
-                <input
-                  type="checkbox"
-                  checked={verifiedOnly}
-                  onChange={event => setVerifiedOnly(event.target.checked)}
-                />{' '}
-                Verified users only
-              </span>
+            <label className="vt-checkbox-row">
+              <input
+                type="checkbox"
+                checked={verifiedOnly}
+                onChange={event => setVerifiedOnly(event.target.checked)}
+              />
+              <span>Verified users only</span>
             </label>
           )}
 
