@@ -1,6 +1,41 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 
+function vtText(value, fallback = '') {
+  if (value === undefined || value === null) return fallback;
+
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(entry => vtText(entry)).filter(Boolean).join(', ');
+  }
+
+  if (typeof value === 'object') {
+    if (typeof value.username === 'string') return value.username;
+    if (typeof value.name === 'string') return value.name;
+    if (typeof value.title === 'string') return value.title;
+    if (typeof value.message === 'string') return value.message;
+    if (typeof value.value === 'string' || typeof value.value === 'number') {
+      return String(value.value);
+    }
+
+    try {
+      const json = JSON.stringify(value);
+      return json && json !== '{}' ? json : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  return fallback;
+}
+
 const ITEM_SELECTORS = [
   '.inventory-grid > *',
   '.inventory-items > *',
@@ -21,8 +56,10 @@ const ITEM_SELECTORS = [
 
 function closestItemElement(target) {
   if (!target?.closest) return null;
+
   const image = target.closest('img');
   if (!image) return null;
+
   return target.closest(ITEM_SELECTORS);
 }
 
@@ -32,51 +69,58 @@ function getText(element, selectors) {
     const text = found?.textContent?.trim();
     if (text) return text;
   }
+
   return '';
 }
 
 function getData(element, key) {
   let current = element;
+
   while (current && current !== document.body) {
-    if (current.dataset && current.dataset[key] !== undefined) return current.dataset[key];
+    if (current.dataset && current.dataset[key] !== undefined) {
+      return current.dataset[key];
+    }
+
     current = current.parentElement;
   }
+
   return '';
 }
 
 function parseItem(element) {
   const img = element.querySelector('img');
-  const src = img?.src || '';
+  const src = vtText(img?.src);
 
-  const title =
+  const title = vtText(
     getData(element, 'title') ||
-    getData(element, 'itemTitle') ||
-    getText(element, ['.item-title', '.title', 'h3', 'h4', 'strong']) ||
-    img?.alt ||
-    'Item';
+      getData(element, 'itemTitle') ||
+      getText(element, ['.item-title', '.title', 'h3', 'h4', 'strong']) ||
+      img?.alt,
+    'Item'
+  );
 
-  const price =
+  const price = vtText(
     getData(element, 'price') ||
-    getData(element, 'itemPrice') ||
-    getText(element, ['.price', '.item-price', '.bazaar-price']) ||
-    '';
+      getData(element, 'itemPrice') ||
+      getText(element, ['.price', '.item-price', '.bazaar-price'])
+  );
 
-  const id =
+  const id = vtText(
     getData(element, 'itemId') ||
-    getData(element, 'id') ||
-    element.id?.match(/\d+/)?.[0] ||
-    '';
+      getData(element, 'id') ||
+      element.id?.match(/\d+/)?.[0]
+  );
 
-  const ownerId =
+  const ownerId = vtText(
     getData(element, 'ownerId') ||
-    getData(element, 'userId') ||
-    getData(element, 'userid') ||
-    '';
+      getData(element, 'userId') ||
+      getData(element, 'userid')
+  );
 
-  const ownerUsername =
+  const ownerUsername = vtText(
     getData(element, 'ownerUsername') ||
-    getData(element, 'username') ||
-    '';
+      getData(element, 'username')
+  );
 
   return {
     id,
@@ -90,14 +134,42 @@ function parseItem(element) {
 }
 
 function isPrivileged(user) {
-  return Boolean(user?.isAdmin || user?.is_admin || user?.isDeveloper || user?.is_developer || user?.role === 'admin' || user?.role === 'developer');
+  return Boolean(
+    user?.isAdmin ||
+      user?.is_admin ||
+      user?.isDeveloper ||
+      user?.is_developer ||
+      user?.role === 'admin' ||
+      user?.role === 'developer'
+  );
 }
 
 function isOwner(user, item) {
   if (!user || !item) return false;
-  if (item.ownerId && user.id && String(item.ownerId) === String(user.id)) return true;
-  if (item.ownerUsername && user.username && item.ownerUsername.toLowerCase() === user.username.toLowerCase()) return true;
+
+  if (item.ownerId && user.id && String(item.ownerId) === String(user.id)) {
+    return true;
+  }
+
+  if (
+    item.ownerUsername &&
+    user.username &&
+    item.ownerUsername.toLowerCase() === user.username.toLowerCase()
+  ) {
+    return true;
+  }
+
   return false;
+}
+
+function userDisplayName(user) {
+  return vtText(
+    user?.username ||
+      user?.name ||
+      user?.displayName ||
+      user?.id,
+    'User'
+  );
 }
 
 export default function UnifiedItemExperience({ currentUser }) {
@@ -112,7 +184,10 @@ export default function UnifiedItemExperience({ currentUser }) {
       document.querySelectorAll(ITEM_SELECTORS).forEach(card => {
         card.classList.add('vt-unified-item-card');
 
-        const priceText = getText(card, ['.price', '.item-price', '.bazaar-price']);
+        const priceText = vtText(
+          getText(card, ['.price', '.item-price', '.bazaar-price'])
+        );
+
         if (priceText && !card.querySelector(':scope > .vt-hover-price')) {
           const badge = document.createElement('span');
           badge.className = 'vt-hover-price';
@@ -123,6 +198,7 @@ export default function UnifiedItemExperience({ currentUser }) {
     }
 
     tagItems();
+
     const observer = new MutationObserver(tagItems);
     observer.observe(document.body, { childList: true, subtree: true });
 
@@ -137,7 +213,7 @@ export default function UnifiedItemExperience({ currentUser }) {
       event.stopPropagation();
 
       setItem(parsed);
-      setPrice(parsed.price || '');
+      setPrice(vtText(parsed.price));
       setMessage('');
       setInterestedUsers([]);
     }
@@ -150,8 +226,13 @@ export default function UnifiedItemExperience({ currentUser }) {
     };
   }, []);
 
-  const canManage = useMemo(() => Boolean(item && (isOwner(currentUser, item) || isPrivileged(currentUser))), [currentUser, item]);
-  const canInterest = useMemo(() => Boolean(item && !isOwner(currentUser, item)), [currentUser, item]);
+  const canManage = useMemo(() => {
+    return Boolean(item && (isOwner(currentUser, item) || isPrivileged(currentUser)));
+  }, [currentUser, item]);
+
+  const canInterest = useMemo(() => {
+    return Boolean(item && !isOwner(currentUser, item));
+  }, [currentUser, item]);
 
   async function savePrice() {
     if (!item?.id) {
@@ -161,7 +242,7 @@ export default function UnifiedItemExperience({ currentUser }) {
 
     await api(`/api/items/${encodeURIComponent(item.id)}/price`, {
       method: 'PUT',
-      body: JSON.stringify({ price })
+      body: JSON.stringify({ price: vtText(price) })
     });
 
     setMessage('Price updated.');
@@ -216,7 +297,12 @@ export default function UnifiedItemExperience({ currentUser }) {
     }
 
     const data = await api(`/api/items/${encodeURIComponent(item.id)}/interest`);
-    const users = Array.isArray(data.users) ? data.users : Array.isArray(data.interestedUsers) ? data.interestedUsers : [];
+    const users = Array.isArray(data?.users)
+      ? data.users
+      : Array.isArray(data?.interestedUsers)
+        ? data.interestedUsers
+        : [];
+
     setInterestedUsers(users);
   }
 
@@ -228,7 +314,7 @@ export default function UnifiedItemExperience({ currentUser }) {
 
     await api(`/api/items/${encodeURIComponent(item.id)}/instant-trade`, {
       method: 'POST',
-      body: JSON.stringify({ price })
+      body: JSON.stringify({ price: vtText(price) })
     });
 
     setMessage('Trade created and item marked trade pending.');
@@ -237,44 +323,95 @@ export default function UnifiedItemExperience({ currentUser }) {
   if (!item) return null;
 
   const visibleInterested = verifiedOnly
-    ? interestedUsers.filter(user => user.isVerified || user.is_verified || user.isTrusted)
+    ? interestedUsers.filter(user => user?.isVerified || user?.is_verified || user?.isTrusted)
     : interestedUsers;
 
   return (
     <div className="vt-item-popout-backdrop" onClick={() => setItem(null)}>
       <section className="vt-item-popout" onClick={event => event.stopPropagation()}>
         <div className="vt-item-popout-image-wrap">
-          <img src={item.src} alt={item.title} />
+          <img src={vtText(item.src)} alt={vtText(item.title, 'Item')} />
         </div>
 
         <aside className="vt-item-popout-menu">
-          <h2>{item.title}</h2>
+          <h2>{vtText(item.title, 'Item')}</h2>
 
-          {item.price && <p className="admin-ic-line">{item.price}</p>}
-          {!item.id && <p className="vt-muted-note">Item id could not be detected. Preview only.</p>}
-          {message && <p className="vt-muted-note">{message}</p>}
+          {vtText(item.price) && (
+            <p className="admin-ic-line">{vtText(item.price)}</p>
+          )}
+
+          {!item.id && (
+            <p className="vt-muted-note">
+              Item id could not be detected. Preview only.
+            </p>
+          )}
+
+          {vtText(message) && (
+            <p className="vt-muted-note">{vtText(message)}</p>
+          )}
 
           {canManage && (
             <label>
               <span>Edit price</span>
-              <input value={price} onChange={event => setPrice(event.target.value)} placeholder="Example: 500000 IC" />
+              <input
+                value={vtText(price)}
+                onChange={event => setPrice(event.target.value)}
+                placeholder="Example: 500000 IC"
+              />
             </label>
           )}
 
           <div className="vt-item-popout-actions">
-            {canManage && <button type="button" onClick={savePrice}>Save price</button>}
-            {canInterest && <button type="button" onClick={addInterest}>Interested</button>}
-            {canInterest && <button type="button" className="ghost" onClick={removeInterest}>Remove interest</button>}
-            {canManage && <button type="button" className="vt-danger-button" onClick={removeItem}>Remove item/listing</button>}
-            {canManage && <button type="button" onClick={loadInterestedUsers}>Show interested users</button>}
-            {canManage && <button type="button" onClick={instantTrade}>Instant trade / mark pending</button>}
-            <button type="button" className="ghost" onClick={() => setItem(null)}>Close</button>
+            {canManage && (
+              <button type="button" onClick={savePrice}>
+                Save price
+              </button>
+            )}
+
+            {canInterest && (
+              <button type="button" onClick={addInterest}>
+                Interested
+              </button>
+            )}
+
+            {canInterest && (
+              <button type="button" className="ghost" onClick={removeInterest}>
+                Remove interest
+              </button>
+            )}
+
+            {canManage && (
+              <button type="button" className="vt-danger-button" onClick={removeItem}>
+                Remove item/listing
+              </button>
+            )}
+
+            {canManage && (
+              <button type="button" onClick={loadInterestedUsers}>
+                Show interested users
+              </button>
+            )}
+
+            {canManage && (
+              <button type="button" onClick={instantTrade}>
+                Instant trade / mark pending
+              </button>
+            )}
+
+            <button type="button" className="ghost" onClick={() => setItem(null)}>
+              Close
+            </button>
           </div>
 
           {canManage && (
             <label>
               <span>
-                <input type="checkbox" checked={verifiedOnly} onChange={event => setVerifiedOnly(event.target.checked)} /> Verified users only
+                <input
+                  type="checkbox"
+                  checked={verifiedOnly}
+                  onChange={event => setVerifiedOnly(event.target.checked)}
+                />{' '}
+                Verified users only
               </span>
             </label>
           )}
@@ -284,10 +421,10 @@ export default function UnifiedItemExperience({ currentUser }) {
               {visibleInterested.length === 0 ? (
                 <p className="vt-muted-note">No matching interested users.</p>
               ) : (
-                visibleInterested.map(user => (
-                  <p key={user.id || user.username}>
-                    {user.username || user.name || `User ${user.id}`}
-                    {(user.isVerified || user.is_verified || user.isTrusted) ? ' ✓' : ''}
+                visibleInterested.map((user, index) => (
+                  <p key={vtText(user?.id || user?.username || index, String(index))}>
+                    {userDisplayName(user)}
+                    {(user?.isVerified || user?.is_verified || user?.isTrusted) ? ' ✓' : ''}
                   </p>
                 ))
               )}
