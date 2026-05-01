@@ -12,6 +12,7 @@ const { registerProfileShareRoute } = require('./profileShareRoute');
 const { createToken, authMiddleware } = require('./auth');
 const { fetchImgurItem, isImgurUrl } = require('./imgur');
 const { normalizeUsername, isSaltUsername, isDeveloperUsername, isProtectedDeveloperUser, isAdminUser, publicUser } = require('./admin');
+const installVelkTradeCompatRoutes = require('./velktrade-compat-routes');
 
 // === velktradeUnifiedItemExperiencePatch ===
 function vtCurrentUserId(req) {
@@ -639,6 +640,19 @@ const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
 const PORT = process.env.PORT || 3001;
 const PUBLIC_FRONTEND_URL = (process.env.PUBLIC_FRONTEND_URL || FRONTEND_ORIGIN || 'https://nicecock.ca/VelkTrade').replace(/\/$/, '');
 
+// Core middleware must be registered before API routes so req.body exists.
+app.use(express.json());
+app.use(cors({ origin: FRONTEND_ORIGIN }));
+
+// Compatibility routes used by the item popup actions and online toggle.
+// This server uses ./db helpers named run/get/all, so do not pass undefined pool/query.
+installVelkTradeCompatRoutes({
+  app,
+  authMiddleware,
+  run,
+  get
+});
+
 
 
 app.put('/api/me/online', authMiddleware, vtOnlineToggle);
@@ -691,17 +705,6 @@ app.post('/api/admin/bazaar/items/:itemId/offline-accepted-trade', authMiddlewar
 
 app.use(express.json());
 app.use(cors({ origin: FRONTEND_ORIGIN }));
-
-const installVelkTradeCompatRoutes = require("./velktrade-compat-routes");
-
-installVelkTradeCompatRoutes({
-  app,
-  authMiddleware,
-  pool,
-  query,
-  run,
-  get
-});
 
 registerProfileShareRoute(app, {
   get,
