@@ -388,6 +388,85 @@ function applyPriceToCard(rawElement, nextPrice) {
 
   const oldBadge = rawElement.querySelector(':scope > .vt-hover-price');
   if (oldBadge) oldBadge.textContent = formatted;
+
+  const titleNode = findCardTitleNode(rawElement);
+  if (titleNode && rawElement.dataset.vtHoveringPrice === 'true') {
+    titleNode.textContent = formatted || rawElement.dataset.vtOriginalTitle || titleNode.textContent;
+  }
+}
+
+function findCardTitleNode(card) {
+  if (!card) return null;
+
+  const selectors = [
+    '.item-title',
+    '.title',
+    '.inventory-item-title',
+    '.bazaar-item-title',
+    '.trade-item-title',
+    '.admin-trade-item-title',
+    'h3',
+    'h4',
+    'figcaption',
+    'strong'
+  ];
+
+  for (const selector of selectors) {
+    const found = card.querySelector(selector);
+    if (!found) continue;
+    const text = vtText(found.textContent).trim();
+    if (!text) continue;
+    if (/interested|remove|show interested|save price|no items/i.test(text)) continue;
+    return found;
+  }
+
+  const nodes = Array.from(card.querySelectorAll('p, span, small, div')).filter(node => {
+    if (!node || node.children.length) return false;
+    const text = vtText(node.textContent).trim();
+    if (!text || text.length > 80) return false;
+    if (/interested|remove|show interested|save price|verified users|IC price/i.test(text)) return false;
+    return true;
+  });
+
+  return nodes[nodes.length - 1] || null;
+}
+
+function bindHoverTitleSwap(card) {
+  if (!card || card.dataset.vtHoverSwapBound === 'true') return;
+  card.dataset.vtHoverSwapBound = 'true';
+
+  const titleNode = findCardTitleNode(card);
+  if (!titleNode) return;
+
+  const originalTitle = vtText(titleNode.textContent).trim();
+  if (originalTitle) {
+    card.dataset.vtOriginalTitle = originalTitle;
+  }
+
+  const onEnter = () => {
+    const nextPrice = formatIcPrice(card.dataset.vtPrice || card.dataset.price || card.dataset.itemPrice || '');
+    card.dataset.vtHoveringPrice = 'true';
+    if (nextPrice) {
+      if (!card.dataset.vtOriginalTitle) {
+        card.dataset.vtOriginalTitle = vtText(titleNode.textContent).trim();
+      }
+      titleNode.textContent = nextPrice;
+      card.classList.add('vt-hover-price-title');
+    }
+  };
+
+  const onLeave = () => {
+    card.dataset.vtHoveringPrice = 'false';
+    card.classList.remove('vt-hover-price-title');
+    if (card.dataset.vtOriginalTitle) {
+      titleNode.textContent = card.dataset.vtOriginalTitle;
+    }
+  };
+
+  card.addEventListener('mouseenter', onEnter);
+  card.addEventListener('mouseleave', onLeave);
+  card.addEventListener('focusin', onEnter);
+  card.addEventListener('focusout', onLeave);
 }
 
 function isPrivileged(user) {
@@ -502,7 +581,7 @@ export default function UnifiedItemExperience({ currentUser }) {
   useEffect(() => {
     window.__VELKTRADE_OPEN_ITEM_POPUP__ = parsed => {
       setItem(parsed);
-      setPrice(vtText(parsed.price));
+      setPrice(formatIcPrice(parsed.price || ''));
       setMessage('');
       setInterestedUsers([]);
     };
@@ -531,11 +610,16 @@ export default function UnifiedItemExperience({ currentUser }) {
           card.dataset.id = parsed.id;
         }
 
-        if (parsed.title) card.dataset.title = parsed.title;
+        if (parsed.title) {
+          card.dataset.title = parsed.title;
+          card.dataset.vtOriginalTitle = parsed.title;
+        }
         if (parsed.price) {
           card.dataset.vtPrice = parsed.price;
           card.dataset.price = parsed.price;
         }
+
+        bindHoverTitleSwap(card);
       });
     }
 
@@ -767,8 +851,24 @@ export default function UnifiedItemExperience({ currentUser }) {
     : interestedUsers;
 
   return (
-    <div className="vt-item-popout-backdrop" onClick={() => setItem(null)}>
-      <section className="vt-item-popout" onClick={event => event.stopPropagation()}>
+    <div
+      className="vt-item-popout-backdrop"
+      onMouseDown={event => {
+        if (event.target === event.currentTarget) {
+          setItem(null);
+        }
+      }}
+      onClick={event => {
+        if (event.target === event.currentTarget) {
+          setItem(null);
+        }
+      }}
+    >
+      <section
+        className="vt-item-popout"
+        onMouseDown={event => event.stopPropagation()}
+        onClick={event => event.stopPropagation()}
+      >
         <div className="vt-item-popout-image-wrap">
           <img src={vtText(item.src)} alt={vtText(item.title, 'Item')} />
         </div>

@@ -738,3 +738,157 @@ body,
     height: min(55vh, 520px);
   }
 }
+
+
+/* =========================================================
+   Popup centering and hover title-only pricing
+   ========================================================= */
+
+.vt-hover-price,
+.vt-item-hover-preview,
+.item-hover-preview,
+.bazaar-item-hover,
+.inventory-item-hover,
+.trade-item-hover,
+.admin-trade-hover-preview,
+.admin-image-preview-backdrop,
+.admin-image-preview-modal {
+  display: none !important;
+}
+
+.vt-unified-item-card {
+  align-self: start !important;
+}
+
+.vt-unified-item-card .item-title,
+.vt-unified-item-card .title,
+.vt-unified-item-card h3,
+.vt-unified-item-card h4,
+.vt-unified-item-card figcaption,
+.vt-unified-item-card strong {
+  transition: color 120ms ease, opacity 120ms ease;
+}
+
+.vt-unified-item-card.vt-hover-price-title .item-title,
+.vt-unified-item-card.vt-hover-price-title .title,
+.vt-unified-item-card.vt-hover-price-title h3,
+.vt-unified-item-card.vt-hover-price-title h4,
+.vt-unified-item-card.vt-hover-price-title figcaption,
+.vt-unified-item-card.vt-hover-price-title strong {
+  color: #ffdc93 !important;
+}
+
+.vt-item-popout-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 100000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 24px !important;
+  background: rgba(4, 3, 10, 0.78) !important;
+  backdrop-filter: blur(6px) !important;
+}
+
+.vt-item-popout {
+  width: min(1040px, 88vw) !important;
+  max-width: 1040px !important;
+  max-height: 88vh !important;
+  margin: 0 auto !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr) !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 24px !important;
+  padding: 20px !important;
+  border-radius: 20px !important;
+  overflow: hidden !important;
+  background:
+    radial-gradient(circle at top left, rgba(141, 99, 255, 0.16), transparent 34%),
+    rgba(12, 10, 20, 0.97) !important;
+  border: 1px solid rgba(142, 113, 255, 0.38) !important;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.72) !important;
+}
+
+.vt-item-popout-image-wrap {
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 4px 8px 4px 0 !important;
+}
+
+.vt-item-popout-image-wrap img {
+  display: block !important;
+  width: auto !important;
+  max-width: min(58vw, 660px) !important;
+  height: auto !important;
+  max-height: 74vh !important;
+  object-fit: contain !important;
+  margin: 0 auto !important;
+  border-radius: 16px !important;
+  background: rgba(0, 0, 0, 0.28) !important;
+  border: 1px solid rgba(142, 113, 255, 0.28) !important;
+}
+
+.vt-item-popout-menu {
+  min-width: 0 !important;
+  max-width: 360px !important;
+  width: 100% !important;
+  justify-self: start !important;
+  align-self: center !important;
+  display: grid !important;
+  align-content: start !important;
+  gap: 12px !important;
+  padding: 16px !important;
+  border-radius: 18px !important;
+  background: rgba(7, 6, 14, 0.72) !important;
+  border: 1px solid rgba(142, 113, 255, 0.24) !important;
+}
+
+.vt-item-popout-header {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 10px !important;
+  align-items: start !important;
+}
+
+.vt-item-popout-header h2 {
+  font-size: 1.85rem !important;
+  line-height: 1.1 !important;
+}
+
+.vt-item-popout-actions {
+  display: grid !important;
+  gap: 10px !important;
+}
+
+.vt-item-popout-actions button,
+.vt-price-editor input,
+.vt-icon-button {
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+@media (max-width: 860px) {
+  .vt-item-popout {
+    width: min(96vw, 760px) !important;
+    grid-template-columns: 1fr !important;
+    max-height: 92vh !important;
+    overflow: auto !important;
+  }
+
+  .vt-item-popout-image-wrap {
+    padding-right: 0 !important;
+  }
+
+  .vt-item-popout-image-wrap img {
+    max-width: 100% !important;
+    max-height: 54vh !important;
+  }
+
+  .vt-item-popout-menu {
+    max-width: none !important;
+    justify-self: stretch !important;
+  }
+}
