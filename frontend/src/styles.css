@@ -5502,3 +5502,381 @@ textarea {
   }
 }
 
+
+
+/* === VelkTrade bazaar/trade/inventory/admin mosaic responsive patch === */
+/* === VelkTrade 3-wide mosaic + responsive/mobile overrides === */
+
+html,
+body,
+#root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img {
+  max-width: 100%;
+}
+
+/* Restore desktop player menu visibility */
+.unified-player-menu,
+.presence-hub,
+.safe-online-dropdown {
+  display: block;
+}
+
+.unified-player-panel,
+.presence-hub-panel,
+.safe-online-panel {
+  width: min(430px, calc(100vw - 28px));
+  max-height: min(720px, calc(100vh - 76px));
+  overflow: auto;
+}
+
+/* Known item grids: inventory, bazaar, trade menu, admin logs */
+.inventory-grid,
+.items-grid,
+.inventory-items,
+.bazaar-grid,
+.bazaar-items,
+.trade-items-grid,
+.trade-inventory-grid,
+.trade-offer-grid,
+.trade-menu-items,
+.selected-items,
+.offer-items,
+.admin-trade-side ul {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  align-items: stretch;
+}
+
+.inventory-grid > *,
+.items-grid > *,
+.inventory-items > *,
+.bazaar-grid > *,
+.bazaar-items > *,
+.trade-items-grid > *,
+.trade-inventory-grid > *,
+.trade-offer-grid > *,
+.trade-menu-items > *,
+.selected-items > *,
+.offer-items > *,
+.admin-trade-side li {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  border-radius: 14px !important;
+}
+
+.item-image,
+.inventory-item-image,
+.bazaar-item-image,
+.trade-item-image,
+.admin-trade-image-frame,
+.item-card-image,
+.item-thumb,
+.image-preview,
+.preview-image {
+  width: 100% !important;
+  min-width: 0 !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  background: rgba(0, 0, 0, 0.28) !important;
+  border: 1px solid var(--border, rgba(255,255,255,.14)) !important;
+}
+
+/* Full image visibility; no separate tiny boxes */
+.inventory-grid img,
+.items-grid img,
+.inventory-items img,
+.bazaar-grid img,
+.bazaar-items img,
+.trade-items-grid img,
+.trade-inventory-grid img,
+.trade-offer-grid img,
+.trade-menu-items img,
+.selected-items img,
+.offer-items img,
+.admin-trade-side img,
+.admin-trade-item-thumb {
+  width: 100% !important;
+  height: clamp(150px, 18vw, 240px) !important;
+  max-height: none !important;
+  object-fit: contain !important;
+  display: block !important;
+  border-radius: 12px !important;
+  background: rgba(0, 0, 0, 0.25) !important;
+  cursor: default !important;
+}
+
+/* Disable zoom/preview behavior */
+.admin-trade-item-thumb:hover,
+.admin-trade-item-thumb:focus,
+.admin-trade-image-button:hover .admin-trade-item-thumb,
+.admin-trade-image-button:focus .admin-trade-item-thumb,
+.inventory-grid img:hover,
+.bazaar-grid img:hover,
+.trade-items-grid img:hover {
+  position: static !important;
+  inset: auto !important;
+  transform: none !important;
+  z-index: auto !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.admin-trade-image-button {
+  width: 100% !important;
+  height: auto !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+}
+
+.admin-image-preview-backdrop,
+.admin-image-preview-modal {
+  display: none !important;
+}
+
+/* Admin trade details readability */
+.admin-trade-details {
+  width: min(1180px, calc(100% - 20px)) !important;
+  max-width: 1180px !important;
+  margin: 16px auto 0 !important;
+  padding: clamp(10px, 2vw, 18px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 18px !important;
+  overflow: hidden !important;
+}
+
+.admin-trade-meta,
+.admin-trade-side,
+.admin-trade-chat,
+.admin-raw-trade-details {
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.admin-trade-side li {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 8px !important;
+  padding: 10px !important;
+  background: rgba(8, 7, 12, 0.46) !important;
+  border: 1px solid var(--border, rgba(255,255,255,.14)) !important;
+}
+
+.admin-trade-side li span,
+.admin-trade-side li em,
+.admin-chat-log li,
+.admin-trade-meta p,
+.admin-raw-trade-details pre,
+.bazaar-grid *,
+.inventory-grid *,
+.trade-items-grid * {
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+.admin-chat-log {
+  display: grid !important;
+  gap: 10px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  list-style: none !important;
+}
+
+/* Hide seller identity elements on buyer-facing Bazaar cards if frontend exposes common labels/classes. Admin-specific owner labels can override elsewhere. */
+.bazaar-card .seller-name,
+.bazaar-card .seller-username,
+.bazaar-card .owner-name,
+.bazaar-card .owner-username,
+.bazaar-item .seller-name,
+.bazaar-item .seller-username,
+.bazaar-item .owner-name,
+.bazaar-item .owner-username,
+.bazaar-listing .seller-name,
+.bazaar-listing .seller-username,
+.bazaar-listing .owner-name,
+.bazaar-listing .owner-username {
+  display: none;
+}
+
+/* Tablet */
+@media (max-width: 980px) {
+  .inventory-grid,
+  .items-grid,
+  .inventory-items,
+  .bazaar-grid,
+  .bazaar-items,
+  .trade-items-grid,
+  .trade-inventory-grid,
+  .trade-offer-grid,
+  .trade-menu-items,
+  .selected-items,
+  .offer-items,
+  .admin-trade-side ul {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .inventory-grid img,
+  .items-grid img,
+  .inventory-items img,
+  .bazaar-grid img,
+  .bazaar-items img,
+  .trade-items-grid img,
+  .trade-inventory-grid img,
+  .trade-offer-grid img,
+  .trade-menu-items img,
+  .selected-items img,
+  .offer-items img,
+  .admin-trade-side img,
+  .admin-trade-item-thumb {
+    height: clamp(130px, 24vw, 210px) !important;
+  }
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }
+
+  button {
+    min-height: 42px;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .app,
+  .dashboard,
+  main,
+  .page {
+    width: 100%;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .card,
+  .panel,
+  .admin-tab-card,
+  .admin-user-card,
+  .admin-room-card,
+  .admin-trade-card,
+  .inventory-card,
+  .profile-card,
+  .bazaar-card {
+    border-radius: 16px;
+    padding: 10px;
+  }
+
+  .panel-title-row,
+  .admin-filter-grid,
+  .filter-grid,
+  .inventory-controls,
+  .bazaar-controls,
+  .trade-room,
+  .trade-layout,
+  .trade-columns,
+  .room-layout {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .inventory-grid,
+  .items-grid,
+  .inventory-items,
+  .bazaar-grid,
+  .bazaar-items,
+  .trade-items-grid,
+  .trade-inventory-grid,
+  .trade-offer-grid,
+  .trade-menu-items,
+  .selected-items,
+  .offer-items,
+  .admin-trade-side ul {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+  }
+
+  .inventory-grid img,
+  .items-grid img,
+  .inventory-items img,
+  .bazaar-grid img,
+  .bazaar-items img,
+  .trade-items-grid img,
+  .trade-inventory-grid img,
+  .trade-offer-grid img,
+  .trade-menu-items img,
+  .selected-items img,
+  .offer-items img,
+  .admin-trade-side img,
+  .admin-trade-item-thumb {
+    height: 31vw !important;
+    min-height: 94px !important;
+  }
+
+  .unified-player-menu,
+  .presence-hub,
+  .safe-online-dropdown {
+    top: 10px !important;
+    right: 10px !important;
+  }
+
+  .unified-player-panel,
+  .presence-hub-panel,
+  .safe-online-panel {
+    width: calc(100vw - 20px) !important;
+    max-height: calc(100vh - 70px) !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .inventory-grid,
+  .items-grid,
+  .inventory-items,
+  .bazaar-grid,
+  .bazaar-items,
+  .trade-items-grid,
+  .trade-inventory-grid,
+  .trade-offer-grid,
+  .trade-menu-items,
+  .selected-items,
+  .offer-items,
+  .admin-trade-side ul {
+    gap: 6px !important;
+  }
+
+  .inventory-grid img,
+  .items-grid img,
+  .inventory-items img,
+  .bazaar-grid img,
+  .bazaar-items img,
+  .trade-items-grid img,
+  .trade-inventory-grid img,
+  .trade-offer-grid img,
+  .trade-menu-items img,
+  .selected-items img,
+  .offer-items img,
+  .admin-trade-side img,
+  .admin-trade-item-thumb {
+    min-height: 82px !important;
+  }
+}
+

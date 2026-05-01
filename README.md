@@ -1,86 +1,120 @@
-# VelkTrade responsive item previews + mobile layout + online toggle fix
+# VelkTrade bazaar/trade/mosaic/online/privacy fix patch
 
-This is a repo-safe patch bundle. Run the included patch script from the repository root.
+Run from repo root:
 
-## What it changes
+```bash
+node scripts/apply-bazaar-trade-mosaic-online-privacy-fix.mjs
+```
 
-### Responsive item previews
+## Includes
 
-Admin trade item previews are made readable by default:
+### 3-wide item mosaic
 
-- full image visible with `object-fit: contain`
-- desktop/browser: roughly 4–5 item cards across
-- tablet: roughly 3–4 item cards across
-- mobile: 2 item cards across
-- hover/click zoom is disabled so images do not jump around
+Makes images in these areas display as 3-wide mosaic tiles:
 
-### Mobile/tablet accessibility
+- Admin trade logs
+- Trade menu
+- Bazaar
+- Inventory
 
-Adds responsive CSS across the app:
+Images fill the tile area with `object-fit: contain`, so the full image is visible and readable without hover/click zoom.
 
-- no horizontal overflow
-- cards/forms/buttons resize properly
-- admin panels stack on phones
-- inventory/bazaar/item grids use 2 columns on mobile
-- trade-room sections stack
-- fixed player menu is viewport-safe
+### Mobile/tablet CSS
+
+Adds mobile and tablet CSS across the app while preserving the theme.
 
 ### Online toggle fix
 
-Adds backend-compatible online visibility endpoints:
+Adds compatible backend routes for the inventory Online toggle:
 
-- `PUT /api/me/online`
-- `POST /api/me/online`
-- `PATCH /api/me/online`
-- `PUT /api/profile/online`
-- `POST /api/profile/online`
-- `PATCH /api/profile/online`
-- `PUT /api/users/me/online`
-- `POST /api/users/me/online`
-- `PATCH /api/users/me/online`
+- `PUT/POST/PATCH /api/me/online`
+- `PUT/POST/PATCH /api/profile/online`
+- `PUT/POST/PATCH /api/users/me/online`
 
-The route accepts any of these body fields:
+Also includes Neon SQL for `users.show_online`.
+
+### Admin bazaar listing removal
+
+Adds backend routes:
+
+- `DELETE /api/admin/bazaar/items/:itemId`
+- `POST /api/admin/bazaar/items/:itemId/remove`
+- `DELETE /api/bazaar/items/:itemId/admin`
+- `POST /api/bazaar/items/:itemId/admin-remove`
+
+These remove a bazaar listing by making the item invalid for Bazaar display, without deleting the item.
+
+### Accepted offline trade from Bazaar
+
+Adds backend routes:
+
+- `POST /api/bazaar/items/:itemId/offline-accepted-trade`
+- `POST /api/bazaar/items/:itemId/create-offline-trade`
+- `POST /api/admin/bazaar/items/:itemId/offline-accepted-trade`
+
+Expected body:
 
 ```json
 {
-  "showOnline": true,
-  "show_online": true,
-  "online": true,
-  "enabled": true
+  "buyerId": 123,
+  "buyerUsername": "BuyerName",
+  "icAmount": 500
 }
 ```
 
-It saves to `users.show_online`.
+The route creates an offline trade with:
 
-## Apply
+- buyer IC
+- seller item from the bazaar post
+- seller still needing final confirmation
 
-From your repo root:
+### Seller privacy for buy orders
 
-```bash
-node scripts/apply-responsive-mobile-online-toggle-patch.mjs
-```
+Adds a response sanitizer so buyer-facing bazaar/buy-order responses do **not** expose seller identity until accepted.
 
-Then run the Neon migration if needed:
+Hidden fields before seller acceptance:
+
+- `seller`
+- `sellerId`
+- `seller_id`
+- `sellerUsername`
+- `seller_username`
+- `owner`
+- `ownerId`
+- `owner_id`
+- `ownerUsername`
+- `owner_username`
+- `userId`
+- `userid`
+
+Admins and sellers can still see owner/seller fields.
+
+## Neon SQL
+
+Run in Neon:
 
 ```sql
 ALTER TABLE users ADD COLUMN IF NOT EXISTS show_online BOOLEAN DEFAULT TRUE;
+UPDATE users SET show_online = TRUE WHERE show_online IS NULL;
 ```
 
-Or run the included file:
+Included file:
 
 ```bash
-psql "$DATABASE_URL" -f database/neon-show-online.sql
+database/neon-online-toggle.sql
 ```
 
-Then:
+## Apply
 
 ```bash
-git add frontend/src/styles.css backend/server.js database/neon-show-online.sql scripts/apply-responsive-mobile-online-toggle-patch.mjs
-git commit -m "Improve responsive layout and fix online toggle"
+node scripts/apply-bazaar-trade-mosaic-online-privacy-fix.mjs
+psql "$DATABASE_URL" -f database/neon-online-toggle.sql
+git add frontend/src/styles.css backend/server.js database/neon-online-toggle.sql scripts/apply-bazaar-trade-mosaic-online-privacy-fix.mjs patches/mosaic-responsive-overrides.css
+git commit -m "Fix bazaar privacy online toggle and item mosaics"
 git push
 ```
 
-Deploy:
+Then:
 
 ```bash
 cd frontend

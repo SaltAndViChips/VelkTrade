@@ -230,7 +230,39 @@ async function invitePlayerToRoom(username) {
     setView('trade');
   }
 
+  async function adminRemoveBazaarListing(item) {
+    const itemId = item?.id || item?.itemId;
+    if (!itemId) return;
+    if (!window.confirm('Remove this listing from the Bazaar?')) return;
 
+    await api('/api/admin/bazaar/items/' + encodeURIComponent(itemId), {
+      method: 'DELETE'
+    });
+
+    if (typeof loadBazaarItems === 'function') {
+      await loadBazaarItems();
+    }
+  }
+
+  async function createAcceptedBazaarOfflineTrade(item) {
+    const itemId = item?.id || item?.itemId;
+    if (!itemId) return;
+
+    const rawIc = window.prompt('IC amount from buyer:', item?.price || '');
+    const icAmount = Number(rawIc);
+
+    if (!Number.isFinite(icAmount) || icAmount <= 0) {
+      alert('Enter a valid IC amount.');
+      return;
+    }
+
+    await api('/api/bazaar/items/' + encodeURIComponent(itemId) + '/offline-accepted-trade', {
+      method: 'POST',
+      body: JSON.stringify({ icAmount })
+    });
+
+    alert('Offline trade created. Seller must confirm.');
+  }
 
 
   return () => {
