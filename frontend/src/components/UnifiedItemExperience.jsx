@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
+import '../styles-unified-mosaic-overrides.css';
 
 function vtText(value, fallback = '') {
   if (value === undefined || value === null) return fallback;
@@ -36,10 +37,53 @@ function vtText(value, fallback = '') {
   return fallback;
 }
 
-const ITEM_SELECTORS = [
+const ITEM_AREA_SELECTOR = [
+  '.inventory',
+  '.inventory-page',
+  '.profile',
+  '.profile-page',
+  '.profile-inventory',
+  '.bazaar',
+  '.bazaar-page',
+  '.trade-room',
+  '.trade-menu',
+  '.trade-panel',
+  '.admin-panel',
+  '.admin-trade-side',
+  '[class*="inventory"]',
+  '[class*="Inventory"]',
+  '[class*="profile"]',
+  '[class*="Profile"]',
+  '[class*="bazaar"]',
+  '[class*="Bazaar"]',
+  '[class*="trade"]',
+  '[class*="Trade"]'
+].join(',');
+
+const GRID_SELECTORS = [
+  '.inventory-grid',
+  '.inventory-items',
+  '.items-grid',
+  '.item-grid',
+  '.profile-items',
+  '.profile-inventory',
+  '.bazaar-grid',
+  '.bazaar-items',
+  '.bazaar-list',
+  '.trade-items-grid',
+  '.trade-inventory-grid',
+  '.trade-offer-grid',
+  '.trade-menu-items',
+  '.selected-items',
+  '.offer-items',
+  '.admin-trade-side ul'
+];
+
+const ITEM_CARD_SELECTOR = [
   '.inventory-grid > *',
   '.inventory-items > *',
   '.items-grid > *',
+  '.item-grid > *',
   '.profile-items > *',
   '.profile-inventory > *',
   '.bazaar-grid > *',
@@ -54,13 +98,34 @@ const ITEM_SELECTORS = [
   '.admin-trade-side li'
 ].join(',');
 
-function closestItemElement(target) {
+function getLikelyItemCard(target) {
   if (!target?.closest) return null;
 
   const image = target.closest('img');
   if (!image) return null;
 
-  return target.closest(ITEM_SELECTORS);
+  const area = image.closest(ITEM_AREA_SELECTOR);
+  if (!area) return null;
+
+  const explicit = image.closest(ITEM_CARD_SELECTOR);
+  if (explicit && explicit !== document.body) return explicit;
+
+  let current = image.parentElement;
+  let depth = 0;
+
+  while (current && current !== area && current !== document.body && depth < 8) {
+    const className = vtText(current.className);
+    const hasItemClass = /item|card|tile|listing|entry|slot/i.test(className);
+    const hasText = current.textContent && current.textContent.trim().length > 0;
+    const imgCount = current.querySelectorAll?.('img')?.length || 0;
+
+    if ((hasItemClass || hasText) && imgCount <= 2) return current;
+
+    current = current.parentElement;
+    depth += 1;
+  }
+
+  return image.parentElement;
 }
 
 function getText(element, selectors) {
@@ -87,11 +152,27 @@ function getData(element, key) {
   return '';
 }
 
+function extractPriceText(element) {
+  const direct = vtText(
+    getData(element, 'price') ||
+      getData(element, 'itemPrice') ||
+      getText(element, ['.price', '.item-price', '.bazaar-price'])
+  );
+
+  if (direct) return direct;
+
+  const text = vtText(element.textContent);
+  const icMatch = text.match(/[\d,]+(?:\.\d+)?\s*IC/i);
+  if (icMatch) return icMatch[0];
+
+  return '';
+}
+
 function parseItem(element) {
   const img = element.querySelector('img');
   const src = vtText(img?.src);
 
-  const title = vtText(
+  const titleText = vtText(
     getData(element, 'title') ||
       getData(element, 'itemTitle') ||
       getText(element, ['.item-title', '.title', 'h3', 'h4', 'strong']) ||
@@ -99,11 +180,13 @@ function parseItem(element) {
     'Item'
   );
 
-  const price = vtText(
-    getData(element, 'price') ||
-      getData(element, 'itemPrice') ||
-      getText(element, ['.price', '.item-price', '.bazaar-price'])
-  );
+  const title = titleText
+    .replace(/\bI'?m interested\b/gi, '')
+    .replace(/\bInterested\b/gi, '')
+    .replace(/\bRemove interest\b/gi, '')
+    .trim() || 'Item';
+
+  const price = extractPriceText(element);
 
   const id = vtText(
     getData(element, 'itemId') ||
@@ -172,6 +255,14 @@ function userDisplayName(user) {
   );
 }
 
+function isInteractiveElement(target) {
+  return Boolean(
+    target?.closest?.(
+      'button, a, input, textarea, select, label, summary, details, [role="button"]'
+    )
+  );
+}
+
 export default function UnifiedItemExperience({ currentUser }) {
   const [item, setItem] = useState(null);
   const [price, setPrice] = useState('');
@@ -181,13 +272,19 @@ export default function UnifiedItemExperience({ currentUser }) {
 
   useEffect(() => {
     function tagItems() {
-      document.querySelectorAll(ITEM_SELECTORS).forEach(card => {
+      GRID_SELECTORS.forEach(selector => {
+        document.querySelectorAll(selector).forEach(grid => {
+          grid.classList.add('vt-unified-mosaic-grid');
+        });
+      });
+
+      document.querySelectorAll(ITEM_CARD_SELECTOR).forEach(card => {
+        const hasImage = card.querySelector('img');
+        if (!hasImage) return;
+
         card.classList.add('vt-unified-item-card');
 
-        const priceText = vtText(
-          getText(card, ['.price', '.item-price', '.bazaar-price'])
-        );
-
+        const priceText = extractPriceText(card);
         if (priceText && !card.querySelector(':scope > .vt-hover-price')) {
           const badge = document.createElement('span');
           badge.className = 'vt-hover-price';
@@ -203,7 +300,11 @@ export default function UnifiedItemExperience({ currentUser }) {
     observer.observe(document.body, { childList: true, subtree: true });
 
     function handleClick(event) {
-      const card = closestItemElement(event.target);
+      if (isInteractiveElement(event.target) && !event.target.closest('img')) {
+        return;
+      }
+
+      const card = getLikelyItemCard(event.target);
       if (!card) return;
 
       const parsed = parseItem(card);
