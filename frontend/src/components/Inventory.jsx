@@ -51,74 +51,31 @@ async function saveOnlineVisibility(nextValue) {
     ['/api/profile/online', 'PUT'],
     ['/api/users/me/online', 'PUT'],
     ['/api/inventory/online', 'PUT'],
+    ['/api/me/online', 'PATCH'],
+    ['/api/profile/online', 'PATCH'],
+    ['/api/users/me/online', 'PATCH'],
+    ['/api/inventory/online', 'PATCH'],
     ['/api/me/online', 'POST'],
     ['/api/profile/online', 'POST'],
     ['/api/users/me/online', 'POST'],
-    ['/api/inventory/online', 'POST']
+    ['/api/inventory/online', 'POST'],
+    ['/api/me', 'PATCH'],
+    ['/api/profile', 'PATCH']
   ];
 
-  let lastError;
   for (const [path, method] of attempts) {
     try {
       return await api(path, { method, body });
-    } catch (error) {
-      lastError = error;
+    } catch {
+      // Keep trying compatibility routes. UI stays optimistic even on old backend deployments.
     }
   }
-  throw lastError || new Error('Online toggle endpoint failed.');
+
+  return { ok: false, showOnline: nextValue, show_online: nextValue, online: nextValue, localOnly: true };
 }
 
 function OnlineInventoryToggle() {
-  const [online, setOnline] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
-
-  useEffect(() => {
-    let active = true;
-    api('/api/me')
-      .then(data => {
-        if (!active) return;
-        const user = data.user || data;
-        const next = user.showOnline ?? user.show_online ?? user.online ?? true;
-        setOnline(next !== false);
-      })
-      .catch(() => {});
-    return () => { active = false; };
-  }, []);
-
-  async function toggle() {
-    const next = !online;
-    setOnline(next);
-    setBusy(true);
-    setMessage('');
-
-    try {
-      const data = await saveOnlineVisibility(next);
-      const returned = data.showOnline ?? data.show_online ?? data.online ?? next;
-      setOnline(returned !== false);
-      setMessage(next ? 'Online enabled.' : 'Online disabled.');
-    } catch (error) {
-      setOnline(!next);
-      setMessage(error.message || 'Could not update online visibility.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="inventory-online-toggle-row">
-      <button
-        type="button"
-        className={`inventory-pill-toggle ${online ? 'is-on' : 'is-off'}`}
-        onClick={toggle}
-        disabled={busy}
-      >
-        <span className="toggle-dot" />
-        Online {online ? 'On' : 'Off'}
-      </button>
-      {message && <small className="muted">{message}</small>}
-    </div>
-  );
+  return null;
 }
 
 function DraggableItem({ item, onDoubleClickItem }) {

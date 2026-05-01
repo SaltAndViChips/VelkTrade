@@ -14,6 +14,23 @@ const VERIFIED_FILTERS = [
   { key: 'nonverified', label: 'Non-Verified' }
 ];
 
+function vtText(value, fallback = '') {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (typeof value === 'object') {
+    if (typeof value.title === 'string') return value.title;
+    if (typeof value.name === 'string') return value.name;
+    if (typeof value.username === 'string') return value.username;
+    try {
+      const json = JSON.stringify(value);
+      return json && json !== '{}' ? json : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+}
+
 function formatNumber(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return '';
@@ -67,10 +84,11 @@ export default function Bazaar({ currentUser }) {
     setError('');
 
     try {
-      await api(`/api/bazaar/items/${item.id}/interest`, {
-        method: item.viewerInterested ? 'DELETE' : 'POST',
-        body: JSON.stringify({})
-      });
+      if (item.viewerInterested) {
+        await api(`/api/bazaar/items/${item.id}/interest`, { method: 'DELETE' });
+      } else {
+        await api(`/api/bazaar/items/${item.id}/interest`, { method: 'POST' });
+      }
 
       await loadBazaar();
     } catch (err) {
@@ -167,15 +185,24 @@ export default function Bazaar({ currentUser }) {
           const verifiedInterestCount = Number(item.interestCount || 0);
 
           return (
-            <article className="bazaar-item-card" key={item.id}>
+            <article
+              className="bazaar-item-card vt-unified-item-card"
+              key={item.id}
+              data-item-id={item.id || ''}
+              data-id={item.id || ''}
+              data-title={vtText(item.title, 'Item')}
+              data-price={`${formatNumber(item.priceAmount)} IC`}
+              data-owner-id={item.ownerId || item.owner_id || item.userId || item.userid || ''}
+              data-owner-username={item.ownerUsername || ''}
+            >
               <div className="bazaar-image-wrap">
-                <img src={item.image} alt={item.title} />
+                <img src={vtText(item.image)} alt={vtText(item.title, 'Item')} />
               </div>
 
               <div className="bazaar-item-body">
-                <h3>{item.title}</h3>
+                <h3>{vtText(item.title, 'Item')}</h3>
 
-                {item.ownerUsername && (
+                {currentUser?.isAdmin && item.ownerUsername && (
                   <p className="bazaar-admin-owner">
                     Owner: <strong>{item.ownerUsername}</strong>
                     {item.ownerVerified && <span className="verified-badge mini" title="Verified user">✓</span>}
@@ -194,19 +221,6 @@ export default function Bazaar({ currentUser }) {
                   <span>{verifiedInterestCount} verified user{verifiedInterestCount === 1 ? '' : 's'} interested</span>
                   {item.viewerInterested && <span className="status-pill">you are interested</span>}
                 </div>
-
-                <button
-                  type="button"
-                  disabled={item.isOwnItem}
-                  className={item.viewerInterested ? 'mini-danger' : ''}
-                  onClick={() => toggleInterest(item)}
-                >
-                  {item.isOwnItem
-                    ? 'Your Item'
-                    : item.viewerInterested
-                      ? 'Remove Interest'
-                      : 'Interested'}
-                </button>
               </div>
 
               <div className="bazaar-full-preview" aria-hidden="true">

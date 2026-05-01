@@ -37,6 +37,46 @@ function vtText(value, fallback = '') {
   return fallback;
 }
 
+
+function vtNormalizeImage(value) {
+  return vtText(value).replace(/^https?:\/\//i, '').replace(/\?.*$/, '').trim().toLowerCase();
+}
+
+function vtNormalizeTitle(value) {
+  return vtText(value).replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function vtArray(value) {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.items)) return value.items;
+  if (Array.isArray(value?.data)) return value.data;
+  if (Array.isArray(value?.listings)) return value.listings;
+  if (Array.isArray(value?.bazaarItems)) return value.bazaarItems;
+  if (Array.isArray(value?.inventory)) return value.inventory;
+  return [];
+}
+
+function vtCandidateId(candidate) {
+  return vtText(candidate?.id ?? candidate?.itemId ?? candidate?.item_id ?? candidate?.itemID ?? candidate?.listingId ?? candidate?.listing_id);
+}
+
+function vtCandidateTitle(candidate) {
+  return vtText(candidate?.title ?? candidate?.itemTitle ?? candidate?.item_title ?? candidate?.name ?? candidate?.itemName);
+}
+
+function vtCandidateImage(candidate) {
+  return vtText(candidate?.image ?? candidate?.itemImage ?? candidate?.item_image ?? candidate?.img ?? candidate?.src ?? candidate?.url ?? candidate?.imageUrl ?? candidate?.image_url);
+}
+
+const ITEM_CACHE_ENDPOINTS = [
+  '/api/bazaar/items',
+  '/api/items',
+  '/api/inventory',
+  '/api/me/inventory',
+  '/api/users/me/inventory',
+  '/api/profile/inventory'
+];
+
 const ITEM_AREA_SELECTOR = [
   '.inventory',
   '.inventory-page',
@@ -102,29 +142,29 @@ function getLikelyItemCard(target) {
   if (!target?.closest) return null;
 
   const directCard = target.closest(ITEM_CARD_SELECTOR);
-  if (directCard?.querySelector?.('img') && directCard.closest(ITEM_AREA_SELECTOR)) {
-    return directCard;
-  }
+  if (directCard?.querySelector?.('img')) return directCard;
 
-  const area = target.closest(ITEM_AREA_SELECTOR);
+  const area = target.closest(ITEM_AREA_SELECTOR) || target.closest('main, section, article, .card, .panel, body');
   if (!area) return null;
 
   let current = target;
   let depth = 0;
 
-  while (current && current !== area && current !== document.body && depth < 10) {
+  while (current && current !== area && current !== document.body && depth < 12) {
     if (current.querySelector?.('img')) {
       const className = vtText(current.className);
-      const hasItemClass = /item|card|tile|listing|entry|slot/i.test(className);
+      const hasItemClass = /item|card|tile|listing|entry|slot|bazaar|inventory|trade/i.test(className);
       const hasOneMainImage = (current.querySelectorAll?.('img')?.length || 0) <= 3;
-      if (hasItemClass || hasOneMainImage) return current;
+      const hasPriceOrTitle = /IC|price|interested|remove/i.test(vtText(current.textContent)) || current.querySelector?.('h3,h4,strong,.title,.item-title');
+
+      if (hasItemClass || (hasOneMainImage && hasPriceOrTitle)) return current;
     }
 
     current = current.parentElement;
     depth += 1;
   }
 
-  return null;
+  return target.closest('article, li, .card, [class*="item" i], [class*="card" i]');
 }
 
 function getText(element, selectors) {
@@ -139,10 +179,18 @@ function getText(element, selectors) {
 
 function getData(element, key) {
   let current = element;
+  const normalizedKey = key.toLowerCase();
 
   while (current && current !== document.body) {
     if (current.dataset && current.dataset[key] !== undefined) {
       return current.dataset[key];
+    }
+
+    if (current.attributes) {
+      for (const attr of Array.from(current.attributes)) {
+        const attrName = attr.name.toLowerCase().replace(/^data-/, '').replace(/-/g, '');
+        if (attrName === normalizedKey.toLowerCase()) return attr.value;
+      }
     }
 
     current = current.parentElement;
@@ -167,12 +215,104 @@ function extractPriceText(element) {
   return '';
 }
 
+
+function normalizeItemCandidate(value) {
+  if (!value || typeof value !== 'object') return null;
+
+  const id = vtText(value.id ?? value.itemId ?? value.item_id ?? value.itemID ?? value.listingId ?? value.listing_id);
+  const title = vtText(value.title ?? value.itemTitle ?? value.item_title ?? value.name ?? value.itemName);
+  const src = vtText(value.image ?? value.itemImage ?? value.item_image ?? value.img ?? value.src ?? value.url ?? value.imageUrl ?? value.image_url);
+  const price = vtText(value.price ?? value.itemPrice ?? value.item_price ?? value.priceAmount ?? value.price_amount ?? value.ic ?? value.icPrice ?? value.ic_price);
+  const ownerId = vtText(value.ownerId ?? value.owner_id ?? value.userId ?? value.user_id ?? value.userid ?? value.sellerId ?? value.seller_id);
+  const ownerUsername = vtText(value.ownerUsername ?? value.owner_username ?? value.username ?? value.sellerUsername ?? value.seller_username);
+
+  if (!id && !title && !src && !price) return null;
+
+  return { id, title, src, price, ownerId, ownerUsername };
+}
+
+function findItemLike(value, seen = new WeakSet(), depth = 0) {
+  if (!value || typeof value !== 'object' || depth > 5) return null;
+  if (seen.has(value)) return null;
+  seen.add(value);
+
+  if (value instanceof Element || value instanceof Window || value instanceof Document) return null;
+
+  const direct = normalizeItemCandidate(value);
+  if (direct && (direct.id || direct.src || direct.title)) return direct;
+
+  const preferredKeys = [
+    'item', 'listing', 'bazaarItem', 'inventoryItem', 'tradeItem',
+    'data', 'payload', 'props', 'children'
+  ];
+
+  for (const key of preferredKeys) {
+    if (value[key]) {
+      const found = findItemLike(value[key], seen, depth + 1);
+      if (found) return found;
+    }
+  }
+
+  for (const key of Object.keys(value).slice(0, 30)) {
+    if (key === 'stateNode' || key === 'return' || key === 'alternate' || key === '_owner') continue;
+    const found = findItemLike(value[key], seen, depth + 1);
+    if (found) return found;
+  }
+
+  return null;
+}
+
+function findReactItemData(element) {
+  let current = element;
+  let depth = 0;
+
+  while (current && current !== document.body && depth < 10) {
+    for (const key of Object.keys(current)) {
+      if (!key.startsWith('__reactProps$') && !key.startsWith('__reactFiber$')) continue;
+
+      const found = findItemLike(current[key]);
+      if (found) return found;
+    }
+
+    current = current.parentElement;
+    depth += 1;
+  }
+
+  return null;
+}
+
+function readAnyDataId(element) {
+  let current = element;
+
+  while (current && current !== document.body) {
+    for (const attr of Array.from(current.attributes || [])) {
+      const name = attr.name.toLowerCase();
+      const value = vtText(attr.value);
+
+      if ((name.includes('item') || name.endsWith('id') || name.includes('listing')) && /\d+/.test(value)) {
+        return value.match(/\d+/)?.[0] || value;
+      }
+
+      const routeMatch = value.match(/(?:items?|bazaar\/items)\/(\d+)/i);
+      if (routeMatch) return routeMatch[1];
+    }
+
+    current = current.parentElement;
+  }
+
+  return '';
+}
+
+
 function parseItem(element) {
+  const reactItem = findReactItemData(element) || {};
   const img = element.querySelector('img');
-  const src = vtText(img?.src);
+  const src = vtText(reactItem.src || img?.src);
 
   const titleText = vtText(
-    getData(element, 'title') ||
+    reactItem.title ||
+      reactItem.title ||
+      getData(element, 'title') ||
       getData(element, 'itemTitle') ||
       getText(element, ['.item-title', '.title', 'h3', 'h4', 'strong']) ||
       img?.alt,
@@ -188,22 +328,29 @@ function parseItem(element) {
     .replace(/\d+\s+verified users interested/gi, '')
     .trim() || 'Item';
 
-  const price = extractPriceText(element);
+  const price = vtText(reactItem.price || extractPriceText(element));
 
   const id = vtText(
-    getData(element, 'itemId') ||
+    reactItem.id ||
+      reactItem.id ||
+      getData(element, 'itemId') ||
       getData(element, 'id') ||
+      readAnyDataId(element) ||
       element.id?.match(/\d+/)?.[0]
   );
 
   const ownerId = vtText(
-    getData(element, 'ownerId') ||
+    reactItem.ownerId ||
+      reactItem.ownerId ||
+      getData(element, 'ownerId') ||
       getData(element, 'userId') ||
       getData(element, 'userid')
   );
 
   const ownerUsername = vtText(
-    getData(element, 'ownerUsername') ||
+    reactItem.ownerUsername ||
+      reactItem.ownerUsername ||
+      getData(element, 'ownerUsername') ||
       getData(element, 'username')
   );
 
@@ -267,6 +414,58 @@ function shouldIgnoreClick(target) {
   return !interactive.closest?.('.vt-unified-item-card');
 }
 
+
+async function vtSetOnlineFromTopPill(nextValue) {
+  const body = JSON.stringify({ showOnline: nextValue, show_online: nextValue, online: nextValue, enabled: nextValue });
+  const attempts = [
+    ['/api/me/online', 'PUT'],
+    ['/api/profile/online', 'PUT'],
+    ['/api/users/me/online', 'PUT'],
+    ['/api/inventory/online', 'PUT'],
+    ['/api/me/online', 'PATCH'],
+    ['/api/profile/online', 'PATCH'],
+    ['/api/users/me/online', 'PATCH'],
+    ['/api/inventory/online', 'PATCH'],
+    ['/api/me/online', 'POST'],
+    ['/api/profile/online', 'POST'],
+    ['/api/users/me/online', 'POST'],
+    ['/api/inventory/online', 'POST']
+  ];
+
+  for (const [path, method] of attempts) {
+    try {
+      return await api(path, { method, body });
+    } catch {
+      // Try next compatibility route.
+    }
+  }
+
+  return { ok: false, localOnly: true, online: nextValue };
+}
+
+function vtSyncOnlinePillText(nextValue) {
+  document.querySelectorAll('button, .profile-toggle-pill, .inventory-status-pill, [class*="online" i]').forEach(element => {
+    const text = vtText(element.textContent).trim().toLowerCase();
+    if (text !== 'online' && text !== 'offline') return;
+    element.classList.toggle('is-online', nextValue);
+    element.classList.toggle('is-offline', !nextValue);
+
+    const dot = element.querySelector('.status-dot') || element.querySelector('span');
+    if (dot) dot.classList.add('status-dot');
+
+    for (const node of Array.from(element.childNodes)) {
+      if (node.nodeType === Node.TEXT_NODE && /online|offline/i.test(node.textContent)) {
+        node.textContent = nextValue ? 'Online' : 'Offline';
+        return;
+      }
+    }
+
+    if (!element.querySelector('.status-dot')) {
+      element.textContent = nextValue ? 'Online' : 'Offline';
+    }
+  });
+}
+
 export default function UnifiedItemExperience({ currentUser }) {
   const [item, setItem] = useState(null);
   const [price, setPrice] = useState('');
@@ -282,14 +481,26 @@ export default function UnifiedItemExperience({ currentUser }) {
         });
       });
 
+      const cards = new Set();
+
       document.querySelectorAll(ITEM_CARD_SELECTOR).forEach(card => {
-        const hasImage = card.querySelector('img');
-        if (!hasImage) return;
+        if (card.querySelector('img')) cards.add(card);
+      });
 
+      document.querySelectorAll('main img, section img, article img, .card img').forEach(image => {
+        const card = getLikelyItemCard(image);
+        if (card?.querySelector?.('img')) cards.add(card);
+      });
+
+      cards.forEach(card => {
         card.classList.add('vt-unified-item-card');
-
-        const priceText = extractPriceText(card);
-        card.dataset.vtPrice = priceText;
+        const parsed = parseItem(card);
+        if (parsed.id) {
+          card.dataset.itemId = parsed.id;
+          card.dataset.id = parsed.id;
+        }
+        if (parsed.title) card.dataset.title = parsed.title;
+        if (parsed.price) card.dataset.vtPrice = parsed.price;
       });
     }
 
@@ -316,11 +527,32 @@ export default function UnifiedItemExperience({ currentUser }) {
       setInterestedUsers([]);
     }
 
+    async function handleTopOnlineClick(event) {
+      const pill = event.target?.closest?.('button, .profile-toggle-pill, .inventory-status-pill, [class*="online" i]');
+      if (!pill) return;
+
+      const text = vtText(pill.textContent).trim().toLowerCase();
+      if (text !== 'online' && text !== 'offline') return;
+
+      const isInsideItem = pill.closest('.vt-unified-item-card, .vt-item-popout, .unified-player-panel, .presence-hub-panel, .safe-online-panel');
+      if (isInsideItem) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const next = text !== 'online';
+      window.localStorage.setItem('velktrade-show-online', String(next));
+      vtSyncOnlinePillText(next);
+      await vtSetOnlineFromTopPill(next);
+    }
+
     document.addEventListener('click', handleClick, true);
+    document.addEventListener('click', handleTopOnlineClick, true);
 
     return () => {
       observer.disconnect();
       document.removeEventListener('click', handleClick, true);
+      document.removeEventListener('click', handleTopOnlineClick, true);
     };
   }, []);
 
@@ -331,41 +563,109 @@ export default function UnifiedItemExperience({ currentUser }) {
   const canInterest = useMemo(() => {
     return Boolean(item && !isOwner(currentUser, item));
   }, [currentUser, item]);
+  async function resolveItemIdFromApis() {
+    const targetImage = vtNormalizeImage(item?.src);
+    const targetTitle = vtNormalizeTitle(item?.title);
+
+    for (const endpoint of ITEM_CACHE_ENDPOINTS) {
+      try {
+        const data = await api(endpoint);
+        const candidates = vtArray(data);
+
+        for (const candidate of candidates) {
+          const id = vtCandidateId(candidate);
+          if (!id) continue;
+
+          const candidateImage = vtNormalizeImage(vtCandidateImage(candidate));
+          const candidateTitle = vtNormalizeTitle(vtCandidateTitle(candidate));
+
+          if (targetImage && candidateImage && candidateImage === targetImage) return id;
+          if (targetTitle && candidateTitle && candidateTitle === targetTitle) return id;
+          if (targetImage && candidateImage && (candidateImage.includes(targetImage) || targetImage.includes(candidateImage))) return id;
+        }
+      } catch {
+        // Try the next compatibility endpoint.
+      }
+    }
+
+    return '';
+  }
+
+  async function ensureItemId() {
+    if (item?.id) return item.id;
+
+    const parsed = item?.rawElement ? parseItem(item.rawElement) : null;
+    if (parsed?.id) {
+      setItem(previous => ({ ...previous, ...parsed }));
+      return parsed.id;
+    }
+
+    const resolvedFromApis = await resolveItemIdFromApis();
+    if (resolvedFromApis) {
+      setItem(previous => ({ ...previous, id: resolvedFromApis }));
+      return resolvedFromApis;
+    }
+
+    try {
+      const data = await api('/api/items/resolve', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: vtText(item?.title),
+          image: vtText(item?.src),
+          price: vtText(item?.price || price)
+        })
+      });
+
+      const resolvedId = vtText(data?.id || data?.itemId || data?.item?.id);
+      if (resolvedId) {
+        setItem(previous => ({ ...previous, id: resolvedId }));
+        return resolvedId;
+      }
+    } catch {
+      // Optional route. Older backends will not have it.
+    }
+
+    return '';
+  }
 
   async function savePrice() {
-    if (!item?.id) {
+    const itemId = await ensureItemId();
+    if (!itemId) {
       setMessage('Could not detect item id for price update.');
       return;
     }
 
-    await api(`/api/items/${encodeURIComponent(item.id)}/price`, {
+    await api(`/api/items/${encodeURIComponent(itemId)}/price`, {
       method: 'PUT',
-      body: JSON.stringify({ price: vtText(price) })
+      body: JSON.stringify({ price: vtText(price), title: vtText(item?.title), image: vtText(item?.src) })
     });
 
     setMessage('Price updated.');
   }
 
   async function addInterest() {
-    if (!item?.id) {
+    const itemId = await ensureItemId();
+    if (!itemId) {
       setMessage('Could not detect item id for interest.');
       return;
     }
 
-    await api(`/api/items/${encodeURIComponent(item.id)}/interest`, {
-      method: 'POST'
+    await api(`/api/items/${encodeURIComponent(itemId)}/interest`, {
+      method: 'POST',
+      body: JSON.stringify({ title: vtText(item?.title), image: vtText(item?.src), price: vtText(item?.price) })
     });
 
     setMessage('Interest added.');
   }
 
   async function removeInterest() {
-    if (!item?.id) {
+    const itemId = await ensureItemId();
+    if (!itemId) {
       setMessage('Could not detect item id for interest.');
       return;
     }
 
-    await api(`/api/items/${encodeURIComponent(item.id)}/interest`, {
+    await api(`/api/items/${encodeURIComponent(itemId)}/interest`, {
       method: 'DELETE'
     });
 
@@ -373,14 +673,15 @@ export default function UnifiedItemExperience({ currentUser }) {
   }
 
   async function removeItem() {
-    if (!item?.id) {
+    const itemId = await ensureItemId();
+    if (!itemId) {
       setMessage('Could not detect item id for removal.');
       return;
     }
 
     if (!window.confirm('Remove this item/listing?')) return;
 
-    await api(`/api/items/${encodeURIComponent(item.id)}`, {
+    await api(`/api/items/${encodeURIComponent(itemId)}`, {
       method: 'DELETE'
     });
 
@@ -389,12 +690,13 @@ export default function UnifiedItemExperience({ currentUser }) {
   }
 
   async function loadInterestedUsers() {
-    if (!item?.id) {
+    const itemId = await ensureItemId();
+    if (!itemId) {
       setMessage('Could not detect item id for interested users.');
       return;
     }
 
-    const data = await api(`/api/items/${encodeURIComponent(item.id)}/interest`);
+    const data = await api(`/api/items/${encodeURIComponent(itemId)}/interest`);
     const users = Array.isArray(data?.users)
       ? data.users
       : Array.isArray(data?.interestedUsers)
@@ -405,14 +707,15 @@ export default function UnifiedItemExperience({ currentUser }) {
   }
 
   async function instantTrade() {
-    if (!item?.id) {
+    const itemId = await ensureItemId();
+    if (!itemId) {
       setMessage('Could not detect item id for instant trade.');
       return;
     }
 
-    await api(`/api/items/${encodeURIComponent(item.id)}/instant-trade`, {
+    await api(`/api/items/${encodeURIComponent(itemId)}/instant-trade`, {
       method: 'POST',
-      body: JSON.stringify({ price: vtText(price) })
+      body: JSON.stringify({ price: vtText(price), title: vtText(item?.title), image: vtText(item?.src) })
     });
 
     setMessage('Trade created and item marked trade pending.');
@@ -441,12 +744,6 @@ export default function UnifiedItemExperience({ currentUser }) {
 
           {vtText(item.price) && (
             <p className="admin-ic-line">{vtText(item.price)}</p>
-          )}
-
-          {!item.id && (
-            <p className="vt-muted-note">
-              Item id could not be detected. Preview only.
-            </p>
           )}
 
           {vtText(message) && (

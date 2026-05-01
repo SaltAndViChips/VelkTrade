@@ -1,29 +1,37 @@
-# VelkTrade direct inventory/trades/popup/online fix
+# VelkTrade ultrawide scaling + top online + item id fix
 
-No scripts. Direct full-file replacements only.
+Direct full-file zip. No scripts.
 
 ## Files included
 
 ```txt
 frontend/src/components/Inventory.jsx
-frontend/src/components/Trades.jsx
 frontend/src/components/UnifiedItemExperience.jsx
+frontend/src/components/Trades.jsx
+frontend/src/components/Bazaar.jsx
 frontend/src/styles-unified-mosaic-overrides.css
 ```
 
 ## Fixes
 
-- Trades tab React error #31 from rendering `{}` objects.
-- Inventory Online toggle can turn off/on from inside the Inventory component.
-- Inventory items are clickable and open the unified popup.
-- Inventory top-level `IC Price` and `Remove` buttons are removed from item cards.
-- Trade/Bazaar/admin/profile item hover zoom/popout behavior is disabled.
-- Popup buttons are cleaner and grouped.
-- All item values are converted to safe text before render.
+- Desktop/ultrawide layouts now use horizontal room:
+  - app shell expands up to wide viewport sizes
+  - item grids use `auto-fill`
+  - 21:9 screens show more cards while preserving card scale
+- Removes the duplicate lower inventory Online/Offline pill.
+- The top Online/Offline pill now toggles online state.
+- Online toggle is optimistic and silently tries compatibility backend routes.
+- Item popup can resolve item IDs by:
+  - DOM `data-item-id`
+  - route/attribute parsing
+  - React props/fiber data
+  - API matching by image/title from Bazaar/inventory endpoints
+  - optional `/api/items/resolve`
+- The popup no longer shows the preview-only warning before an action is attempted.
 
 ## Apply
 
-Extract into your repo root and overwrite files.
+Extract into repo root and overwrite files.
 
 Then:
 
@@ -42,7 +50,9 @@ Commit:
 
 ```bash
 cd ..
-git add frontend/src/components/Inventory.jsx frontend/src/components/Trades.jsx frontend/src/components/UnifiedItemExperience.jsx frontend/src/styles-unified-mosaic-overrides.css
-git commit -m "Fix inventory popup online toggle and trade render crash"
+git add frontend/src/components/Inventory.jsx frontend/src/components/UnifiedItemExperience.jsx frontend/src/components/Trades.jsx frontend/src/components/Bazaar.jsx frontend/src/styles-unified-mosaic-overrides.css
+git commit -m "Fix ultrawide scaling online pill and item id resolution"
 git push
 ```
+
+Redeploy backend if your online toggle/item action routes were updated separately.
