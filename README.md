@@ -1,116 +1,106 @@
-# VelkTrade bazaar/trade/mosaic/online/privacy fix patch
+# VelkTrade unified item experience + online/player menu fix
 
-Run from repo root:
+Run from the repo root:
 
 ```bash
-node scripts/apply-bazaar-trade-mosaic-online-privacy-fix.mjs
+node scripts/apply-unified-item-experience-online-player-fix.mjs
 ```
 
-## Includes
+## Adds/fixes
 
-### 3-wide item mosaic
+### Unified item style across all item screens
 
-Makes images in these areas display as 3-wide mosaic tiles:
+Targets item tiles in:
 
-- Admin trade logs
-- Trade menu
+- My Inventory
+- Profile inventories
 - Bazaar
-- Inventory
+- Trade menu
+- Admin trade logs
 
-Images fill the tile area with `object-fit: contain`, so the full image is visible and readable without hover/click zoom.
+The patch forces a shared 3-wide mosaic style on desktop:
 
-### Mobile/tablet CSS
+- 3 wide on desktop
+- 3 wide on tablet unless extremely narrow
+- 2 wide on small phones only
+- full image visible using `object-fit: contain`
+- removes nested tiny image boxes visually
+- item text/price overlays on hover/focus at the bottom
 
-Adds mobile and tablet CSS across the app while preserving the theme.
+### Click item popout
+
+Clicking an item image/card opens a unified popout:
+
+- image fills about 60–75% of viewport height
+- image is slightly left of center
+- action menu is on the right
+- mobile stacks the image above the menu
+
+Menu supports:
+
+- Edit price, if owner/admin/dev can be detected
+- Mark Interested, if not owner
+- Remove Interest
+- Remove item/listing, if owner/admin/dev can be detected
+- Show interested users, if owner/admin/dev can be detected
+- Verified-only interested users toggle
+- Instant trade button for owner/admin/dev:
+  - creates a pending seller-confirm trade
+  - marks item as trade pending through backend endpoint
+  - blocks further interest through backend endpoint
+
+The overlay uses DOM data if available and gracefully degrades if an item id cannot be detected.
 
 ### Online toggle fix
 
-Adds compatible backend routes for the inventory Online toggle:
+Adds robust backend routes for online toggle:
 
 - `PUT/POST/PATCH /api/me/online`
 - `PUT/POST/PATCH /api/profile/online`
 - `PUT/POST/PATCH /api/users/me/online`
+- `PUT/POST/PATCH /api/inventory/online`
 
-Also includes Neon SQL for `users.show_online`.
+Also adds frontend global fallback handling for buttons/toggles labelled `Online`.
 
-### Admin bazaar listing removal
+### Player menu desktop fix
 
-Adds backend routes:
+Adds CSS fixes so the online/player menu opens fully on desktop instead of only opening a bit.
 
-- `DELETE /api/admin/bazaar/items/:itemId`
-- `POST /api/admin/bazaar/items/:itemId/remove`
-- `DELETE /api/bazaar/items/:itemId/admin`
-- `POST /api/bazaar/items/:itemId/admin-remove`
+### Backend endpoints
 
-These remove a bazaar listing by making the item invalid for Bazaar display, without deleting the item.
+Adds compatibility routes:
 
-### Accepted offline trade from Bazaar
-
-Adds backend routes:
-
-- `POST /api/bazaar/items/:itemId/offline-accepted-trade`
-- `POST /api/bazaar/items/:itemId/create-offline-trade`
-- `POST /api/admin/bazaar/items/:itemId/offline-accepted-trade`
-
-Expected body:
-
-```json
-{
-  "buyerId": 123,
-  "buyerUsername": "BuyerName",
-  "icAmount": 500
-}
-```
-
-The route creates an offline trade with:
-
-- buyer IC
-- seller item from the bazaar post
-- seller still needing final confirmation
-
-### Seller privacy for buy orders
-
-Adds a response sanitizer so buyer-facing bazaar/buy-order responses do **not** expose seller identity until accepted.
-
-Hidden fields before seller acceptance:
-
-- `seller`
-- `sellerId`
-- `seller_id`
-- `sellerUsername`
-- `seller_username`
-- `owner`
-- `ownerId`
-- `owner_id`
-- `ownerUsername`
-- `owner_username`
-- `userId`
-- `userid`
-
-Admins and sellers can still see owner/seller fields.
+- `PUT/PATCH/POST /api/items/:itemId/price`
+- `DELETE /api/items/:itemId`
+- `POST /api/items/:itemId/remove`
+- `POST /api/items/:itemId/interest`
+- `DELETE /api/items/:itemId/interest`
+- `POST /api/items/:itemId/instant-trade`
+- `POST /api/bazaar/items/:itemId/instant-trade`
+- `POST /api/bazaar/items/:itemId/trade-pending`
 
 ## Neon SQL
 
-Run in Neon:
+Run in Neon if needed:
 
 ```sql
 ALTER TABLE users ADD COLUMN IF NOT EXISTS show_online BOOLEAN DEFAULT TRUE;
-UPDATE users SET show_online = TRUE WHERE show_online IS NULL;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS trade_pending BOOLEAN DEFAULT FALSE;
 ```
 
-Included file:
+Included:
 
 ```bash
-database/neon-online-toggle.sql
+database/neon-unified-item-experience.sql
 ```
 
 ## Apply
 
 ```bash
-node scripts/apply-bazaar-trade-mosaic-online-privacy-fix.mjs
-psql "$DATABASE_URL" -f database/neon-online-toggle.sql
-git add frontend/src/styles.css backend/server.js database/neon-online-toggle.sql scripts/apply-bazaar-trade-mosaic-online-privacy-fix.mjs patches/mosaic-responsive-overrides.css
-git commit -m "Fix bazaar privacy online toggle and item mosaics"
+node scripts/apply-unified-item-experience-online-player-fix.mjs
+psql "$DATABASE_URL" -f database/neon-unified-item-experience.sql
+git add frontend/src/App.jsx frontend/src/components/UnifiedItemExperience.jsx frontend/src/styles.css backend/server.js database/neon-unified-item-experience.sql scripts/apply-unified-item-experience-online-player-fix.mjs patches/unified-item-experience.css
+git commit -m "Unify item views and fix online player toggles"
 git push
 ```
 

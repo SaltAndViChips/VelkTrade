@@ -24,6 +24,7 @@ import UserInventoryPage from './components/UserInventoryPage';
 import Bazaar from './components/Bazaar';
 import Notifications from './components/Notifications';
 import UnifiedPlayerMenu from './components/UnifiedPlayerMenu.jsx';
+import UnifiedItemExperience from './components/UnifiedItemExperience.jsx';
 
 function parseDraggedItemId(active) {
   const dataItemId = active?.data?.current?.itemId;
@@ -1081,6 +1082,12 @@ previousRoomPlayerIdsRef.current = nextIds;
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveDragItem(null)}
     >
+
+      {user && (
+        <UnifiedItemExperience currentUser={user} />
+      )}
+
+
       {user && (
         <UnifiedPlayerMenu
           currentUser={user}
