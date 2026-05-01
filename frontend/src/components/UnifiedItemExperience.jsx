@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import '../styles-unified-mosaic-overrides.css';
+
+let vtUnifiedItemExperienceInstanceCounter = 0;
 
 function vtText(value, fallback = '') {
   if (value === undefined || value === null) return fallback;
@@ -467,6 +469,13 @@ function vtSyncOnlinePillText(nextValue) {
 }
 
 export default function UnifiedItemExperience({ currentUser }) {
+  const instanceIdRef = useRef(null);
+  if (instanceIdRef.current === null) {
+    vtUnifiedItemExperienceInstanceCounter += 1;
+    instanceIdRef.current = vtUnifiedItemExperienceInstanceCounter;
+    window.__VELKTRADE_ACTIVE_ITEM_EXPERIENCE_ID__ = instanceIdRef.current;
+  }
+
   const [item, setItem] = useState(null);
   const [price, setPrice] = useState('');
   const [interestedUsers, setInterestedUsers] = useState([]);
@@ -510,6 +519,8 @@ export default function UnifiedItemExperience({ currentUser }) {
     observer.observe(document.body, { childList: true, subtree: true });
 
     function handleClick(event) {
+      if (window.__VELKTRADE_ACTIVE_ITEM_EXPERIENCE_ID__ !== instanceIdRef.current) return;
+      if (event.target?.closest?.('.vt-item-popout')) return;
       if (shouldIgnoreClick(event.target)) return;
 
       const card = getLikelyItemCard(event.target);
@@ -521,6 +532,7 @@ export default function UnifiedItemExperience({ currentUser }) {
       event.preventDefault();
       event.stopPropagation();
 
+      document.querySelectorAll('.vt-item-popout-backdrop').forEach(node => node.remove());
       setItem(parsed);
       setPrice(vtText(parsed.price));
       setMessage('');
@@ -629,6 +641,7 @@ export default function UnifiedItemExperience({ currentUser }) {
   }
 
   async function savePrice() {
+    try {
     const itemId = await ensureItemId();
     if (!itemId) {
       setMessage('Could not detect item id for price update.');
@@ -641,9 +654,14 @@ export default function UnifiedItemExperience({ currentUser }) {
     });
 
     setMessage('Price updated.');
+    } catch (error) {
+      console.error('savePrice failed:', error);
+      setMessage('Request failed. The backend route may need redeploying.');
+    }
   }
 
   async function addInterest() {
+    try {
     const itemId = await ensureItemId();
     if (!itemId) {
       setMessage('Could not detect item id for interest.');
@@ -656,9 +674,14 @@ export default function UnifiedItemExperience({ currentUser }) {
     });
 
     setMessage('Interest added.');
+    } catch (error) {
+      console.error('addInterest failed:', error);
+      setMessage('Request failed. The backend route may need redeploying.');
+    }
   }
 
   async function removeInterest() {
+    try {
     const itemId = await ensureItemId();
     if (!itemId) {
       setMessage('Could not detect item id for interest.');
@@ -670,9 +693,14 @@ export default function UnifiedItemExperience({ currentUser }) {
     });
 
     setMessage('Interest removed.');
+    } catch (error) {
+      console.error('removeInterest failed:', error);
+      setMessage('Request failed. The backend route may need redeploying.');
+    }
   }
 
   async function removeItem() {
+    try {
     const itemId = await ensureItemId();
     if (!itemId) {
       setMessage('Could not detect item id for removal.');
@@ -687,9 +715,14 @@ export default function UnifiedItemExperience({ currentUser }) {
 
     setMessage('Item removed or listing disabled.');
     item.rawElement?.remove?.();
+    } catch (error) {
+      console.error('removeItem failed:', error);
+      setMessage('Request failed. The backend route may need redeploying.');
+    }
   }
 
   async function loadInterestedUsers() {
+    try {
     const itemId = await ensureItemId();
     if (!itemId) {
       setMessage('Could not detect item id for interested users.');
@@ -704,9 +737,14 @@ export default function UnifiedItemExperience({ currentUser }) {
         : [];
 
     setInterestedUsers(users);
+    } catch (error) {
+      console.error('loadInterestedUsers failed:', error);
+      setMessage('Request failed. The backend route may need redeploying.');
+    }
   }
 
   async function instantTrade() {
+    try {
     const itemId = await ensureItemId();
     if (!itemId) {
       setMessage('Could not detect item id for instant trade.');
@@ -719,9 +757,13 @@ export default function UnifiedItemExperience({ currentUser }) {
     });
 
     setMessage('Trade created and item marked trade pending.');
+    } catch (error) {
+      console.error('instantTrade failed:', error);
+      setMessage('Request failed. The backend route may need redeploying.');
+    }
   }
 
-  if (!item) return null;
+  if (!item || window.__VELKTRADE_ACTIVE_ITEM_EXPERIENCE_ID__ !== instanceIdRef.current) return null;
 
   const visibleInterested = verifiedOnly
     ? interestedUsers.filter(user => user?.isVerified || user?.is_verified || user?.isTrusted)

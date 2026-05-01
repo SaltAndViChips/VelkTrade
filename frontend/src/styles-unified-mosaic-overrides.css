@@ -815,3 +815,91 @@ section.bazaar,
 .vt-item-popout-menu .vt-muted-note:empty {
   display: none !important;
 }
+
+
+/* === Single popup, wide shell, and network-error-safe polish === */
+
+/* Force root/layout wrappers wider on desktop. */
+@media (min-width: 1100px) {
+  body #root,
+  body #root > div,
+  body #root main,
+  body #root .app,
+  body #root .dashboard,
+  body #root .page,
+  body #root section,
+  body #root .card,
+  body #root .panel {
+    max-width: none !important;
+  }
+
+  body #root > div,
+  body #root main,
+  body #root .dashboard,
+  body #root .page {
+    width: min(96vw, 2400px) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+}
+
+@media (min-width: 1800px) {
+  body #root > div,
+  body #root main,
+  body #root .dashboard,
+  body #root .page {
+    width: min(98vw, 3000px) !important;
+  }
+}
+
+/* Auto-add columns while retaining current card scale. */
+@media (min-width: 761px) {
+  .inventory-grid,
+  .inventory-items,
+  .items-grid,
+  .item-grid,
+  .profile-items,
+  .profile-inventory,
+  .bazaar-grid,
+  .bazaar-items,
+  .bazaar-list,
+  .trade-items-grid,
+  .trade-inventory-grid,
+  .trade-offer-grid,
+  .trade-menu-items,
+  .selected-items,
+  .offer-items,
+  .admin-trade-side ul,
+  .vt-unified-mosaic-grid {
+    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)) !important;
+  }
+}
+
+/* Hide duplicate inventory online/offline pill. Top profile pill is the active toggle. */
+.inventory-status-pill {
+  display: none !important;
+}
+
+/* Prevent duplicate popouts from being useful if stale DOM remains. */
+.vt-item-popout-backdrop + .vt-item-popout-backdrop {
+  display: none !important;
+}
+
+/* Keep top online pill clickable and clear. */
+.profile-toggle-pill,
+button:has(.status-dot),
+button[class*="online" i] {
+  cursor: pointer !important;
+}
+
+.profile-toggle-pill.is-offline .status-dot,
+button.is-offline .status-dot {
+  background: #dc5a64 !important;
+  box-shadow: 0 0 12px rgba(220, 90, 100, 0.65) !important;
+}
+
+.profile-toggle-pill.is-online .status-dot,
+button.is-online .status-dot {
+  background: #61d98b !important;
+  box-shadow: 0 0 12px rgba(97, 217, 139, 0.7) !important;
+}
