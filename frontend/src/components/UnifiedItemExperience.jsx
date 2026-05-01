@@ -177,6 +177,7 @@ function getText(element, selectors) {
     const text = found?.textContent?.trim();
     if (text) return text;
   }
+
   return '';
 }
 
@@ -339,14 +340,48 @@ function parseItem(element) {
   };
 }
 
+function formatIcPrice(value) {
+  const text = vtText(value).trim();
+  if (!text) return '';
+
+  if (/IC$/i.test(text)) return text;
+
+  const number = Number(text.replace(/[^\d.]/g, ''));
+  if (Number.isFinite(number) && number > 0) {
+    return `${number.toLocaleString()} IC`;
+  }
+
+  return text;
+}
+
+function applyPriceToCard(rawElement, nextPrice) {
+  if (!rawElement) return;
+
+  const formatted = formatIcPrice(nextPrice);
+
+  rawElement.dataset.vtPrice = formatted;
+  rawElement.dataset.price = formatted;
+  rawElement.dataset.itemPrice = formatted;
+
+  const visiblePrice = rawElement.querySelector('.price, .item-price, .bazaar-price');
+  if (visiblePrice) visiblePrice.textContent = formatted;
+
+  const oldBadge = rawElement.querySelector(':scope > .vt-hover-price');
+  if (oldBadge) oldBadge.textContent = formatted;
+}
+
 function isPrivileged(user) {
   return Boolean(
     user?.isAdmin ||
       user?.is_admin ||
+      user?.admin ||
       user?.isDeveloper ||
       user?.is_developer ||
+      user?.developer ||
       user?.role === 'admin' ||
-      user?.role === 'developer'
+      user?.role === 'developer' ||
+      user?.rank === 'admin' ||
+      user?.rank === 'developer'
   );
 }
 
@@ -442,7 +477,6 @@ export default function UnifiedItemExperience({ currentUser }) {
 
   useEffect(() => {
     window.__VELKTRADE_OPEN_ITEM_POPUP__ = parsed => {
-      document.querySelectorAll('.vt-item-popout-backdrop').forEach(node => node.remove());
       setItem(parsed);
       setPrice(vtText(parsed.price));
       setMessage('');
@@ -474,7 +508,10 @@ export default function UnifiedItemExperience({ currentUser }) {
         }
 
         if (parsed.title) card.dataset.title = parsed.title;
-        if (parsed.price) card.dataset.vtPrice = parsed.price;
+        if (parsed.price) {
+          card.dataset.vtPrice = parsed.price;
+          card.dataset.price = parsed.price;
+        }
       });
     }
 
@@ -612,11 +649,16 @@ export default function UnifiedItemExperience({ currentUser }) {
         return;
       }
 
+      const formatted = formatIcPrice(price);
+
       await api(`/api/items/${encodeURIComponent(itemId)}/price`, {
         method: 'PUT',
-        body: JSON.stringify({ price: vtText(price), title: vtText(item?.title), image: vtText(item?.src) })
+        body: JSON.stringify({ price: formatted, title: vtText(item?.title), image: vtText(item?.src) })
       });
 
+      applyPriceToCard(item?.rawElement, formatted);
+      setPrice(formatted);
+      setItem(previous => ({ ...previous, id: itemId, price: formatted }));
       setMessage('Price updated.');
     } catch (error) {
       console.error('savePrice failed:', error);
@@ -637,6 +679,7 @@ export default function UnifiedItemExperience({ currentUser }) {
         body: JSON.stringify({ title: vtText(item?.title), image: vtText(item?.src), price: vtText(item?.price) })
       });
 
+      setItem(previous => ({ ...previous, id: itemId }));
       setMessage('Interest added.');
     } catch (error) {
       console.error('addInterest failed:', error);
@@ -656,6 +699,7 @@ export default function UnifiedItemExperience({ currentUser }) {
         method: 'DELETE'
       });
 
+      setItem(previous => ({ ...previous, id: itemId }));
       setMessage('Interest removed.');
     } catch (error) {
       console.error('removeInterest failed:', error);
@@ -679,6 +723,7 @@ export default function UnifiedItemExperience({ currentUser }) {
 
       setMessage('Item removed or listing disabled.');
       item.rawElement?.remove?.();
+      setItem(null);
     } catch (error) {
       console.error('removeItem failed:', error);
       setMessage('Request failed. The backend route may need redeploying.');
@@ -700,6 +745,7 @@ export default function UnifiedItemExperience({ currentUser }) {
           ? data.interestedUsers
           : [];
 
+      setItem(previous => ({ ...previous, id: itemId }));
       setInterestedUsers(users);
     } catch (error) {
       console.error('loadInterestedUsers failed:', error);
@@ -720,6 +766,7 @@ export default function UnifiedItemExperience({ currentUser }) {
         body: JSON.stringify({ price: vtText(price), title: vtText(item?.title), image: vtText(item?.src) })
       });
 
+      setItem(previous => ({ ...previous, id: itemId }));
       setMessage('Trade created and item marked trade pending.');
     } catch (error) {
       console.error('instantTrade failed:', error);

@@ -1,28 +1,28 @@
-# VelkTrade online/player sidebar position fix
+# VelkTrade item popup refresh/reopen fix
 
-Direct CSS fix.
+Direct full-file patch. No scripts.
 
-## File included
+## Files included
 
 ```txt
+frontend/src/components/UnifiedItemExperience.jsx
 frontend/src/styles-unified-mosaic-overrides.css
 ```
 
-## Fix
+## Fixes
 
-The online/player sidebar was being pulled to the top-left by the wide-layout rules. This patch forces:
-
-- the ≡ player menu trigger to the top-right
-- the expanded player/online panel to open below it, aligned right
-- the menu to stay fixed to the browser viewport instead of the page shell
+- You can open an item, close it, then open another item without refreshing.
+- Removes the unsafe manual DOM deletion that caused the popup state/listener to get stuck.
+- Saving price updates the popup immediately.
+- Saving price updates the clicked card's data attributes immediately.
+- If a card has a visible `.price`, `.item-price`, or `.bazaar-price`, it updates that text immediately.
+- Keeps item actions inside the popup.
+- Keeps online/player sidebar pinned top-right.
+- Keeps item mosaic wide-screen behavior.
 
 ## Apply
 
-Extract into repo root and overwrite:
-
-```txt
-frontend/src/styles-unified-mosaic-overrides.css
-```
+Extract into repo root and overwrite files.
 
 Then:
 
@@ -36,7 +36,7 @@ Commit:
 
 ```bash
 cd ..
-git add frontend/src/styles-unified-mosaic-overrides.css
-git commit -m "Fix online player sidebar position"
+git add frontend/src/components/UnifiedItemExperience.jsx frontend/src/styles-unified-mosaic-overrides.css
+git commit -m "Fix item popup reopening and live price updates"
 git push
 ```
