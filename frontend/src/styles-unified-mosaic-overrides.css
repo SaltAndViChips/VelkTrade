@@ -903,3 +903,243 @@ button.is-online .status-dot {
   background: #61d98b !important;
   box-shadow: 0 0 12px rgba(97, 217, 139, 0.7) !important;
 }
+
+
+/* === Corrective wide layout: more columns, not taller cards === */
+
+/* Use the browser width. Remove old narrow caps from likely wrappers. */
+@media (min-width: 1000px) {
+  html,
+  body,
+  #root {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  #root > div,
+  #root > div > main,
+  #root main,
+  #root .app,
+  #root .dashboard,
+  #root .dashboard-shell,
+  #root .page,
+  #root .page-shell,
+  #root .main-content,
+  #root .content-shell {
+    width: calc(100vw - 96px) !important;
+    max-width: 2400px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  #root section,
+  #root .card,
+  #root .panel,
+  #root .bazaar-page,
+  #root .inventory-page,
+  #root .profile-page,
+  #root .admin-panel {
+    max-width: none !important;
+  }
+}
+
+@media (min-width: 1800px) {
+  #root > div,
+  #root > div > main,
+  #root main,
+  #root .app,
+  #root .dashboard,
+  #root .dashboard-shell,
+  #root .page,
+  #root .page-shell,
+  #root .main-content,
+  #root .content-shell {
+    width: calc(100vw - 120px) !important;
+    max-width: 3200px !important;
+  }
+}
+
+/* Fixed readable card width. Auto-fill adds columns on 21:9 instead of stretching cards. */
+@media (min-width: 761px) {
+  .inventory-grid,
+  .inventory-items,
+  .items-grid,
+  .item-grid,
+  .profile-items,
+  .profile-inventory,
+  .bazaar-grid,
+  .bazaar-items,
+  .bazaar-list,
+  .trade-items-grid,
+  .trade-inventory-grid,
+  .trade-offer-grid,
+  .trade-menu-items,
+  .selected-items,
+  .offer-items,
+  .admin-trade-side ul,
+  .vt-unified-mosaic-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 300px)) !important;
+    justify-content: start !important;
+    align-items: start !important;
+    gap: 14px !important;
+  }
+}
+
+@media (min-width: 1600px) {
+  .inventory-grid,
+  .inventory-items,
+  .items-grid,
+  .item-grid,
+  .profile-items,
+  .profile-inventory,
+  .bazaar-grid,
+  .bazaar-items,
+  .bazaar-list,
+  .trade-items-grid,
+  .trade-inventory-grid,
+  .trade-offer-grid,
+  .trade-menu-items,
+  .selected-items,
+  .offer-items,
+  .admin-trade-side ul,
+  .vt-unified-mosaic-grid {
+    grid-template-columns: repeat(auto-fill, minmax(285px, 285px)) !important;
+  }
+}
+
+@media (min-width: 2200px) {
+  .inventory-grid,
+  .inventory-items,
+  .items-grid,
+  .item-grid,
+  .profile-items,
+  .profile-inventory,
+  .bazaar-grid,
+  .bazaar-items,
+  .bazaar-list,
+  .trade-items-grid,
+  .trade-inventory-grid,
+  .trade-offer-grid,
+  .trade-menu-items,
+  .selected-items,
+  .offer-items,
+  .admin-trade-side ul,
+  .vt-unified-mosaic-grid {
+    grid-template-columns: repeat(auto-fill, minmax(270px, 270px)) !important;
+  }
+}
+
+/* Revert oversized images. Keep current card scale readable but not screen-tall. */
+@media (min-width: 761px) {
+  .inventory-grid img,
+  .inventory-items img,
+  .items-grid img,
+  .item-grid img,
+  .profile-items img,
+  .profile-inventory img,
+  .bazaar-grid img,
+  .bazaar-items img,
+  .bazaar-list img,
+  .trade-items-grid img,
+  .trade-inventory-grid img,
+  .trade-offer-grid img,
+  .trade-menu-items img,
+  .selected-items img,
+  .offer-items img,
+  .admin-trade-side img,
+  .admin-trade-item-thumb,
+  .vt-unified-item-card img {
+    height: 300px !important;
+    max-height: 300px !important;
+    object-fit: contain !important;
+  }
+
+  .vt-unified-item-card {
+    min-height: 320px !important;
+    max-height: 360px !important;
+  }
+}
+
+@media (min-width: 1600px) {
+  .inventory-grid img,
+  .inventory-items img,
+  .items-grid img,
+  .item-grid img,
+  .profile-items img,
+  .profile-inventory img,
+  .bazaar-grid img,
+  .bazaar-items img,
+  .bazaar-list img,
+  .trade-items-grid img,
+  .trade-inventory-grid img,
+  .trade-offer-grid img,
+  .trade-menu-items img,
+  .selected-items img,
+  .offer-items img,
+  .admin-trade-side img,
+  .admin-trade-item-thumb,
+  .vt-unified-item-card img {
+    height: 285px !important;
+    max-height: 285px !important;
+  }
+
+  .vt-unified-item-card {
+    min-height: 305px !important;
+    max-height: 345px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .inventory-grid,
+  .inventory-items,
+  .items-grid,
+  .item-grid,
+  .profile-items,
+  .profile-inventory,
+  .bazaar-grid,
+  .bazaar-items,
+  .bazaar-list,
+  .trade-items-grid,
+  .trade-inventory-grid,
+  .trade-offer-grid,
+  .trade-menu-items,
+  .selected-items,
+  .offer-items,
+  .admin-trade-side ul,
+  .vt-unified-mosaic-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    justify-content: stretch !important;
+  }
+
+  .inventory-grid img,
+  .inventory-items img,
+  .items-grid img,
+  .item-grid img,
+  .profile-items img,
+  .profile-inventory img,
+  .bazaar-grid img,
+  .bazaar-items img,
+  .bazaar-list img,
+  .trade-items-grid img,
+  .trade-inventory-grid img,
+  .trade-offer-grid img,
+  .trade-menu-items img,
+  .selected-items img,
+  .offer-items img,
+  .admin-trade-side img,
+  .admin-trade-item-thumb,
+  .vt-unified-item-card img {
+    height: clamp(135px, 42vw, 220px) !important;
+    max-height: 220px !important;
+  }
+
+  .vt-unified-item-card {
+    min-height: auto !important;
+    max-height: none !important;
+  }
+}
+
+/* Make backend route failures clear but not crashing. */
+.vt-muted-note {
+  color: #ffd7a8 !important;
+}

@@ -1,6 +1,6 @@
-# VelkTrade single-popup + wide shell + NetworkError-safe item action fix
+# VelkTrade wide cards + backend route fix
 
-Direct full-file zip. No scripts required for frontend.
+Direct full-file zip. No frontend scripts.
 
 ## Files included
 
@@ -15,17 +15,14 @@ backend/velktrade-compat-routes.js
 
 ## Fixes
 
-- Uses more desktop/ultrawide width.
-- Item grids use `auto-fill` to show more cards horizontally.
-- Prevents duplicate stacked item popups.
-- Hides duplicate lower inventory Online toggle.
-- Top Online pill stays the toggle.
-- Item popup actions catch request failures instead of throwing uncaught NetworkError.
-- Adds optional backend compatibility routes for item actions and online toggle.
+- Cards no longer scale taller than the viewport.
+- Desktop/21:9 screens show more cards horizontally by using fixed card widths with `auto-fill`.
+- Frontend item-action failures are caught instead of crashing.
+- Adds a backend compatibility route file for the popup buttons and online toggle.
 
 ## Apply frontend
 
-Extract into repo root and overwrite files.
+Extract into repo root, then:
 
 ```bash
 cd frontend
@@ -33,22 +30,24 @@ npm run build
 npm run deploy
 ```
 
-Commit frontend files:
+## Required backend route install for popup buttons
 
-```bash
-cd ..
-git add frontend/src/components/Inventory.jsx frontend/src/components/UnifiedItemExperience.jsx frontend/src/components/Bazaar.jsx frontend/src/components/Trades.jsx frontend/src/styles-unified-mosaic-overrides.css backend/velktrade-compat-routes.js
-git commit -m "Fix single item popup wide layout and item action errors"
-git push
-```
+The message `Request failed. The backend route may need redeploying.` means the frontend built correctly, but Render/backend does not have the item action routes yet.
 
-## Optional backend NetworkError fix
-
-If item popup buttons still show request failures, add this once in `backend/server.js` after `app`, `authMiddleware`, and your DB helper/pool are defined:
+Add this once in `backend/server.js` after `app`, `authMiddleware`, and your DB helper/pool are defined:
 
 ```js
 const installVelkTradeCompatRoutes = require('./velktrade-compat-routes');
 installVelkTradeCompatRoutes({ app, authMiddleware, pool, query, run, get });
 ```
 
-Then redeploy Render backend.
+Then commit/push and redeploy Render.
+
+## Commit
+
+```bash
+cd ..
+git add frontend/src/components/Inventory.jsx frontend/src/components/UnifiedItemExperience.jsx frontend/src/components/Bazaar.jsx frontend/src/components/Trades.jsx frontend/src/styles-unified-mosaic-overrides.css backend/velktrade-compat-routes.js backend/server.js
+git commit -m "Fix wide item cards and backend item action routes"
+git push
+```
