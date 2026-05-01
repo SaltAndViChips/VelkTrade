@@ -1,32 +1,28 @@
-# VelkTrade restore item popup + wide grid fix
+# VelkTrade online/player sidebar position fix
 
-Direct full-file patch. No scripts.
+Direct CSS fix.
 
-## Files included
+## File included
 
 ```txt
-frontend/src/components/UnifiedItemExperience.jsx
 frontend/src/styles-unified-mosaic-overrides.css
 ```
 
-## Fixes
+## Fix
 
-- Restores item popup opening on click.
-- Supports clicking cards in:
-  - My Inventory
-  - Profile inventories
-  - Bazaar
-  - Trade item lists
-  - Admin trade logs
-- Removes the brittle duplicate-popup singleton behavior that stopped clicks from opening the UI.
-- Adds a single global popup layer safely.
-- Forces wide desktop / 21:9 screens to show more cards horizontally by using fixed tile widths and broader grid selectors.
-- Restores admin trade item preview behavior through the unified popup.
-- Keeps hover zoom disabled.
+The online/player sidebar was being pulled to the top-left by the wide-layout rules. This patch forces:
+
+- the ≡ player menu trigger to the top-right
+- the expanded player/online panel to open below it, aligned right
+- the menu to stay fixed to the browser viewport instead of the page shell
 
 ## Apply
 
-Extract into your repo root and overwrite files.
+Extract into repo root and overwrite:
+
+```txt
+frontend/src/styles-unified-mosaic-overrides.css
+```
 
 Then:
 
@@ -40,7 +36,7 @@ Commit:
 
 ```bash
 cd ..
-git add frontend/src/components/UnifiedItemExperience.jsx frontend/src/styles-unified-mosaic-overrides.css
-git commit -m "Restore item popup and fix wide item grids"
+git add frontend/src/styles-unified-mosaic-overrides.css
+git commit -m "Fix online player sidebar position"
 git push
 ```
