@@ -110,7 +110,7 @@ body,
   body #root .page-shell,
   body #root .main-content,
   body #root .content-shell {
-    width: min(96vw, 2600px) !important;
+    width: min(98vw, 3400px) !important;
     margin-left: auto !important;
     margin-right: auto !important;
   }
@@ -126,23 +126,8 @@ body,
   }
 }
 
-@media (min-width: 1800px) {
-  body #root > div,
-  body #root > div > main,
-  body #root main,
-  body #root .app,
-  body #root .dashboard,
-  body #root .dashboard-shell,
-  body #root .page,
-  body #root .page-shell,
-  body #root .main-content,
-  body #root .content-shell {
-    width: min(98vw, 3400px) !important;
-  }
-}
-
 /* =========================================================
-   Item grid container flattening
+   Force more horizontal item columns
    ========================================================= */
 
 .inventory-grid,
@@ -161,6 +146,9 @@ body,
 .selected-items,
 .offer-items,
 .admin-trade-side ul,
+.admin-trade-items,
+.admin-trade-log,
+.trade-log,
 .vt-unified-mosaic-grid {
   display: grid !important;
   width: 100% !important;
@@ -178,25 +166,33 @@ body,
   border-radius: 0 !important;
 }
 
-.inventory-page .inventory-grid,
-.inventory-page .inventory-items,
-.profile-page .profile-inventory,
-.profile-page .profile-items,
-.bazaar-page .bazaar-grid,
-.bazaar-page .bazaar-items,
-.bazaar-page .bazaar-list,
-.admin-trade-side ul,
-.trade-room .trade-items-grid,
-.trade-room .trade-inventory-grid,
-.trade-room .trade-offer-grid {
-  border: 0 !important;
-  outline: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-}
-
 @media (min-width: 761px) {
+  section:has(.vt-unified-item-card),
+  .card:has(.vt-unified-item-card),
+  .panel:has(.vt-unified-item-card),
+  [class*="bazaar" i]:has(.vt-unified-item-card),
+  [class*="inventory" i]:has(.vt-unified-item-card),
+  [class*="profile" i]:has(.vt-unified-item-card),
+  [class*="trade" i]:has(.vt-unified-item-card) {
+    max-width: none !important;
+  }
+
+  section:has(> .vt-unified-item-card),
+  div:has(> .vt-unified-item-card),
+  ul:has(> .vt-unified-item-card),
+  [class*="bazaar" i]:has(> .vt-unified-item-card),
+  [class*="inventory" i]:has(> .vt-unified-item-card),
+  [class*="profile" i]:has(> .vt-unified-item-card),
+  [class*="trade" i]:has(> .vt-unified-item-card) {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, 300px) !important;
+    justify-content: start !important;
+    align-items: start !important;
+    gap: 14px !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
   .inventory-grid,
   .inventory-items,
   .items-grid,
@@ -213,12 +209,49 @@ body,
   .selected-items,
   .offer-items,
   .admin-trade-side ul,
+  .admin-trade-items,
+  .admin-trade-log,
+  .trade-log,
   .vt-unified-mosaic-grid {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 300px)) !important;
+    grid-template-columns: repeat(auto-fill, 300px) !important;
+  }
+
+  .inventory-grid > *,
+  .inventory-items > *,
+  .items-grid > *,
+  .item-grid > *,
+  .profile-items > *,
+  .profile-inventory > *,
+  .bazaar-grid > *,
+  .bazaar-items > *,
+  .bazaar-list > *,
+  .trade-items-grid > *,
+  .trade-inventory-grid > *,
+  .trade-offer-grid > *,
+  .trade-menu-items > *,
+  .selected-items > *,
+  .offer-items > *,
+  .admin-trade-side li,
+  .admin-trade-items > *,
+  .admin-trade-log > *,
+  .trade-log > *,
+  .vt-unified-item-card {
+    width: 300px !important;
+    max-width: 300px !important;
+    min-width: 300px !important;
+    flex: 0 0 300px !important;
+    grid-column: auto !important;
   }
 }
 
 @media (min-width: 1600px) {
+  section:has(> .vt-unified-item-card),
+  div:has(> .vt-unified-item-card),
+  ul:has(> .vt-unified-item-card),
+  [class*="bazaar" i]:has(> .vt-unified-item-card),
+  [class*="inventory" i]:has(> .vt-unified-item-card),
+  [class*="profile" i]:has(> .vt-unified-item-card),
+  [class*="trade" i]:has(> .vt-unified-item-card),
   .inventory-grid,
   .inventory-items,
   .items-grid,
@@ -235,30 +268,37 @@ body,
   .selected-items,
   .offer-items,
   .admin-trade-side ul,
+  .admin-trade-items,
+  .admin-trade-log,
+  .trade-log,
   .vt-unified-mosaic-grid {
-    grid-template-columns: repeat(auto-fill, minmax(285px, 285px)) !important;
+    grid-template-columns: repeat(auto-fill, 285px) !important;
   }
-}
 
-@media (min-width: 2200px) {
-  .inventory-grid,
-  .inventory-items,
-  .items-grid,
-  .item-grid,
-  .profile-items,
-  .profile-inventory,
-  .bazaar-grid,
-  .bazaar-items,
-  .bazaar-list,
-  .trade-items-grid,
-  .trade-inventory-grid,
-  .trade-offer-grid,
-  .trade-menu-items,
-  .selected-items,
-  .offer-items,
-  .admin-trade-side ul,
-  .vt-unified-mosaic-grid {
-    grid-template-columns: repeat(auto-fill, minmax(270px, 270px)) !important;
+  .inventory-grid > *,
+  .inventory-items > *,
+  .items-grid > *,
+  .item-grid > *,
+  .profile-items > *,
+  .profile-inventory > *,
+  .bazaar-grid > *,
+  .bazaar-items > *,
+  .bazaar-list > *,
+  .trade-items-grid > *,
+  .trade-inventory-grid > *,
+  .trade-offer-grid > *,
+  .trade-menu-items > *,
+  .selected-items > *,
+  .offer-items > *,
+  .admin-trade-side li,
+  .admin-trade-items > *,
+  .admin-trade-log > *,
+  .trade-log > *,
+  .vt-unified-item-card {
+    width: 285px !important;
+    max-width: 285px !important;
+    min-width: 285px !important;
+    flex-basis: 285px !important;
   }
 }
 
@@ -282,9 +322,12 @@ body,
 .selected-items > *,
 .offer-items > *,
 .admin-trade-side li,
+.admin-trade-items > *,
+.admin-trade-log > *,
+.trade-log > *,
 .vt-unified-item-card {
   position: relative !important;
-  min-width: 0 !important;
+  min-width: 0;
   overflow: hidden !important;
   border-radius: 12px !important;
   background: transparent !important;
@@ -293,13 +336,6 @@ body,
   padding: 0 !important;
   margin: 0 !important;
   cursor: zoom-in !important;
-}
-
-@media (min-width: 761px) {
-  .vt-unified-item-card {
-    min-height: 300px !important;
-    max-height: 335px !important;
-  }
 }
 
 .vt-unified-item-card button,
@@ -355,6 +391,9 @@ body,
 .selected-items img,
 .offer-items img,
 .admin-trade-side img,
+.admin-trade-items img,
+.admin-trade-log img,
+.trade-log img,
 .admin-trade-item-thumb,
 .vt-unified-item-card img {
   width: 100% !important;
@@ -387,18 +426,31 @@ body,
   .selected-items img,
   .offer-items img,
   .admin-trade-side img,
+  .admin-trade-items img,
+  .admin-trade-log img,
+  .trade-log img,
   .admin-trade-item-thumb,
   .vt-unified-item-card img {
     height: 285px !important;
     max-height: 285px !important;
   }
-
-  .vt-unified-item-card {
-    min-height: 285px !important;
-    max-height: 320px !important;
-  }
 }
 
+/* Trade/admin image legibility fallback */
+.admin-panel [class*="trade" i] img,
+.trade-room img,
+.trade-log img,
+.admin-trade-log img,
+.admin-trade-side img,
+.admin-trade-item-thumb {
+  min-width: 160px !important;
+  min-height: 160px !important;
+  object-fit: contain !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Mobile */
 @media (max-width: 760px) {
   .safe-online-dropdown,
   .unified-player-menu,
@@ -438,6 +490,9 @@ body,
     max-height: calc(100vh - 82px) !important;
   }
 
+  section:has(> .vt-unified-item-card),
+  div:has(> .vt-unified-item-card),
+  ul:has(> .vt-unified-item-card),
   .inventory-grid,
   .inventory-items,
   .items-grid,
@@ -460,6 +515,29 @@ body,
     gap: 8px !important;
   }
 
+  .inventory-grid > *,
+  .inventory-items > *,
+  .items-grid > *,
+  .item-grid > *,
+  .profile-items > *,
+  .profile-inventory > *,
+  .bazaar-grid > *,
+  .bazaar-items > *,
+  .bazaar-list > *,
+  .trade-items-grid > *,
+  .trade-inventory-grid > *,
+  .trade-offer-grid > *,
+  .trade-menu-items > *,
+  .selected-items > *,
+  .offer-items > *,
+  .admin-trade-side li,
+  .vt-unified-item-card {
+    width: auto !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    flex-basis: auto !important;
+  }
+
   .inventory-grid img,
   .inventory-items img,
   .items-grid img,
@@ -480,11 +558,6 @@ body,
   .vt-unified-item-card img {
     height: clamp(135px, 42vw, 220px) !important;
     max-height: 220px !important;
-  }
-
-  .vt-unified-item-card {
-    min-height: auto !important;
-    max-height: none !important;
   }
 }
 

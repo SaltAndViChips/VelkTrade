@@ -184,8 +184,9 @@ function installVelkTradeCompatRoutes({ app, authMiddleware, pool, query, run, g
         return res.status(404).json({ error: 'Item not found' });
       }
 
-      if (!(await isAdmin(req)) && !ownsItem(req, item)) {
-        return res.status(403).json({ error: 'Not allowed' });
+      /* Price edit is owner-only. Admin/dev removal remains allowed separately. */
+      if (!ownsItem(req, item)) {
+        return res.status(403).json({ error: 'Only the item owner can edit price' });
       }
 
       await q('UPDATE items SET price = $1 WHERE id = $2', [req.body?.price || '', item.id]);
@@ -288,34 +289,6 @@ function installVelkTradeCompatRoutes({ app, authMiddleware, pool, query, run, g
     }
   }
 
-  async function instantTrade(req, res) {
-    try {
-      const item = await resolveItem(req);
-
-      if (!item?.id) {
-        return res.status(404).json({ error: 'Item not found' });
-      }
-
-      if (!(await isAdmin(req)) && !ownsItem(req, item)) {
-        return res.status(403).json({ error: 'Not allowed' });
-      }
-
-      await ensureColumns();
-      await q('UPDATE items SET trade_pending = TRUE WHERE id = $1', [item.id]).catch(() => {});
-      await q('DELETE FROM buy_requests WHERE item_id = $1', [item.id]).catch(() => {});
-
-      res.json({
-        ok: true,
-        itemId: item.id,
-        tradePending: true,
-        status: 'seller_pending_confirm'
-      });
-    } catch (error) {
-      console.error('compat instant trade failed:', error);
-      res.status(500).json({ error: error.message || 'Failed to mark trade pending' });
-    }
-  }
-
   async function removeItem(req, res) {
     try {
       const item = await resolveItem(req);
@@ -330,7 +303,6 @@ function installVelkTradeCompatRoutes({ app, authMiddleware, pool, query, run, g
 
       await ensureColumns();
 
-      /* Remove the listing without deleting the owner's inventory record. */
       await q('UPDATE items SET price = NULL, trade_pending = TRUE WHERE id = $1', [item.id]).catch(() => {});
 
       res.json({
@@ -362,10 +334,6 @@ function installVelkTradeCompatRoutes({ app, authMiddleware, pool, query, run, g
   app.get('/api/items/:itemId/interest', auth, getInterest);
   app.post('/api/items/:itemId/interest', auth, addInterest);
   app.delete('/api/items/:itemId/interest', auth, removeInterest);
-
-  app.post('/api/items/:itemId/instant-trade', auth, instantTrade);
-  app.post('/api/bazaar/items/:itemId/instant-trade', auth, instantTrade);
-  app.post('/api/bazaar/items/:itemId/trade-pending', auth, instantTrade);
 }
 
 module.exports = installVelkTradeCompatRoutes;

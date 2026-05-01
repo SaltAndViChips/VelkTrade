@@ -57,6 +57,8 @@ function arrayFromPayload(value) {
   if (Array.isArray(value?.listings)) return value.listings;
   if (Array.isArray(value?.bazaarItems)) return value.bazaarItems;
   if (Array.isArray(value?.inventory)) return value.inventory;
+  if (Array.isArray(value?.fromItemDetails)) return value.fromItemDetails;
+  if (Array.isArray(value?.toItemDetails)) return value.toItemDetails;
   return [];
 }
 
@@ -90,7 +92,9 @@ const ITEM_API_ENDPOINTS = [
   '/api/inventory',
   '/api/me/inventory',
   '/api/users/me/inventory',
-  '/api/profile/inventory'
+  '/api/profile/inventory',
+  '/api/admin/trades',
+  '/api/trades'
 ];
 
 const GRID_SELECTORS = [
@@ -109,7 +113,11 @@ const GRID_SELECTORS = [
   '.trade-menu-items',
   '.selected-items',
   '.offer-items',
-  '.admin-trade-side ul'
+  '.admin-trade-side ul',
+  '.admin-trade-items',
+  '.admin-trade-card',
+  '.admin-trade-log',
+  '.trade-log'
 ];
 
 const EXCLUDED_IMAGE_SELECTOR = [
@@ -131,10 +139,10 @@ function isProbablyItemImage(image) {
   if (!src) return false;
 
   const bounds = image.getBoundingClientRect?.();
-  if (bounds && (bounds.width < 60 || bounds.height < 60)) return false;
+  if (bounds && (bounds.width < 34 || bounds.height < 34)) return false;
 
   const area = image.closest(
-    '.inventory, .inventory-page, .profile, .profile-page, .profile-inventory, .bazaar, .bazaar-page, .trade-room, .trade-menu, .trade-panel, .admin-panel, .admin-trade-side, main, section'
+    '.inventory, .inventory-page, .profile, .profile-page, .profile-inventory, .bazaar, .bazaar-page, .trade-room, .trade-menu, .trade-panel, .admin-panel, .admin-trade-side, .admin-trade-log, .trade-log, main, section'
   );
 
   return Boolean(area);
@@ -145,7 +153,7 @@ function nearestItemCard(start) {
   if (!isProbablyItemImage(image)) return null;
 
   const explicit = image.closest(
-    '.vt-unified-item-card, article, li, .item-card, .inventory-item, .bazaar-item-card, .bazaar-item, .trade-item, .admin-trade-side li'
+    '.vt-unified-item-card, article, li, .item-card, .inventory-item, .bazaar-item-card, .bazaar-item, .trade-item, .admin-trade-item, .admin-trade-side li, .admin-trade-image-frame, .admin-trade-image-button'
   );
 
   if (explicit && explicit.querySelector('img')) return explicit;
@@ -153,14 +161,14 @@ function nearestItemCard(start) {
   let current = image.parentElement;
   let depth = 0;
 
-  while (current && current !== document.body && depth < 10) {
+  while (current && current !== document.body && depth < 12) {
     const className = vtText(current.className);
     const imgCount = current.querySelectorAll?.('img')?.length || 0;
     const text = vtText(current.textContent);
-    const hasItemishClass = /item|card|tile|listing|entry|slot|bazaar|inventory|trade/i.test(className);
-    const hasItemishText = /IC|price|interested|remove|LVL|DMG|RPM|MAG/i.test(text);
+    const hasItemishClass = /item|card|tile|listing|entry|slot|bazaar|inventory|trade|offer|log/i.test(className);
+    const hasItemishText = /IC|price|interested|remove|LVL|DMG|RPM|MAG|offers/i.test(text);
 
-    if (imgCount >= 1 && imgCount <= 3 && (hasItemishClass || hasItemishText)) {
+    if (imgCount >= 1 && imgCount <= 6 && (hasItemishClass || hasItemishText)) {
       return current;
     }
 
@@ -251,7 +259,7 @@ function normalizeReactCandidate(value) {
 }
 
 function findReactItemLike(value, seen = new WeakSet(), depth = 0) {
-  if (!value || typeof value !== 'object' || depth > 5) return null;
+  if (!value || typeof value !== 'object' || depth > 6) return null;
   if (seen.has(value)) return null;
   seen.add(value);
 
@@ -260,14 +268,26 @@ function findReactItemLike(value, seen = new WeakSet(), depth = 0) {
   const direct = normalizeReactCandidate(value);
   if (direct && (direct.id || direct.src || direct.title)) return direct;
 
-  for (const key of ['item', 'listing', 'bazaarItem', 'inventoryItem', 'tradeItem', 'data', 'payload', 'props', 'children']) {
+  for (const key of [
+    'item',
+    'listing',
+    'bazaarItem',
+    'inventoryItem',
+    'tradeItem',
+    'fromItemDetails',
+    'toItemDetails',
+    'data',
+    'payload',
+    'props',
+    'children'
+  ]) {
     if (value[key]) {
       const found = findReactItemLike(value[key], seen, depth + 1);
       if (found) return found;
     }
   }
 
-  for (const key of Object.keys(value).slice(0, 32)) {
+  for (const key of Object.keys(value).slice(0, 48)) {
     if (['stateNode', 'return', 'alternate', '_owner'].includes(key)) continue;
     const found = findReactItemLike(value[key], seen, depth + 1);
     if (found) return found;
@@ -280,7 +300,7 @@ function readReactItemData(element) {
   let current = element;
   let depth = 0;
 
-  while (current && current !== document.body && depth < 10) {
+  while (current && current !== document.body && depth < 12) {
     for (const key of Object.keys(current)) {
       if (!key.startsWith('__reactProps$') && !key.startsWith('__reactFiber$')) continue;
       const found = findReactItemLike(current[key]);
@@ -371,6 +391,8 @@ function applyPriceToCard(rawElement, nextPrice) {
 }
 
 function isPrivileged(user) {
+  const username = vtText(user?.username).toLowerCase();
+
   return Boolean(
     user?.isAdmin ||
       user?.is_admin ||
@@ -381,7 +403,9 @@ function isPrivileged(user) {
       user?.role === 'admin' ||
       user?.role === 'developer' ||
       user?.rank === 'admin' ||
-      user?.rank === 'developer'
+      user?.rank === 'developer' ||
+      username === 'salt' ||
+      username === 'velkon'
   );
 }
 
@@ -492,7 +516,7 @@ export default function UnifiedItemExperience({ currentUser }) {
 
       const cards = new Set();
 
-      document.querySelectorAll('main img, section img, article img, .card img, .panel img').forEach(image => {
+      document.querySelectorAll('main img, section img, article img, .card img, .panel img, .admin-panel img, .trade-room img, .trade-log img').forEach(image => {
         if (!isProbablyItemImage(image)) return;
         const card = nearestItemCard(image);
         if (card?.querySelector?.('img')) cards.add(card);
@@ -568,13 +592,11 @@ export default function UnifiedItemExperience({ currentUser }) {
     };
   }, []);
 
-  const canManage = useMemo(() => {
-    return Boolean(item && (isOwner(currentUser, item) || isPrivileged(currentUser)));
-  }, [currentUser, item]);
-
-  const canInterest = useMemo(() => {
-    return Boolean(item && !isOwner(currentUser, item));
-  }, [currentUser, item]);
+  const hasItemId = Boolean(vtText(item?.id));
+  const ownerCanEditPrice = useMemo(() => Boolean(item && hasItemId && isOwner(currentUser, item)), [currentUser, item, hasItemId]);
+  const canRemoveListing = useMemo(() => Boolean(item && hasItemId && (isOwner(currentUser, item) || isPrivileged(currentUser))), [currentUser, item, hasItemId]);
+  const canShowInterested = useMemo(() => Boolean(item && hasItemId && (isOwner(currentUser, item) || isPrivileged(currentUser))), [currentUser, item, hasItemId]);
+  const canInterest = useMemo(() => Boolean(item && hasItemId && !isOwner(currentUser, item)), [currentUser, item, hasItemId]);
 
   async function resolveItemIdFromApis() {
     const targetImage = normalizeImage(item?.src);
@@ -644,10 +666,7 @@ export default function UnifiedItemExperience({ currentUser }) {
   async function savePrice() {
     try {
       const itemId = await ensureItemId();
-      if (!itemId) {
-        setMessage('Could not detect item id for price update.');
-        return;
-      }
+      if (!itemId || !ownerCanEditPrice) return;
 
       const formatted = formatIcPrice(price);
 
@@ -669,10 +688,7 @@ export default function UnifiedItemExperience({ currentUser }) {
   async function addInterest() {
     try {
       const itemId = await ensureItemId();
-      if (!itemId) {
-        setMessage('Could not detect item id for interest.');
-        return;
-      }
+      if (!itemId || !canInterest) return;
 
       await api(`/api/items/${encodeURIComponent(itemId)}/interest`, {
         method: 'POST',
@@ -690,10 +706,7 @@ export default function UnifiedItemExperience({ currentUser }) {
   async function removeInterest() {
     try {
       const itemId = await ensureItemId();
-      if (!itemId) {
-        setMessage('Could not detect item id for interest.');
-        return;
-      }
+      if (!itemId || !canInterest) return;
 
       await api(`/api/items/${encodeURIComponent(itemId)}/interest`, {
         method: 'DELETE'
@@ -710,10 +723,7 @@ export default function UnifiedItemExperience({ currentUser }) {
   async function removeItem() {
     try {
       const itemId = await ensureItemId();
-      if (!itemId) {
-        setMessage('Could not detect item id for removal.');
-        return;
-      }
+      if (!itemId || !canRemoveListing) return;
 
       if (!window.confirm('Remove this item/listing?')) return;
 
@@ -733,10 +743,7 @@ export default function UnifiedItemExperience({ currentUser }) {
   async function loadInterestedUsers() {
     try {
       const itemId = await ensureItemId();
-      if (!itemId) {
-        setMessage('Could not detect item id for interested users.');
-        return;
-      }
+      if (!itemId || !canShowInterested) return;
 
       const data = await api(`/api/items/${encodeURIComponent(itemId)}/interest`);
       const users = Array.isArray(data?.users)
@@ -749,27 +756,6 @@ export default function UnifiedItemExperience({ currentUser }) {
       setInterestedUsers(users);
     } catch (error) {
       console.error('loadInterestedUsers failed:', error);
-      setMessage('Request failed. The backend route may need redeploying.');
-    }
-  }
-
-  async function instantTrade() {
-    try {
-      const itemId = await ensureItemId();
-      if (!itemId) {
-        setMessage('Could not detect item id for instant trade.');
-        return;
-      }
-
-      await api(`/api/items/${encodeURIComponent(itemId)}/instant-trade`, {
-        method: 'POST',
-        body: JSON.stringify({ price: vtText(price), title: vtText(item?.title), image: vtText(item?.src) })
-      });
-
-      setItem(previous => ({ ...previous, id: itemId }));
-      setMessage('Trade created and item marked trade pending.');
-    } catch (error) {
-      console.error('instantTrade failed:', error);
       setMessage('Request failed. The backend route may need redeploying.');
     }
   }
@@ -799,7 +785,7 @@ export default function UnifiedItemExperience({ currentUser }) {
 
           {vtText(message) && <p className="vt-muted-note">{vtText(message)}</p>}
 
-          {canManage && (
+          {ownerCanEditPrice && (
             <label className="vt-price-editor">
               <span>Edit price</span>
               <input
@@ -811,7 +797,7 @@ export default function UnifiedItemExperience({ currentUser }) {
           )}
 
           <div className="vt-item-popout-actions">
-            {canManage && (
+            {ownerCanEditPrice && (
               <button type="button" className="vt-primary-action" onClick={savePrice}>
                 Save price
               </button>
@@ -829,26 +815,20 @@ export default function UnifiedItemExperience({ currentUser }) {
               </button>
             )}
 
-            {canManage && (
+            {canShowInterested && (
               <button type="button" className="vt-secondary-action" onClick={loadInterestedUsers}>
                 Show interested users
               </button>
             )}
 
-            {canManage && (
-              <button type="button" className="vt-primary-action" onClick={instantTrade}>
-                Instant trade / mark pending
-              </button>
-            )}
-
-            {canManage && (
+            {canRemoveListing && (
               <button type="button" className="vt-danger-button" onClick={removeItem}>
                 Remove item/listing
               </button>
             )}
           </div>
 
-          {canManage && (
+          {canShowInterested && interestedUsers.length > 0 && (
             <label className="vt-checkbox-row">
               <input
                 type="checkbox"
@@ -859,7 +839,7 @@ export default function UnifiedItemExperience({ currentUser }) {
             </label>
           )}
 
-          {canManage && interestedUsers.length > 0 && (
+          {canShowInterested && interestedUsers.length > 0 && (
             <div className="vt-interested-list">
               {visibleInterested.length === 0 ? (
                 <p className="vt-muted-note">No matching interested users.</p>
@@ -872,6 +852,10 @@ export default function UnifiedItemExperience({ currentUser }) {
                 ))
               )}
             </div>
+          )}
+
+          {!ownerCanEditPrice && !canInterest && !canShowInterested && !canRemoveListing && (
+            <p className="vt-muted-note">No actions available for this item.</p>
           )}
         </aside>
       </section>
