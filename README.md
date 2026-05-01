@@ -1,4 +1,4 @@
-# VelkTrade duplicate item popup fix
+# VelkTrade item actions + trade images fix
 
 Direct full-file patch.
 
@@ -7,23 +7,37 @@ Direct full-file patch.
 ```txt
 frontend/src/components/UnifiedItemExperience.jsx
 frontend/src/styles-unified-mosaic-overrides.css
+backend/velktrade-compat-routes.js
 ```
 
-`backend/velktrade-compat-routes.js` is included too if it was present in the source patch.
+## Frontend fixes
 
-## Fixes
+- Removes `Instant trade / mark pending` from the item popup.
+- Price editing is visible only to the item owner.
+- Remove listing is visible only to the item owner, admins, or developers.
+- Interested / remove interest are visible only to non-owners.
+- Show interested users is visible only to the item owner, admins, or developers.
+- Popup buttons are hidden if the item has no usable id.
+- Trade/admin-trade item images are clickable and open the same item popup.
+- Trade/admin-trade images are made larger/legible.
+- Admin trade images get CSS fallback visibility if they are present in the DOM.
 
-- Prevents the old/off-side item popup from appearing together with the centered popup.
-- Adds a centered-popup marker so CSS can hide stale legacy popup layers.
-- Uses a singleton handler token so only the newest `UnifiedItemExperience` instance handles item clicks.
-- Stops the original click event immediately after the unified item card is detected, preventing older item-popup click handlers from also opening.
-- Keeps the centered item popup as the only interactive item modal.
+## Backend fixes
+
+The compatibility routes now include more tolerant interest routes:
+
+- `GET /api/items/:itemId/interest`
+- `POST /api/items/:itemId/interest`
+- `DELETE /api/items/:itemId/interest`
+- `POST /api/items/:itemId/remove`
+- `DELETE /api/items/:itemId`
+- `PUT/PATCH/POST /api/items/:itemId/price`
 
 ## Apply
 
-Extract into your repo root and overwrite files.
+Extract into repo root and overwrite files.
 
-Then:
+Frontend:
 
 ```bash
 cd frontend
@@ -31,13 +45,13 @@ npm run build
 npm run deploy
 ```
 
-Commit:
+Backend:
 
 ```bash
 cd ..
-git add frontend/src/components/UnifiedItemExperience.jsx frontend/src/styles-unified-mosaic-overrides.css
-git commit -m "Fix duplicate item popup opening"
+git add frontend/src/components/UnifiedItemExperience.jsx frontend/src/styles-unified-mosaic-overrides.css backend/velktrade-compat-routes.js
+git commit -m "Fix item popup actions and trade image previews"
 git push
 ```
 
-Since GitHub is connected now, future patches can be applied directly to the repository once you ask me to patch the repo/branch.
+Redeploy Render backend after pushing because `backend/velktrade-compat-routes.js` changed.

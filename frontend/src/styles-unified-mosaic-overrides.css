@@ -1,10 +1,36 @@
-/* VelkTrade unified item mosaic + popup override.
-   This file is imported by UnifiedItemExperience.jsx.
-*/
+/* VelkTrade unified item mosaic + centered item popup overrides. */
 
-/* =========================================================
-   Online/player sidebar position fix
-   ========================================================= */
+html,
+body,
+#root {
+  width: 100% !important;
+  max-width: none !important;
+  overflow-x: hidden;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+@media (min-width: 1000px) {
+  body #root,
+  body #root > div,
+  body #root main,
+  body #root .app,
+  body #root .dashboard,
+  body #root .dashboard-shell,
+  body #root .page,
+  body #root .page-shell,
+  body #root .main-content,
+  body #root .content-shell {
+    width: min(98vw, 3400px) !important;
+    max-width: none !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+}
 
 .safe-online-dropdown,
 .unified-player-menu,
@@ -68,68 +94,6 @@ button[title*="Online players" i] {
   margin: 0 !important;
 }
 
-/* =========================================================
-   Wide shell
-   ========================================================= */
-
-html,
-body,
-#root {
-  width: 100% !important;
-  max-width: none !important;
-  overflow-x: hidden;
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-@media (min-width: 1000px) {
-  body #root,
-  body #root > div,
-  body #root main,
-  body #root .app,
-  body #root .dashboard,
-  body #root .dashboard-shell,
-  body #root .page,
-  body #root .page-shell,
-  body #root .main-content,
-  body #root .content-shell {
-    max-width: none !important;
-  }
-
-  body #root > div,
-  body #root > div > main,
-  body #root main,
-  body #root .app,
-  body #root .dashboard,
-  body #root .dashboard-shell,
-  body #root .page,
-  body #root .page-shell,
-  body #root .main-content,
-  body #root .content-shell {
-    width: min(98vw, 3400px) !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-  }
-
-  body #root section,
-  body #root .card,
-  body #root .panel,
-  body #root .bazaar-page,
-  body #root .inventory-page,
-  body #root .profile-page,
-  body #root .admin-panel {
-    max-width: none !important;
-  }
-}
-
-/* =========================================================
-   Force more horizontal item columns
-   ========================================================= */
-
 .inventory-grid,
 .inventory-items,
 .items-grid,
@@ -167,32 +131,13 @@ body,
 }
 
 @media (min-width: 761px) {
-  section:has(.vt-unified-item-card),
-  .card:has(.vt-unified-item-card),
-  .panel:has(.vt-unified-item-card),
-  [class*="bazaar" i]:has(.vt-unified-item-card),
-  [class*="inventory" i]:has(.vt-unified-item-card),
-  [class*="profile" i]:has(.vt-unified-item-card),
-  [class*="trade" i]:has(.vt-unified-item-card) {
-    max-width: none !important;
-  }
-
   section:has(> .vt-unified-item-card),
   div:has(> .vt-unified-item-card),
   ul:has(> .vt-unified-item-card),
   [class*="bazaar" i]:has(> .vt-unified-item-card),
   [class*="inventory" i]:has(> .vt-unified-item-card),
   [class*="profile" i]:has(> .vt-unified-item-card),
-  [class*="trade" i]:has(> .vt-unified-item-card) {
-    display: grid !important;
-    grid-template-columns: repeat(auto-fill, 300px) !important;
-    justify-content: start !important;
-    align-items: start !important;
-    gap: 14px !important;
-    width: 100% !important;
-    max-width: none !important;
-  }
-
+  [class*="trade" i]:has(> .vt-unified-item-card),
   .inventory-grid,
   .inventory-items,
   .items-grid,
@@ -213,7 +158,13 @@ body,
   .admin-trade-log,
   .trade-log,
   .vt-unified-mosaic-grid {
+    display: grid !important;
     grid-template-columns: repeat(auto-fill, 300px) !important;
+    justify-content: start !important;
+    align-items: start !important;
+    gap: 14px !important;
+    width: 100% !important;
+    max-width: none !important;
   }
 
   .inventory-grid > *,
@@ -248,10 +199,6 @@ body,
   section:has(> .vt-unified-item-card),
   div:has(> .vt-unified-item-card),
   ul:has(> .vt-unified-item-card),
-  [class*="bazaar" i]:has(> .vt-unified-item-card),
-  [class*="inventory" i]:has(> .vt-unified-item-card),
-  [class*="profile" i]:has(> .vt-unified-item-card),
-  [class*="trade" i]:has(> .vt-unified-item-card),
   .inventory-grid,
   .inventory-items,
   .items-grid,
@@ -302,32 +249,8 @@ body,
   }
 }
 
-/* =========================================================
-   Item tiles
-   ========================================================= */
-
-.inventory-grid > *,
-.inventory-items > *,
-.items-grid > *,
-.item-grid > *,
-.profile-items > *,
-.profile-inventory > *,
-.bazaar-grid > *,
-.bazaar-items > *,
-.bazaar-list > *,
-.trade-items-grid > *,
-.trade-inventory-grid > *,
-.trade-offer-grid > *,
-.trade-menu-items > *,
-.selected-items > *,
-.offer-items > *,
-.admin-trade-side li,
-.admin-trade-items > *,
-.admin-trade-log > *,
-.trade-log > *,
 .vt-unified-item-card {
   position: relative !important;
-  min-width: 0;
   overflow: hidden !important;
   border-radius: 12px !important;
   background: transparent !important;
@@ -336,6 +259,7 @@ body,
   padding: 0 !important;
   margin: 0 !important;
   cursor: zoom-in !important;
+  align-self: start !important;
 }
 
 .vt-unified-item-card button,
@@ -354,6 +278,7 @@ body,
 .item-image,
 .inventory-item-image,
 .bazaar-item-image,
+.bazaar-image-wrap,
 .trade-item-image,
 .item-card-image,
 .item-thumb,
@@ -375,6 +300,7 @@ body,
   margin: 0 !important;
 }
 
+.vt-unified-item-card img,
 .inventory-grid img,
 .inventory-items img,
 .items-grid img,
@@ -394,8 +320,7 @@ body,
 .admin-trade-items img,
 .admin-trade-log img,
 .trade-log img,
-.admin-trade-item-thumb,
-.vt-unified-item-card img {
+.admin-trade-item-thumb {
   width: 100% !important;
   height: 300px !important;
   max-height: 300px !important;
@@ -410,6 +335,7 @@ body,
 }
 
 @media (min-width: 1600px) {
+  .vt-unified-item-card img,
   .inventory-grid img,
   .inventory-items img,
   .items-grid img,
@@ -429,28 +355,224 @@ body,
   .admin-trade-items img,
   .admin-trade-log img,
   .trade-log img,
-  .admin-trade-item-thumb,
-  .vt-unified-item-card img {
+  .admin-trade-item-thumb {
     height: 285px !important;
     max-height: 285px !important;
   }
 }
 
-/* Trade/admin image legibility fallback */
-.admin-panel [class*="trade" i] img,
-.trade-room img,
-.trade-log img,
-.admin-trade-log img,
-.admin-trade-side img,
-.admin-trade-item-thumb {
-  min-width: 160px !important;
-  min-height: 160px !important;
-  object-fit: contain !important;
-  opacity: 1 !important;
+.vt-hover-price,
+.vt-item-hover-preview,
+.item-hover-preview,
+.bazaar-full-preview,
+.bazaar-item-hover,
+.inventory-item-hover,
+.trade-item-hover,
+.admin-trade-hover-preview,
+.admin-image-preview-backdrop,
+.admin-image-preview-modal,
+.vt-kill-legacy-item-popup {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.vt-unified-item-card.vt-hover-price-title .item-title,
+.vt-unified-item-card.vt-hover-price-title .title,
+.vt-unified-item-card.vt-hover-price-title h3,
+.vt-unified-item-card.vt-hover-price-title h4,
+.vt-unified-item-card.vt-hover-price-title figcaption,
+.vt-unified-item-card.vt-hover-price-title strong {
+  color: #ffdc93 !important;
+}
+
+body:has(.vt-item-popout-backdrop[data-vt-centered-popup="true"]) .vt-item-popout-backdrop:not([data-vt-centered-popup="true"]),
+body:has(.vt-item-popout-backdrop[data-vt-centered-popup="true"]) :is(.item-modal,.item-popup,.item-detail-modal,.item-preview-modal,.legacy-item-popout,.legacy-item-modal,.bazaar-full-preview):not(.vt-item-popout):not(.vt-item-popout-backdrop) {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.vt-item-popout-backdrop[data-vt-centered-popup="true"] {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 100000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 24px !important;
+  background: rgba(4, 3, 10, 0.78) !important;
+  backdrop-filter: blur(6px) !important;
+  pointer-events: auto !important;
   visibility: visible !important;
 }
 
-/* Mobile */
+.vt-item-popout {
+  width: min(1040px, 88vw) !important;
+  max-width: 1040px !important;
+  max-height: 88vh !important;
+  margin: 0 auto !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr) !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 24px !important;
+  padding: 20px !important;
+  border-radius: 20px !important;
+  overflow: hidden !important;
+  background: radial-gradient(circle at top left, rgba(141, 99, 255, 0.16), transparent 34%), rgba(12, 10, 20, 0.97) !important;
+  border: 1px solid rgba(142, 113, 255, 0.38) !important;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.72) !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+}
+
+.vt-item-popout-image-wrap {
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 4px 8px 4px 0 !important;
+}
+
+.vt-item-popout-image-wrap img {
+  display: block !important;
+  width: auto !important;
+  max-width: min(58vw, 660px) !important;
+  height: auto !important;
+  max-height: 74vh !important;
+  object-fit: contain !important;
+  margin: 0 auto !important;
+  border-radius: 16px !important;
+  background: rgba(0, 0, 0, 0.28) !important;
+  border: 1px solid rgba(142, 113, 255, 0.28) !important;
+}
+
+.vt-item-popout-menu {
+  min-width: 0 !important;
+  max-width: 360px !important;
+  width: 100% !important;
+  justify-self: start !important;
+  align-self: center !important;
+  display: grid !important;
+  align-content: start !important;
+  gap: 12px !important;
+  padding: 16px !important;
+  border-radius: 18px !important;
+  background: rgba(7, 6, 14, 0.72) !important;
+  border: 1px solid rgba(142, 113, 255, 0.24) !important;
+}
+
+.vt-item-popout-header {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 10px !important;
+  align-items: start !important;
+}
+
+.vt-item-popout-header h2 {
+  margin: 0 !important;
+  font-size: 1.85rem !important;
+  line-height: 1.1 !important;
+  overflow-wrap: anywhere !important;
+}
+
+.vt-icon-button {
+  width: 38px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 999px !important;
+  background: rgba(255,255,255,.06) !important;
+  border: 1px solid rgba(142, 113, 255, 0.28) !important;
+  box-shadow: none !important;
+}
+
+.vt-price-editor {
+  display: grid !important;
+  gap: 7px !important;
+}
+
+.vt-price-editor input {
+  width: 100% !important;
+  min-height: 42px !important;
+}
+
+.vt-item-popout-actions {
+  display: grid !important;
+  gap: 10px !important;
+}
+
+.vt-item-popout-actions button {
+  width: 100% !important;
+  min-height: 38px !important;
+  border-radius: 11px !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  box-shadow: none !important;
+}
+
+.vt-primary-action {
+  background: linear-gradient(180deg, #8c5cff, #6737d2) !important;
+}
+
+.vt-secondary-action {
+  background: rgba(255,255,255,.045) !important;
+  border: 1px solid rgba(142, 113, 255, 0.34) !important;
+}
+
+.vt-danger-button {
+  background: linear-gradient(180deg, #9c3346, #6f1d2d) !important;
+}
+
+.vt-muted-note {
+  color: #ffd7a8 !important;
+  font-size: 13px !important;
+  line-height: 1.35 !important;
+}
+
+.vt-checkbox-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.vt-interested-list {
+  max-height: 180px !important;
+  overflow: auto !important;
+  display: grid !important;
+  gap: 6px !important;
+  padding: 8px !important;
+  border-radius: 12px !important;
+  background: rgba(0,0,0,.24) !important;
+  border: 1px solid rgba(142, 113, 255, 0.24) !important;
+}
+
+@media (max-width: 860px) {
+  .vt-item-popout {
+    width: min(96vw, 760px) !important;
+    grid-template-columns: 1fr !important;
+    max-height: 92vh !important;
+    overflow: auto !important;
+  }
+
+  .vt-item-popout-image-wrap {
+    padding-right: 0 !important;
+  }
+
+  .vt-item-popout-image-wrap img {
+    max-width: 100% !important;
+    max-height: 54vh !important;
+  }
+
+  .vt-item-popout-menu {
+    max-width: none !important;
+    justify-self: stretch !important;
+  }
+}
+
 @media (max-width: 760px) {
   .safe-online-dropdown,
   .unified-player-menu,
@@ -515,6 +637,7 @@ body,
     gap: 8px !important;
   }
 
+  .vt-unified-item-card,
   .inventory-grid > *,
   .inventory-items > *,
   .items-grid > *,
@@ -530,14 +653,14 @@ body,
   .trade-menu-items > *,
   .selected-items > *,
   .offer-items > *,
-  .admin-trade-side li,
-  .vt-unified-item-card {
+  .admin-trade-side li {
     width: auto !important;
     max-width: none !important;
     min-width: 0 !important;
     flex-basis: auto !important;
   }
 
+  .vt-unified-item-card img,
   .inventory-grid img,
   .inventory-items img,
   .items-grid img,
@@ -554,374 +677,8 @@ body,
   .selected-items img,
   .offer-items img,
   .admin-trade-side img,
-  .admin-trade-item-thumb,
-  .vt-unified-item-card img {
+  .admin-trade-item-thumb {
     height: clamp(135px, 42vw, 220px) !important;
     max-height: 220px !important;
   }
-}
-
-.admin-trade-item-thumb:hover,
-.admin-trade-item-thumb:focus,
-.admin-trade-image-button:hover .admin-trade-item-thumb,
-.admin-trade-image-button:focus .admin-trade-item-thumb,
-.inventory-grid img:hover,
-.bazaar-grid img:hover,
-.trade-items-grid img:hover,
-.vt-unified-item-card img:hover {
-  position: static !important;
-  inset: auto !important;
-  transform: none !important;
-  z-index: auto !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-}
-
-.admin-image-preview-backdrop,
-.admin-image-preview-modal {
-  display: none !important;
-}
-
-/* =========================================================
-   Popup
-   ========================================================= */
-
-.vt-item-popout-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 100000;
-  display: grid;
-  place-items: center;
-  padding: 22px;
-  background: rgba(2, 1, 7, 0.82);
-  backdrop-filter: blur(4px);
-}
-
-.vt-item-popout {
-  width: min(1180px, 96vw);
-  max-height: 94vh;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 370px);
-  gap: 18px;
-  padding: 16px;
-  border-radius: 22px;
-  background:
-    radial-gradient(circle at top left, rgba(141, 99, 255, 0.18), transparent 32%),
-    rgba(12, 10, 20, 0.98);
-  border: 1px solid rgba(142, 113, 255, 0.48);
-  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.86);
-}
-
-.vt-item-popout-image-wrap {
-  min-width: 0;
-  display: grid;
-  place-items: center;
-}
-
-.vt-item-popout-image-wrap img {
-  width: 100%;
-  max-width: 760px;
-  height: min(74vh, 760px);
-  object-fit: contain;
-  border-radius: 16px;
-  background: rgba(0, 0, 0, 0.34);
-  border: 1px solid rgba(142, 113, 255, 0.32);
-}
-
-.vt-item-popout-menu {
-  min-width: 0;
-  display: grid;
-  align-content: start;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 18px;
-  background: rgba(5, 4, 10, 0.58);
-  border: 1px solid rgba(142, 113, 255, 0.24);
-}
-
-.vt-item-popout-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: start;
-}
-
-.vt-item-popout-header h2,
-.vt-item-popout-menu h2,
-.vt-item-popout-menu p {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.vt-icon-button {
-  width: 38px !important;
-  height: 38px !important;
-  min-height: 38px !important;
-  padding: 0 !important;
-  display: grid !important;
-  place-items: center !important;
-  border-radius: 999px !important;
-  background: rgba(255,255,255,.06) !important;
-  border: 1px solid rgba(142, 113, 255, 0.28) !important;
-  box-shadow: none !important;
-}
-
-.vt-price-editor {
-  display: grid;
-  gap: 7px;
-}
-
-.vt-price-editor input {
-  width: 100%;
-  min-height: 42px;
-}
-
-.vt-item-popout-actions {
-  display: grid;
-  gap: 8px !important;
-}
-
-.vt-item-popout-actions button {
-  width: 100%;
-  min-height: 38px !important;
-  border-radius: 11px !important;
-  font-size: 14px !important;
-  font-weight: 800 !important;
-  box-shadow: none !important;
-}
-
-.vt-primary-action {
-  background: linear-gradient(180deg, #8c5cff, #6737d2) !important;
-}
-
-.vt-secondary-action {
-  background: rgba(255,255,255,.045) !important;
-  border: 1px solid rgba(142, 113, 255, 0.34) !important;
-}
-
-.vt-danger-button {
-  background: linear-gradient(180deg, #9c3346, #6f1d2d) !important;
-}
-
-.vt-muted-note {
-  color: #ffd7a8 !important;
-  font-size: 13px;
-  line-height: 1.35 !important;
-}
-
-.vt-checkbox-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.vt-interested-list {
-  max-height: 180px;
-  overflow: auto;
-  display: grid;
-  gap: 6px;
-  padding: 8px;
-  border-radius: 12px;
-  background: rgba(0,0,0,.24);
-  border: 1px solid rgba(142, 113, 255, 0.24);
-}
-
-@media (max-width: 760px) {
-  .vt-item-popout {
-    grid-template-columns: 1fr;
-    width: 96vw;
-    max-height: 96vh;
-    overflow: auto;
-  }
-
-  .vt-item-popout-image-wrap img {
-    height: min(55vh, 520px);
-  }
-}
-
-
-/* =========================================================
-   Popup centering and hover title-only pricing
-   ========================================================= */
-
-.vt-hover-price,
-.vt-item-hover-preview,
-.item-hover-preview,
-.bazaar-item-hover,
-.inventory-item-hover,
-.trade-item-hover,
-.admin-trade-hover-preview,
-.admin-image-preview-backdrop,
-.admin-image-preview-modal {
-  display: none !important;
-}
-
-.vt-unified-item-card {
-  align-self: start !important;
-}
-
-.vt-unified-item-card .item-title,
-.vt-unified-item-card .title,
-.vt-unified-item-card h3,
-.vt-unified-item-card h4,
-.vt-unified-item-card figcaption,
-.vt-unified-item-card strong {
-  transition: color 120ms ease, opacity 120ms ease;
-}
-
-.vt-unified-item-card.vt-hover-price-title .item-title,
-.vt-unified-item-card.vt-hover-price-title .title,
-.vt-unified-item-card.vt-hover-price-title h3,
-.vt-unified-item-card.vt-hover-price-title h4,
-.vt-unified-item-card.vt-hover-price-title figcaption,
-.vt-unified-item-card.vt-hover-price-title strong {
-  color: #ffdc93 !important;
-}
-
-.vt-item-popout-backdrop {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 100000 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 24px !important;
-  background: rgba(4, 3, 10, 0.78) !important;
-  backdrop-filter: blur(6px) !important;
-}
-
-.vt-item-popout {
-  width: min(1040px, 88vw) !important;
-  max-width: 1040px !important;
-  max-height: 88vh !important;
-  margin: 0 auto !important;
-  display: grid !important;
-  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr) !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 24px !important;
-  padding: 20px !important;
-  border-radius: 20px !important;
-  overflow: hidden !important;
-  background:
-    radial-gradient(circle at top left, rgba(141, 99, 255, 0.16), transparent 34%),
-    rgba(12, 10, 20, 0.97) !important;
-  border: 1px solid rgba(142, 113, 255, 0.38) !important;
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.72) !important;
-}
-
-.vt-item-popout-image-wrap {
-  min-width: 0 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 4px 8px 4px 0 !important;
-}
-
-.vt-item-popout-image-wrap img {
-  display: block !important;
-  width: auto !important;
-  max-width: min(58vw, 660px) !important;
-  height: auto !important;
-  max-height: 74vh !important;
-  object-fit: contain !important;
-  margin: 0 auto !important;
-  border-radius: 16px !important;
-  background: rgba(0, 0, 0, 0.28) !important;
-  border: 1px solid rgba(142, 113, 255, 0.28) !important;
-}
-
-.vt-item-popout-menu {
-  min-width: 0 !important;
-  max-width: 360px !important;
-  width: 100% !important;
-  justify-self: start !important;
-  align-self: center !important;
-  display: grid !important;
-  align-content: start !important;
-  gap: 12px !important;
-  padding: 16px !important;
-  border-radius: 18px !important;
-  background: rgba(7, 6, 14, 0.72) !important;
-  border: 1px solid rgba(142, 113, 255, 0.24) !important;
-}
-
-.vt-item-popout-header {
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) auto !important;
-  gap: 10px !important;
-  align-items: start !important;
-}
-
-.vt-item-popout-header h2 {
-  font-size: 1.85rem !important;
-  line-height: 1.1 !important;
-}
-
-.vt-item-popout-actions {
-  display: grid !important;
-  gap: 10px !important;
-}
-
-.vt-item-popout-actions button,
-.vt-price-editor input,
-.vt-icon-button {
-  position: relative !important;
-  z-index: 2 !important;
-}
-
-@media (max-width: 860px) {
-  .vt-item-popout {
-    width: min(96vw, 760px) !important;
-    grid-template-columns: 1fr !important;
-    max-height: 92vh !important;
-    overflow: auto !important;
-  }
-
-  .vt-item-popout-image-wrap {
-    padding-right: 0 !important;
-  }
-
-  .vt-item-popout-image-wrap img {
-    max-width: 100% !important;
-    max-height: 54vh !important;
-  }
-
-  .vt-item-popout-menu {
-    max-width: none !important;
-    justify-self: stretch !important;
-  }
-}
-
-
-/* =========================================================
-   Duplicate legacy popup suppression
-   ========================================================= */
-
-/* Old/off-side item popups do not get this marker. Hide them when the new
-   centered popup is present so only one popup can appear. */
-body:has(.vt-item-popout-backdrop[data-vt-centered-popup="true"])
-  .vt-item-popout-backdrop:not([data-vt-centered-popup="true"]) {
-  display: none !important;
-  pointer-events: none !important;
-}
-
-/* Hide common legacy modal layers/classes if an older item UI still opens. */
-body:has(.vt-item-popout-backdrop[data-vt-centered-popup="true"])
-  :is(.item-modal, .item-popup, .item-detail-modal, .item-preview-modal, .legacy-item-popout, .legacy-item-modal, .vt-hidden-legacy-item-popup):not(.vt-item-popout):not(.vt-item-popout-backdrop) {
-  display: none !important;
-  pointer-events: none !important;
-  visibility: hidden !important;
-}
-
-/* The active centered popup is the only item popup layer allowed to receive input. */
-.vt-item-popout-backdrop[data-vt-centered-popup="true"] {
-  display: flex !important;
-  pointer-events: auto !important;
-  visibility: visible !important;
-}
-
-.vt-item-popout-backdrop[data-vt-centered-popup="true"] .vt-item-popout {
-  pointer-events: auto !important;
-  visibility: visible !important;
 }
