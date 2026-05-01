@@ -692,6 +692,17 @@ app.post('/api/admin/bazaar/items/:itemId/offline-accepted-trade', authMiddlewar
 app.use(express.json());
 app.use(cors({ origin: FRONTEND_ORIGIN }));
 
+const installVelkTradeCompatRoutes = require("./velktrade-compat-routes");
+
+installVelkTradeCompatRoutes({
+  app,
+  authMiddleware,
+  pool,
+  query,
+  run,
+  get
+});
+
 registerProfileShareRoute(app, {
   get,
   publicFrontendUrl: PUBLIC_FRONTEND_URL
