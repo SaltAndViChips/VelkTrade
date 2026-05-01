@@ -1,11 +1,12 @@
-/* VelkTrade direct unified mosaic override.
+/* VelkTrade unified item mosaic + popup override.
    This file is imported by UnifiedItemExperience.jsx.
 */
 
 html,
 body,
 #root {
-  max-width: 100%;
+  width: 100% !important;
+  max-width: none !important;
   overflow-x: hidden;
 }
 
@@ -15,7 +16,63 @@ body,
   box-sizing: border-box;
 }
 
-/* Shared mosaic containers */
+/* Make the real app shell use more horizontal room. */
+@media (min-width: 1000px) {
+  body #root,
+  body #root > div,
+  body #root main,
+  body #root .app,
+  body #root .dashboard,
+  body #root .dashboard-shell,
+  body #root .page,
+  body #root .page-shell,
+  body #root .main-content,
+  body #root .content-shell {
+    max-width: none !important;
+  }
+
+  body #root > div,
+  body #root > div > main,
+  body #root main,
+  body #root .app,
+  body #root .dashboard,
+  body #root .dashboard-shell,
+  body #root .page,
+  body #root .page-shell,
+  body #root .main-content,
+  body #root .content-shell {
+    width: min(96vw, 2400px) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  body #root section,
+  body #root .card,
+  body #root .panel,
+  body #root .bazaar-page,
+  body #root .inventory-page,
+  body #root .profile-page,
+  body #root .admin-panel {
+    max-width: none !important;
+  }
+}
+
+@media (min-width: 1800px) {
+  body #root > div,
+  body #root > div > main,
+  body #root main,
+  body #root .app,
+  body #root .dashboard,
+  body #root .dashboard-shell,
+  body #root .page,
+  body #root .page-shell,
+  body #root .main-content,
+  body #root .content-shell {
+    width: min(98vw, 3200px) !important;
+  }
+}
+
+/* Mosaic grids. Fixed tile widths allow more columns on wide screens. */
 .inventory-grid,
 .inventory-items,
 .items-grid,
@@ -34,15 +91,81 @@ body,
 .admin-trade-side ul,
 .vt-unified-mosaic-grid {
   display: grid !important;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  gap: 14px !important;
   width: 100% !important;
-  max-width: 100% !important;
+  max-width: none !important;
   min-width: 0 !important;
-  align-items: stretch !important;
+  align-items: start !important;
+  justify-content: start !important;
+  gap: 14px !important;
 }
 
-/* Cards become mosaic tiles, not separate boxed listings */
+@media (min-width: 761px) {
+  .inventory-grid,
+  .inventory-items,
+  .items-grid,
+  .item-grid,
+  .profile-items,
+  .profile-inventory,
+  .bazaar-grid,
+  .bazaar-items,
+  .bazaar-list,
+  .trade-items-grid,
+  .trade-inventory-grid,
+  .trade-offer-grid,
+  .trade-menu-items,
+  .selected-items,
+  .offer-items,
+  .admin-trade-side ul,
+  .vt-unified-mosaic-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 300px)) !important;
+  }
+}
+
+@media (min-width: 1600px) {
+  .inventory-grid,
+  .inventory-items,
+  .items-grid,
+  .item-grid,
+  .profile-items,
+  .profile-inventory,
+  .bazaar-grid,
+  .bazaar-items,
+  .bazaar-list,
+  .trade-items-grid,
+  .trade-inventory-grid,
+  .trade-offer-grid,
+  .trade-menu-items,
+  .selected-items,
+  .offer-items,
+  .admin-trade-side ul,
+  .vt-unified-mosaic-grid {
+    grid-template-columns: repeat(auto-fill, minmax(285px, 285px)) !important;
+  }
+}
+
+@media (min-width: 2200px) {
+  .inventory-grid,
+  .inventory-items,
+  .items-grid,
+  .item-grid,
+  .profile-items,
+  .profile-inventory,
+  .bazaar-grid,
+  .bazaar-items,
+  .bazaar-list,
+  .trade-items-grid,
+  .trade-inventory-grid,
+  .trade-offer-grid,
+  .trade-menu-items,
+  .selected-items,
+  .offer-items,
+  .admin-trade-side ul,
+  .vt-unified-mosaic-grid {
+    grid-template-columns: repeat(auto-fill, minmax(270px, 270px)) !important;
+  }
+}
+
+/* Item cards */
 .inventory-grid > *,
 .inventory-items > *,
 .items-grid > *,
@@ -71,30 +194,28 @@ body,
   cursor: zoom-in !important;
 }
 
-/* Hide top-level Bazaar and item action controls. Actions belong in the popout. */
-.bazaar-grid > * > button,
-.bazaar-items > * > button,
-.bazaar-list > * > button,
-.bazaar-grid > * .interested-button,
-.bazaar-items > * .interested-button,
-.bazaar-list > * .interested-button,
-.bazaar-grid > * [class*="interest" i],
-.bazaar-items > * [class*="interest" i],
-.bazaar-list > * [class*="interest" i],
-.vt-unified-item-card > button,
+@media (min-width: 761px) {
+  .vt-unified-item-card {
+    min-height: 320px !important;
+    max-height: 360px !important;
+  }
+}
+
+/* Hide top-level action buttons/prices. All actions are in popup. */
+.vt-unified-item-card button,
+.vt-unified-item-card .inline-controls,
+.vt-unified-item-card .item-actions,
+.vt-unified-item-card .bazaar-interest-row,
+.vt-unified-item-card [class*="interest" i],
 .vt-unified-item-card [class*="remove" i],
-.vt-unified-item-card [class*="interest" i] {
+.vt-unified-item-card [class*="price" i]:not(.sr-only),
+.vt-unified-item-card .admin-ic-line,
+.vt-unified-item-card .status-pill,
+.inventory-status-pill {
   display: none !important;
 }
 
-/* Hide top-level prices/IC. Price appears only in the popout menu. */
-.vt-unified-item-card > :is(.price,.item-price,.bazaar-price),
-.vt-unified-item-card :is(.price,.item-price,.bazaar-price),
-.vt-hover-price {
-  display: none !important;
-}
-
-/* Remove separate inner image-box look */
+/* Remove inner image-box styling. */
 .item-image,
 .inventory-item-image,
 .bazaar-item-image,
@@ -118,7 +239,7 @@ body,
   margin: 0 !important;
 }
 
-/* Unified large readable images */
+/* Correct card image scale: readable, but not screen-tall. */
 .inventory-grid img,
 .inventory-items img,
 .items-grid img,
@@ -138,8 +259,8 @@ body,
 .admin-trade-item-thumb,
 .vt-unified-item-card img {
   width: 100% !important;
-  height: clamp(260px, 28vw, 420px) !important;
-  max-height: none !important;
+  height: 300px !important;
+  max-height: 300px !important;
   object-fit: contain !important;
   display: block !important;
   border-radius: 0 !important;
@@ -149,7 +270,86 @@ body,
   margin: 0 !important;
 }
 
-/* Remove old zoom/hover preview behavior */
+@media (min-width: 1600px) {
+  .inventory-grid img,
+  .inventory-items img,
+  .items-grid img,
+  .item-grid img,
+  .profile-items img,
+  .profile-inventory img,
+  .bazaar-grid img,
+  .bazaar-items img,
+  .bazaar-list img,
+  .trade-items-grid img,
+  .trade-inventory-grid img,
+  .trade-offer-grid img,
+  .trade-menu-items img,
+  .selected-items img,
+  .offer-items img,
+  .admin-trade-side img,
+  .admin-trade-item-thumb,
+  .vt-unified-item-card img {
+    height: 285px !important;
+    max-height: 285px !important;
+  }
+
+  .vt-unified-item-card {
+    min-height: 305px !important;
+    max-height: 345px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .inventory-grid,
+  .inventory-items,
+  .items-grid,
+  .item-grid,
+  .profile-items,
+  .profile-inventory,
+  .bazaar-grid,
+  .bazaar-items,
+  .bazaar-list,
+  .trade-items-grid,
+  .trade-inventory-grid,
+  .trade-offer-grid,
+  .trade-menu-items,
+  .selected-items,
+  .offer-items,
+  .admin-trade-side ul,
+  .vt-unified-mosaic-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    justify-content: stretch !important;
+  }
+
+  .inventory-grid img,
+  .inventory-items img,
+  .items-grid img,
+  .item-grid img,
+  .profile-items img,
+  .profile-inventory img,
+  .bazaar-grid img,
+  .bazaar-items img,
+  .bazaar-list img,
+  .trade-items-grid img,
+  .trade-inventory-grid img,
+  .trade-offer-grid img,
+  .trade-menu-items img,
+  .selected-items img,
+  .offer-items img,
+  .admin-trade-side img,
+  .admin-trade-item-thumb,
+  .vt-unified-item-card img {
+    height: clamp(135px, 42vw, 220px) !important;
+    max-height: 220px !important;
+  }
+
+  .vt-unified-item-card {
+    min-height: auto !important;
+    max-height: none !important;
+  }
+}
+
+/* Disable old hover/preview effects. */
 .admin-trade-item-thumb:hover,
 .admin-trade-item-thumb:focus,
 .admin-trade-image-button:hover .admin-trade-item-thumb,
@@ -171,13 +371,28 @@ body,
   display: none !important;
 }
 
-/* Keep title readable without separate controls */
-.vt-unified-item-card :is(h3,h4,strong,.title,.item-title) {
-  overflow-wrap: anywhere !important;
-  word-break: break-word !important;
+/* Top Online/Offline pill remains active. */
+.profile-toggle-pill,
+button:has(.status-dot),
+button[class*="online" i] {
+  cursor: pointer !important;
 }
 
-/* Popout */
+.profile-toggle-pill.is-online .status-dot,
+button.is-online .status-dot,
+[class*="online" i].is-online .status-dot {
+  background: #61d98b !important;
+  box-shadow: 0 0 12px rgba(97, 217, 139, 0.7) !important;
+}
+
+.profile-toggle-pill.is-offline .status-dot,
+button.is-offline .status-dot,
+[class*="online" i].is-offline .status-dot {
+  background: #dc5a64 !important;
+  box-shadow: 0 0 12px rgba(220, 90, 100, 0.65) !important;
+}
+
+/* Popup */
 .vt-item-popout-backdrop {
   position: fixed;
   inset: 0;
@@ -187,6 +402,10 @@ body,
   padding: 22px;
   background: rgba(2, 1, 7, 0.82);
   backdrop-filter: blur(4px);
+}
+
+.vt-item-popout-backdrop + .vt-item-popout-backdrop {
+  display: none !important;
 }
 
 .vt-item-popout {
@@ -270,13 +489,14 @@ body,
 
 .vt-item-popout-actions {
   display: grid;
-  gap: 9px;
+  gap: 8px !important;
 }
 
 .vt-item-popout-actions button {
   width: 100%;
-  min-height: 42px;
-  border-radius: 12px !important;
+  min-height: 38px !important;
+  border-radius: 11px !important;
+  font-size: 14px !important;
   font-weight: 800 !important;
   box-shadow: none !important;
 }
@@ -295,8 +515,9 @@ body,
 }
 
 .vt-muted-note {
-  color: var(--muted, #b8b0d4);
+  color: #ffd7a8 !important;
   font-size: 13px;
+  line-height: 1.35 !important;
 }
 
 .vt-checkbox-row {
@@ -316,99 +537,7 @@ body,
   border: 1px solid rgba(142, 113, 255, 0.24);
 }
 
-.trade-render-guard-card {
-  margin: 24px auto;
-  max-width: 760px;
-}
-
-/* Responsive */
-@media (max-width: 1050px) {
-  .inventory-grid,
-  .inventory-items,
-  .items-grid,
-  .item-grid,
-  .profile-items,
-  .profile-inventory,
-  .bazaar-grid,
-  .bazaar-items,
-  .bazaar-list,
-  .trade-items-grid,
-  .trade-inventory-grid,
-  .trade-offer-grid,
-  .trade-menu-items,
-  .selected-items,
-  .offer-items,
-  .admin-trade-side ul,
-  .vt-unified-mosaic-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 10px !important;
-  }
-
-  .inventory-grid img,
-  .inventory-items img,
-  .items-grid img,
-  .item-grid img,
-  .profile-items img,
-  .profile-inventory img,
-  .bazaar-grid img,
-  .bazaar-items img,
-  .bazaar-list img,
-  .trade-items-grid img,
-  .trade-inventory-grid img,
-  .trade-offer-grid img,
-  .trade-menu-items img,
-  .selected-items img,
-  .offer-items img,
-  .admin-trade-side img,
-  .admin-trade-item-thumb,
-  .vt-unified-item-card img {
-    height: clamp(190px, 28vw, 300px) !important;
-  }
-}
-
 @media (max-width: 760px) {
-  .inventory-grid,
-  .inventory-items,
-  .items-grid,
-  .item-grid,
-  .profile-items,
-  .profile-inventory,
-  .bazaar-grid,
-  .bazaar-items,
-  .bazaar-list,
-  .trade-items-grid,
-  .trade-inventory-grid,
-  .trade-offer-grid,
-  .trade-menu-items,
-  .selected-items,
-  .offer-items,
-  .admin-trade-side ul,
-  .vt-unified-mosaic-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 8px !important;
-  }
-
-  .inventory-grid img,
-  .inventory-items img,
-  .items-grid img,
-  .item-grid img,
-  .profile-items img,
-  .profile-inventory img,
-  .bazaar-grid img,
-  .bazaar-items img,
-  .bazaar-list img,
-  .trade-items-grid img,
-  .trade-inventory-grid img,
-  .trade-offer-grid img,
-  .trade-menu-items img,
-  .selected-items img,
-  .offer-items img,
-  .admin-trade-side img,
-  .admin-trade-item-thumb,
-  .vt-unified-item-card img {
-    height: clamp(150px, 44vw, 240px) !important;
-  }
-
   .vt-item-popout {
     grid-template-columns: 1fr;
     width: 96vw;
@@ -419,727 +548,4 @@ body,
   .vt-item-popout-image-wrap img {
     height: min(55vh, 520px);
   }
-}
-
-
-/* Final direct cleanup: no top-level item buttons or hover previews */
-.vt-unified-item-card button,
-.vt-unified-item-card .item-card-actions,
-.vt-unified-item-card .price-edit-form,
-.vt-unified-item-card .item-full-preview,
-.item-card .item-card-actions,
-.item-card .price-edit-form,
-.item-card .item-full-preview,
-.mini-trade-item .item-full-preview {
-  display: none !important;
-}
-
-.vt-unified-item-card .item-price,
-.vt-unified-item-card > small,
-.vt-unified-item-card > .muted {
-  display: none !important;
-}
-
-.inventory-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.inventory-online-toggle-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.inventory-pill-toggle {
-  min-height: 34px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  padding: 6px 12px !important;
-  border-radius: 999px !important;
-  font-size: 13px !important;
-  box-shadow: none !important;
-}
-
-.inventory-pill-toggle .toggle-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  background: #df5d6d;
-  box-shadow: 0 0 10px rgba(223, 93, 109, .55);
-}
-
-.inventory-pill-toggle.is-on .toggle-dot {
-  background: #62d18a;
-  box-shadow: 0 0 10px rgba(98, 209, 138, .55);
-}
-
-.sr-only {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  padding: 0 !important;
-  margin: -1px !important;
-  overflow: hidden !important;
-  clip: rect(0, 0, 0, 0) !important;
-  white-space: nowrap !important;
-  border: 0 !important;
-}
-
-.vt-item-popout-actions {
-  grid-template-columns: 1fr !important;
-}
-
-.vt-item-popout-actions button {
-  letter-spacing: .01em;
-}
-
-
-/* === Desktop horizontal scaling + item id/online polish === */
-
-:root {
-  --vt-item-card-min: 360px;
-}
-
-/* Let desktop layouts use ultrawide space instead of staying capped at 3 columns. */
-.app,
-.app-shell,
-.dashboard,
-.page,
-main,
-.main-content,
-.content-shell {
-  max-width: none !important;
-}
-
-@media (min-width: 761px) {
-  .inventory-grid,
-  .inventory-items,
-  .items-grid,
-  .item-grid,
-  .profile-items,
-  .profile-inventory,
-  .bazaar-grid,
-  .bazaar-items,
-  .bazaar-list,
-  .trade-items-grid,
-  .trade-inventory-grid,
-  .trade-offer-grid,
-  .trade-menu-items,
-  .selected-items,
-  .offer-items,
-  .admin-trade-side ul,
-  .vt-unified-mosaic-grid {
-    grid-template-columns: repeat(auto-fill, minmax(min(var(--vt-item-card-min), 100%), 1fr)) !important;
-  }
-}
-
-/* More columns on true ultrawide while preserving current card scale. */
-@media (min-width: 1700px) {
-  .inventory-grid,
-  .inventory-items,
-  .items-grid,
-  .item-grid,
-  .profile-items,
-  .profile-inventory,
-  .bazaar-grid,
-  .bazaar-items,
-  .bazaar-list,
-  .trade-items-grid,
-  .trade-inventory-grid,
-  .trade-offer-grid,
-  .trade-menu-items,
-  .selected-items,
-  .offer-items,
-  .admin-trade-side ul,
-  .vt-unified-mosaic-grid {
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)) !important;
-  }
-}
-
-/* Keep small screens accessible. */
-@media (max-width: 760px) {
-  .inventory-grid,
-  .inventory-items,
-  .items-grid,
-  .item-grid,
-  .profile-items,
-  .profile-inventory,
-  .bazaar-grid,
-  .bazaar-items,
-  .bazaar-list,
-  .trade-items-grid,
-  .trade-inventory-grid,
-  .trade-offer-grid,
-  .trade-menu-items,
-  .selected-items,
-  .offer-items,
-  .admin-trade-side ul,
-  .vt-unified-mosaic-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-}
-
-/* Hide all card-level action buttons/prices now that actions live in the popup. */
-.vt-unified-item-card button,
-.vt-unified-item-card .inline-controls,
-.vt-unified-item-card .item-actions,
-.vt-unified-item-card .bazaar-interest-row,
-.vt-unified-item-card [class*="interest" i],
-.vt-unified-item-card [class*="remove" i],
-.vt-unified-item-card [class*="price" i]:not(.sr-only),
-.vt-unified-item-card .admin-ic-line,
-.vt-unified-item-card .status-pill {
-  display: none !important;
-}
-
-.vt-unified-item-card .sr-only {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  overflow: hidden !important;
-  clip: rect(0, 0, 0, 0) !important;
-  white-space: nowrap !important;
-}
-
-/* Online pill inside inventory header: click the green/red status itself. */
-.inventory-title-row {
-  display: flex !important;
-  justify-content: space-between !important;
-  align-items: center !important;
-  gap: 12px !important;
-  flex-wrap: wrap !important;
-}
-
-.inventory-status-pill {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 7px !important;
-  width: auto !important;
-  min-height: 30px !important;
-  padding: 5px 11px !important;
-  border-radius: 999px !important;
-  border: 1px solid rgba(142, 113, 255, 0.35) !important;
-  background: rgba(255, 255, 255, 0.045) !important;
-  color: #efeaff !important;
-  font-size: 12px !important;
-  font-weight: 800 !important;
-  box-shadow: none !important;
-}
-
-.inventory-status-pill .status-dot {
-  width: 9px !important;
-  height: 9px !important;
-  border-radius: 999px !important;
-  background: #61d98b !important;
-  box-shadow: 0 0 12px rgba(97, 217, 139, 0.7) !important;
-}
-
-.inventory-status-pill.is-offline .status-dot {
-  background: #dc5a64 !important;
-  box-shadow: 0 0 12px rgba(220, 90, 100, 0.65) !important;
-}
-
-.inventory-status-pill.is-offline {
-  color: #ffd7dc !important;
-}
-
-/* Popup actions: cleaner grouping and less bulky buttons. */
-.vt-item-popout-actions {
-  gap: 8px !important;
-}
-
-.vt-item-popout-actions button {
-  min-height: 38px !important;
-  border-radius: 11px !important;
-  font-size: 14px !important;
-}
-
-.vt-item-popout-menu .admin-ic-line {
-  display: inline-flex !important;
-}
-
-
-/* === Ultrawide scaling, top online pill, and popup item-id action polish === */
-
-/* Remove lower duplicate inventory online pill entirely. The profile/top Online pill owns this now. */
-.inventory-status-pill {
-  display: none !important;
-}
-
-/* Top profile Online/Offline pill behavior and styling. */
-.profile-toggle-pill,
-button:has(.status-dot),
-button[class*="online" i],
-[class*="online" i].profile-toggle-pill {
-  cursor: pointer;
-}
-
-.profile-toggle-pill.is-online .status-dot,
-button.is-online .status-dot,
-[class*="online" i].is-online .status-dot {
-  background: #61d98b !important;
-  box-shadow: 0 0 12px rgba(97, 217, 139, 0.7) !important;
-}
-
-.profile-toggle-pill.is-offline .status-dot,
-button.is-offline .status-dot,
-[class*="online" i].is-offline .status-dot {
-  background: #dc5a64 !important;
-  box-shadow: 0 0 12px rgba(220, 90, 100, 0.65) !important;
-}
-
-/* Force the application shell to use wide/ultrawide horizontal room. */
-html,
-body,
-#root {
-  width: 100% !important;
-}
-
-body {
-  margin: 0 !important;
-}
-
-#root > *,
-.app,
-.app-shell,
-.dashboard,
-.dashboard-shell,
-.page,
-.page-shell,
-.main-content,
-.content-shell,
-main,
-main > section,
-section.bazaar,
-.bazaar-page,
-.inventory-page,
-.profile-page,
-.admin-panel {
-  max-width: none !important;
-}
-
-/* The app content should be able to grow on desktop while staying readable. */
-@media (min-width: 1100px) {
-  .app,
-  .app-shell,
-  .dashboard,
-  .dashboard-shell,
-  .page,
-  .page-shell,
-  .main-content,
-  .content-shell,
-  main {
-    width: min(96vw, 2200px) !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-  }
-
-  .card,
-  .panel,
-  .bazaar-page,
-  .inventory-page,
-  .profile-page,
-  .admin-panel {
-    max-width: none !important;
-  }
-}
-
-/* Preserve card size but add columns as desktop viewport widens. */
-@media (min-width: 761px) {
-  .inventory-grid,
-  .inventory-items,
-  .items-grid,
-  .item-grid,
-  .profile-items,
-  .profile-inventory,
-  .bazaar-grid,
-  .bazaar-items,
-  .bazaar-list,
-  .trade-items-grid,
-  .trade-inventory-grid,
-  .trade-offer-grid,
-  .trade-menu-items,
-  .selected-items,
-  .offer-items,
-  .admin-trade-side ul,
-  .vt-unified-mosaic-grid {
-    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)) !important;
-  }
-}
-
-@media (min-width: 1800px) {
-  .app,
-  .app-shell,
-  .dashboard,
-  .dashboard-shell,
-  .page,
-  .page-shell,
-  .main-content,
-  .content-shell,
-  main {
-    width: min(97vw, 2600px) !important;
-  }
-
-  .inventory-grid,
-  .inventory-items,
-  .items-grid,
-  .item-grid,
-  .profile-items,
-  .profile-inventory,
-  .bazaar-grid,
-  .bazaar-items,
-  .bazaar-list,
-  .trade-items-grid,
-  .trade-inventory-grid,
-  .trade-offer-grid,
-  .trade-menu-items,
-  .selected-items,
-  .offer-items,
-  .admin-trade-side ul,
-  .vt-unified-mosaic-grid {
-    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)) !important;
-  }
-}
-
-/* Keep popup menu action feedback compact and readable. */
-.vt-muted-note {
-  line-height: 1.35 !important;
-}
-
-.vt-item-popout-menu .vt-muted-note:empty {
-  display: none !important;
-}
-
-
-/* === Single popup, wide shell, and network-error-safe polish === */
-
-/* Force root/layout wrappers wider on desktop. */
-@media (min-width: 1100px) {
-  body #root,
-  body #root > div,
-  body #root main,
-  body #root .app,
-  body #root .dashboard,
-  body #root .page,
-  body #root section,
-  body #root .card,
-  body #root .panel {
-    max-width: none !important;
-  }
-
-  body #root > div,
-  body #root main,
-  body #root .dashboard,
-  body #root .page {
-    width: min(96vw, 2400px) !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-  }
-}
-
-@media (min-width: 1800px) {
-  body #root > div,
-  body #root main,
-  body #root .dashboard,
-  body #root .page {
-    width: min(98vw, 3000px) !important;
-  }
-}
-
-/* Auto-add columns while retaining current card scale. */
-@media (min-width: 761px) {
-  .inventory-grid,
-  .inventory-items,
-  .items-grid,
-  .item-grid,
-  .profile-items,
-  .profile-inventory,
-  .bazaar-grid,
-  .bazaar-items,
-  .bazaar-list,
-  .trade-items-grid,
-  .trade-inventory-grid,
-  .trade-offer-grid,
-  .trade-menu-items,
-  .selected-items,
-  .offer-items,
-  .admin-trade-side ul,
-  .vt-unified-mosaic-grid {
-    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)) !important;
-  }
-}
-
-/* Hide duplicate inventory online/offline pill. Top profile pill is the active toggle. */
-.inventory-status-pill {
-  display: none !important;
-}
-
-/* Prevent duplicate popouts from being useful if stale DOM remains. */
-.vt-item-popout-backdrop + .vt-item-popout-backdrop {
-  display: none !important;
-}
-
-/* Keep top online pill clickable and clear. */
-.profile-toggle-pill,
-button:has(.status-dot),
-button[class*="online" i] {
-  cursor: pointer !important;
-}
-
-.profile-toggle-pill.is-offline .status-dot,
-button.is-offline .status-dot {
-  background: #dc5a64 !important;
-  box-shadow: 0 0 12px rgba(220, 90, 100, 0.65) !important;
-}
-
-.profile-toggle-pill.is-online .status-dot,
-button.is-online .status-dot {
-  background: #61d98b !important;
-  box-shadow: 0 0 12px rgba(97, 217, 139, 0.7) !important;
-}
-
-
-/* === Corrective wide layout: more columns, not taller cards === */
-
-/* Use the browser width. Remove old narrow caps from likely wrappers. */
-@media (min-width: 1000px) {
-  html,
-  body,
-  #root {
-    width: 100% !important;
-    max-width: none !important;
-  }
-
-  #root > div,
-  #root > div > main,
-  #root main,
-  #root .app,
-  #root .dashboard,
-  #root .dashboard-shell,
-  #root .page,
-  #root .page-shell,
-  #root .main-content,
-  #root .content-shell {
-    width: calc(100vw - 96px) !important;
-    max-width: 2400px !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-  }
-
-  #root section,
-  #root .card,
-  #root .panel,
-  #root .bazaar-page,
-  #root .inventory-page,
-  #root .profile-page,
-  #root .admin-panel {
-    max-width: none !important;
-  }
-}
-
-@media (min-width: 1800px) {
-  #root > div,
-  #root > div > main,
-  #root main,
-  #root .app,
-  #root .dashboard,
-  #root .dashboard-shell,
-  #root .page,
-  #root .page-shell,
-  #root .main-content,
-  #root .content-shell {
-    width: calc(100vw - 120px) !important;
-    max-width: 3200px !important;
-  }
-}
-
-/* Fixed readable card width. Auto-fill adds columns on 21:9 instead of stretching cards. */
-@media (min-width: 761px) {
-  .inventory-grid,
-  .inventory-items,
-  .items-grid,
-  .item-grid,
-  .profile-items,
-  .profile-inventory,
-  .bazaar-grid,
-  .bazaar-items,
-  .bazaar-list,
-  .trade-items-grid,
-  .trade-inventory-grid,
-  .trade-offer-grid,
-  .trade-menu-items,
-  .selected-items,
-  .offer-items,
-  .admin-trade-side ul,
-  .vt-unified-mosaic-grid {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 300px)) !important;
-    justify-content: start !important;
-    align-items: start !important;
-    gap: 14px !important;
-  }
-}
-
-@media (min-width: 1600px) {
-  .inventory-grid,
-  .inventory-items,
-  .items-grid,
-  .item-grid,
-  .profile-items,
-  .profile-inventory,
-  .bazaar-grid,
-  .bazaar-items,
-  .bazaar-list,
-  .trade-items-grid,
-  .trade-inventory-grid,
-  .trade-offer-grid,
-  .trade-menu-items,
-  .selected-items,
-  .offer-items,
-  .admin-trade-side ul,
-  .vt-unified-mosaic-grid {
-    grid-template-columns: repeat(auto-fill, minmax(285px, 285px)) !important;
-  }
-}
-
-@media (min-width: 2200px) {
-  .inventory-grid,
-  .inventory-items,
-  .items-grid,
-  .item-grid,
-  .profile-items,
-  .profile-inventory,
-  .bazaar-grid,
-  .bazaar-items,
-  .bazaar-list,
-  .trade-items-grid,
-  .trade-inventory-grid,
-  .trade-offer-grid,
-  .trade-menu-items,
-  .selected-items,
-  .offer-items,
-  .admin-trade-side ul,
-  .vt-unified-mosaic-grid {
-    grid-template-columns: repeat(auto-fill, minmax(270px, 270px)) !important;
-  }
-}
-
-/* Revert oversized images. Keep current card scale readable but not screen-tall. */
-@media (min-width: 761px) {
-  .inventory-grid img,
-  .inventory-items img,
-  .items-grid img,
-  .item-grid img,
-  .profile-items img,
-  .profile-inventory img,
-  .bazaar-grid img,
-  .bazaar-items img,
-  .bazaar-list img,
-  .trade-items-grid img,
-  .trade-inventory-grid img,
-  .trade-offer-grid img,
-  .trade-menu-items img,
-  .selected-items img,
-  .offer-items img,
-  .admin-trade-side img,
-  .admin-trade-item-thumb,
-  .vt-unified-item-card img {
-    height: 300px !important;
-    max-height: 300px !important;
-    object-fit: contain !important;
-  }
-
-  .vt-unified-item-card {
-    min-height: 320px !important;
-    max-height: 360px !important;
-  }
-}
-
-@media (min-width: 1600px) {
-  .inventory-grid img,
-  .inventory-items img,
-  .items-grid img,
-  .item-grid img,
-  .profile-items img,
-  .profile-inventory img,
-  .bazaar-grid img,
-  .bazaar-items img,
-  .bazaar-list img,
-  .trade-items-grid img,
-  .trade-inventory-grid img,
-  .trade-offer-grid img,
-  .trade-menu-items img,
-  .selected-items img,
-  .offer-items img,
-  .admin-trade-side img,
-  .admin-trade-item-thumb,
-  .vt-unified-item-card img {
-    height: 285px !important;
-    max-height: 285px !important;
-  }
-
-  .vt-unified-item-card {
-    min-height: 305px !important;
-    max-height: 345px !important;
-  }
-}
-
-@media (max-width: 760px) {
-  .inventory-grid,
-  .inventory-items,
-  .items-grid,
-  .item-grid,
-  .profile-items,
-  .profile-inventory,
-  .bazaar-grid,
-  .bazaar-items,
-  .bazaar-list,
-  .trade-items-grid,
-  .trade-inventory-grid,
-  .trade-offer-grid,
-  .trade-menu-items,
-  .selected-items,
-  .offer-items,
-  .admin-trade-side ul,
-  .vt-unified-mosaic-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    justify-content: stretch !important;
-  }
-
-  .inventory-grid img,
-  .inventory-items img,
-  .items-grid img,
-  .item-grid img,
-  .profile-items img,
-  .profile-inventory img,
-  .bazaar-grid img,
-  .bazaar-items img,
-  .bazaar-list img,
-  .trade-items-grid img,
-  .trade-inventory-grid img,
-  .trade-offer-grid img,
-  .trade-menu-items img,
-  .selected-items img,
-  .offer-items img,
-  .admin-trade-side img,
-  .admin-trade-item-thumb,
-  .vt-unified-item-card img {
-    height: clamp(135px, 42vw, 220px) !important;
-    max-height: 220px !important;
-  }
-
-  .vt-unified-item-card {
-    min-height: auto !important;
-    max-height: none !important;
-  }
-}
-
-/* Make backend route failures clear but not crashing. */
-.vt-muted-note {
-  color: #ffd7a8 !important;
 }

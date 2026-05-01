@@ -1,8 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import '../styles-unified-mosaic-overrides.css';
-
-let vtUnifiedItemExperienceInstanceCounter = 0;
 
 function vtText(value, fallback = '') {
   if (value === undefined || value === null) return fallback;
@@ -24,9 +22,7 @@ function vtText(value, fallback = '') {
     if (typeof value.name === 'string') return value.name;
     if (typeof value.title === 'string') return value.title;
     if (typeof value.message === 'string') return value.message;
-    if (typeof value.value === 'string' || typeof value.value === 'number') {
-      return String(value.value);
-    }
+    if (typeof value.value === 'string' || typeof value.value === 'number') return String(value.value);
 
     try {
       const json = JSON.stringify(value);
@@ -39,16 +35,22 @@ function vtText(value, fallback = '') {
   return fallback;
 }
 
-
-function vtNormalizeImage(value) {
-  return vtText(value).replace(/^https?:\/\//i, '').replace(/\?.*$/, '').trim().toLowerCase();
+function normalizeImage(value) {
+  return vtText(value)
+    .replace(/^https?:\/\//i, '')
+    .replace(/\?.*$/, '')
+    .trim()
+    .toLowerCase();
 }
 
-function vtNormalizeTitle(value) {
-  return vtText(value).replace(/\s+/g, ' ').trim().toLowerCase();
+function normalizeTitle(value) {
+  return vtText(value)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 }
 
-function vtArray(value) {
+function arrayFromPayload(value) {
   if (Array.isArray(value)) return value;
   if (Array.isArray(value?.items)) return value.items;
   if (Array.isArray(value?.data)) return value.data;
@@ -58,19 +60,31 @@ function vtArray(value) {
   return [];
 }
 
-function vtCandidateId(candidate) {
-  return vtText(candidate?.id ?? candidate?.itemId ?? candidate?.item_id ?? candidate?.itemID ?? candidate?.listingId ?? candidate?.listing_id);
+function candidateId(value) {
+  return vtText(value?.id ?? value?.itemId ?? value?.item_id ?? value?.listingId ?? value?.listing_id);
 }
 
-function vtCandidateTitle(candidate) {
-  return vtText(candidate?.title ?? candidate?.itemTitle ?? candidate?.item_title ?? candidate?.name ?? candidate?.itemName);
+function candidateTitle(value) {
+  return vtText(value?.title ?? value?.itemTitle ?? value?.item_title ?? value?.name ?? value?.itemName);
 }
 
-function vtCandidateImage(candidate) {
-  return vtText(candidate?.image ?? candidate?.itemImage ?? candidate?.item_image ?? candidate?.img ?? candidate?.src ?? candidate?.url ?? candidate?.imageUrl ?? candidate?.image_url);
+function candidateImage(value) {
+  return vtText(value?.image ?? value?.itemImage ?? value?.item_image ?? value?.img ?? value?.src ?? value?.url ?? value?.imageUrl ?? value?.image_url);
 }
 
-const ITEM_CACHE_ENDPOINTS = [
+function candidatePrice(value) {
+  return vtText(value?.price ?? value?.itemPrice ?? value?.item_price ?? value?.priceAmount ?? value?.price_amount ?? value?.ic ?? value?.icPrice ?? value?.ic_price);
+}
+
+function candidateOwnerId(value) {
+  return vtText(value?.ownerId ?? value?.owner_id ?? value?.userId ?? value?.user_id ?? value?.userid ?? value?.sellerId ?? value?.seller_id);
+}
+
+function candidateOwnerUsername(value) {
+  return vtText(value?.ownerUsername ?? value?.owner_username ?? value?.username ?? value?.sellerUsername ?? value?.seller_username);
+}
+
+const ITEM_API_ENDPOINTS = [
   '/api/bazaar/items',
   '/api/items',
   '/api/inventory',
@@ -78,29 +92,6 @@ const ITEM_CACHE_ENDPOINTS = [
   '/api/users/me/inventory',
   '/api/profile/inventory'
 ];
-
-const ITEM_AREA_SELECTOR = [
-  '.inventory',
-  '.inventory-page',
-  '.profile',
-  '.profile-page',
-  '.profile-inventory',
-  '.bazaar',
-  '.bazaar-page',
-  '.trade-room',
-  '.trade-menu',
-  '.trade-panel',
-  '.admin-panel',
-  '.admin-trade-side',
-  '[class*="inventory"]',
-  '[class*="Inventory"]',
-  '[class*="profile"]',
-  '[class*="Profile"]',
-  '[class*="bazaar"]',
-  '[class*="Bazaar"]',
-  '[class*="trade"]',
-  '[class*="Trade"]'
-].join(',');
 
 const GRID_SELECTORS = [
   '.inventory-grid',
@@ -121,52 +112,63 @@ const GRID_SELECTORS = [
   '.admin-trade-side ul'
 ];
 
-const ITEM_CARD_SELECTOR = [
-  '.inventory-grid > *',
-  '.inventory-items > *',
-  '.items-grid > *',
-  '.item-grid > *',
-  '.profile-items > *',
-  '.profile-inventory > *',
-  '.bazaar-grid > *',
-  '.bazaar-items > *',
-  '.bazaar-list > *',
-  '.trade-items-grid > *',
-  '.trade-inventory-grid > *',
-  '.trade-offer-grid > *',
-  '.trade-menu-items > *',
-  '.selected-items > *',
-  '.offer-items > *',
-  '.admin-trade-side li'
+const EXCLUDED_IMAGE_SELECTOR = [
+  '.avatar',
+  '.profile-avatar',
+  '.user-avatar',
+  '.badge',
+  '.icon',
+  '.status-dot',
+  '.emoji',
+  '.logo',
+  '.favicon'
 ].join(',');
 
-function getLikelyItemCard(target) {
-  if (!target?.closest) return null;
+function isProbablyItemImage(image) {
+  if (!image || image.closest(EXCLUDED_IMAGE_SELECTOR)) return false;
 
-  const directCard = target.closest(ITEM_CARD_SELECTOR);
-  if (directCard?.querySelector?.('img')) return directCard;
+  const src = vtText(image.currentSrc || image.src);
+  if (!src) return false;
 
-  const area = target.closest(ITEM_AREA_SELECTOR) || target.closest('main, section, article, .card, .panel, body');
-  if (!area) return null;
+  const bounds = image.getBoundingClientRect?.();
+  if (bounds && (bounds.width < 60 || bounds.height < 60)) return false;
 
-  let current = target;
+  const area = image.closest(
+    '.inventory, .inventory-page, .profile, .profile-page, .profile-inventory, .bazaar, .bazaar-page, .trade-room, .trade-menu, .trade-panel, .admin-panel, .admin-trade-side, main, section'
+  );
+
+  return Boolean(area);
+}
+
+function nearestItemCard(start) {
+  const image = start?.closest?.('img') || start?.querySelector?.('img');
+  if (!isProbablyItemImage(image)) return null;
+
+  const explicit = image.closest(
+    '.vt-unified-item-card, article, li, .item-card, .inventory-item, .bazaar-item-card, .bazaar-item, .trade-item, .admin-trade-side li'
+  );
+
+  if (explicit && explicit.querySelector('img')) return explicit;
+
+  let current = image.parentElement;
   let depth = 0;
 
-  while (current && current !== area && current !== document.body && depth < 12) {
-    if (current.querySelector?.('img')) {
-      const className = vtText(current.className);
-      const hasItemClass = /item|card|tile|listing|entry|slot|bazaar|inventory|trade/i.test(className);
-      const hasOneMainImage = (current.querySelectorAll?.('img')?.length || 0) <= 3;
-      const hasPriceOrTitle = /IC|price|interested|remove/i.test(vtText(current.textContent)) || current.querySelector?.('h3,h4,strong,.title,.item-title');
+  while (current && current !== document.body && depth < 10) {
+    const className = vtText(current.className);
+    const imgCount = current.querySelectorAll?.('img')?.length || 0;
+    const text = vtText(current.textContent);
+    const hasItemishClass = /item|card|tile|listing|entry|slot|bazaar|inventory|trade/i.test(className);
+    const hasItemishText = /IC|price|interested|remove|LVL|DMG|RPM|MAG/i.test(text);
 
-      if (hasItemClass || (hasOneMainImage && hasPriceOrTitle)) return current;
+    if (imgCount >= 1 && imgCount <= 3 && (hasItemishClass || hasItemishText)) {
+      return current;
     }
 
     current = current.parentElement;
     depth += 1;
   }
 
-  return target.closest('article, li, .card, [class*="item" i], [class*="card" i]');
+  return image.parentElement;
 }
 
 function getText(element, selectors) {
@@ -175,23 +177,21 @@ function getText(element, selectors) {
     const text = found?.textContent?.trim();
     if (text) return text;
   }
-
   return '';
 }
 
-function getData(element, key) {
+function getData(element, keys) {
   let current = element;
-  const normalizedKey = key.toLowerCase();
 
   while (current && current !== document.body) {
-    if (current.dataset && current.dataset[key] !== undefined) {
-      return current.dataset[key];
+    for (const key of keys) {
+      if (current.dataset && current.dataset[key] !== undefined) return current.dataset[key];
     }
 
-    if (current.attributes) {
-      for (const attr of Array.from(current.attributes)) {
-        const attrName = attr.name.toLowerCase().replace(/^data-/, '').replace(/-/g, '');
-        if (attrName === normalizedKey.toLowerCase()) return attr.value;
+    for (const attr of Array.from(current.attributes || [])) {
+      const name = attr.name.toLowerCase().replace(/^data-/, '').replace(/-/g, '');
+      for (const key of keys) {
+        if (name === key.toLowerCase()) return attr.value;
       }
     }
 
@@ -201,89 +201,7 @@ function getData(element, key) {
   return '';
 }
 
-function extractPriceText(element) {
-  const direct = vtText(
-    getData(element, 'price') ||
-      getData(element, 'itemPrice') ||
-      getText(element, ['.price', '.item-price', '.bazaar-price'])
-  );
-
-  if (direct) return direct;
-
-  const text = vtText(element.textContent);
-  const icMatch = text.match(/[\d,]+(?:\.\d+)?\s*IC/i);
-  if (icMatch) return icMatch[0];
-
-  return '';
-}
-
-
-function normalizeItemCandidate(value) {
-  if (!value || typeof value !== 'object') return null;
-
-  const id = vtText(value.id ?? value.itemId ?? value.item_id ?? value.itemID ?? value.listingId ?? value.listing_id);
-  const title = vtText(value.title ?? value.itemTitle ?? value.item_title ?? value.name ?? value.itemName);
-  const src = vtText(value.image ?? value.itemImage ?? value.item_image ?? value.img ?? value.src ?? value.url ?? value.imageUrl ?? value.image_url);
-  const price = vtText(value.price ?? value.itemPrice ?? value.item_price ?? value.priceAmount ?? value.price_amount ?? value.ic ?? value.icPrice ?? value.ic_price);
-  const ownerId = vtText(value.ownerId ?? value.owner_id ?? value.userId ?? value.user_id ?? value.userid ?? value.sellerId ?? value.seller_id);
-  const ownerUsername = vtText(value.ownerUsername ?? value.owner_username ?? value.username ?? value.sellerUsername ?? value.seller_username);
-
-  if (!id && !title && !src && !price) return null;
-
-  return { id, title, src, price, ownerId, ownerUsername };
-}
-
-function findItemLike(value, seen = new WeakSet(), depth = 0) {
-  if (!value || typeof value !== 'object' || depth > 5) return null;
-  if (seen.has(value)) return null;
-  seen.add(value);
-
-  if (value instanceof Element || value instanceof Window || value instanceof Document) return null;
-
-  const direct = normalizeItemCandidate(value);
-  if (direct && (direct.id || direct.src || direct.title)) return direct;
-
-  const preferredKeys = [
-    'item', 'listing', 'bazaarItem', 'inventoryItem', 'tradeItem',
-    'data', 'payload', 'props', 'children'
-  ];
-
-  for (const key of preferredKeys) {
-    if (value[key]) {
-      const found = findItemLike(value[key], seen, depth + 1);
-      if (found) return found;
-    }
-  }
-
-  for (const key of Object.keys(value).slice(0, 30)) {
-    if (key === 'stateNode' || key === 'return' || key === 'alternate' || key === '_owner') continue;
-    const found = findItemLike(value[key], seen, depth + 1);
-    if (found) return found;
-  }
-
-  return null;
-}
-
-function findReactItemData(element) {
-  let current = element;
-  let depth = 0;
-
-  while (current && current !== document.body && depth < 10) {
-    for (const key of Object.keys(current)) {
-      if (!key.startsWith('__reactProps$') && !key.startsWith('__reactFiber$')) continue;
-
-      const found = findItemLike(current[key]);
-      if (found) return found;
-    }
-
-    current = current.parentElement;
-    depth += 1;
-  }
-
-  return null;
-}
-
-function readAnyDataId(element) {
+function readIdFromAttributes(element) {
   let current = element;
 
   while (current && current !== document.body) {
@@ -291,11 +209,22 @@ function readAnyDataId(element) {
       const name = attr.name.toLowerCase();
       const value = vtText(attr.value);
 
-      if ((name.includes('item') || name.endsWith('id') || name.includes('listing')) && /\d+/.test(value)) {
+      if (
+        name === 'data-item-id' ||
+        name === 'data-id' ||
+        name === 'item-id' ||
+        name === 'itemid' ||
+        name === 'listing-id' ||
+        name === 'data-listing-id'
+      ) {
         return value.match(/\d+/)?.[0] || value;
       }
 
-      const routeMatch = value.match(/(?:items?|bazaar\/items)\/(\d+)/i);
+      if ((name.includes('item') || name.includes('listing') || name.endsWith('id')) && /\d+/.test(value)) {
+        return value.match(/\d+/)?.[0] || value;
+      }
+
+      const routeMatch = value.match(/(?:items?|bazaar\/items|inventory)\/(\d+)/i);
       if (routeMatch) return routeMatch[1];
     }
 
@@ -305,64 +234,107 @@ function readAnyDataId(element) {
   return '';
 }
 
+function normalizeReactCandidate(value) {
+  if (!value || typeof value !== 'object') return null;
+
+  const id = candidateId(value);
+  const title = candidateTitle(value);
+  const src = candidateImage(value);
+  const price = candidatePrice(value);
+  const ownerId = candidateOwnerId(value);
+  const ownerUsername = candidateOwnerUsername(value);
+
+  if (!id && !title && !src && !price) return null;
+
+  return { id, title, src, price, ownerId, ownerUsername };
+}
+
+function findReactItemLike(value, seen = new WeakSet(), depth = 0) {
+  if (!value || typeof value !== 'object' || depth > 5) return null;
+  if (seen.has(value)) return null;
+  seen.add(value);
+
+  if (value instanceof Element || value instanceof Window || value instanceof Document) return null;
+
+  const direct = normalizeReactCandidate(value);
+  if (direct && (direct.id || direct.src || direct.title)) return direct;
+
+  for (const key of ['item', 'listing', 'bazaarItem', 'inventoryItem', 'tradeItem', 'data', 'payload', 'props', 'children']) {
+    if (value[key]) {
+      const found = findReactItemLike(value[key], seen, depth + 1);
+      if (found) return found;
+    }
+  }
+
+  for (const key of Object.keys(value).slice(0, 32)) {
+    if (['stateNode', 'return', 'alternate', '_owner'].includes(key)) continue;
+    const found = findReactItemLike(value[key], seen, depth + 1);
+    if (found) return found;
+  }
+
+  return null;
+}
+
+function readReactItemData(element) {
+  let current = element;
+  let depth = 0;
+
+  while (current && current !== document.body && depth < 10) {
+    for (const key of Object.keys(current)) {
+      if (!key.startsWith('__reactProps$') && !key.startsWith('__reactFiber$')) continue;
+      const found = findReactItemLike(current[key]);
+      if (found) return found;
+    }
+
+    current = current.parentElement;
+    depth += 1;
+  }
+
+  return null;
+}
+
+function extractPriceText(element) {
+  const direct =
+    getData(element, ['price', 'itemPrice', 'vtPrice']) ||
+    getText(element, ['.price', '.item-price', '.bazaar-price']);
+
+  if (direct) return vtText(direct);
+
+  const text = vtText(element.textContent);
+  const match = text.match(/[\d,]+(?:\.\d+)?\s*IC/i);
+  return match ? match[0] : '';
+}
 
 function parseItem(element) {
-  const reactItem = findReactItemData(element) || {};
+  const reactItem = readReactItemData(element) || {};
   const img = element.querySelector('img');
-  const src = vtText(reactItem.src || img?.src);
 
-  const titleText = vtText(
+  const src = vtText(reactItem.src || img?.currentSrc || img?.src);
+  const titleRaw = vtText(
     reactItem.title ||
-      reactItem.title ||
-      getData(element, 'title') ||
-      getData(element, 'itemTitle') ||
+      getData(element, ['title', 'itemTitle']) ||
       getText(element, ['.item-title', '.title', 'h3', 'h4', 'strong']) ||
       img?.alt,
     'Item'
   );
 
-  const title = titleText
-    .replace(/\bI'?m interested\b/gi, '')
-    .replace(/\bInterested\b/gi, '')
-    .replace(/\bRemove interest\b/gi, '')
-    .replace(/\bRemove\b/gi, '')
-    .replace(/[\d,]+(?:\.\d+)?\s*IC/gi, '')
-    .replace(/\d+\s+verified users interested/gi, '')
-    .trim() || 'Item';
-
-  const price = vtText(reactItem.price || extractPriceText(element));
-
-  const id = vtText(
-    reactItem.id ||
-      reactItem.id ||
-      getData(element, 'itemId') ||
-      getData(element, 'id') ||
-      readAnyDataId(element) ||
-      element.id?.match(/\d+/)?.[0]
-  );
-
-  const ownerId = vtText(
-    reactItem.ownerId ||
-      reactItem.ownerId ||
-      getData(element, 'ownerId') ||
-      getData(element, 'userId') ||
-      getData(element, 'userid')
-  );
-
-  const ownerUsername = vtText(
-    reactItem.ownerUsername ||
-      reactItem.ownerUsername ||
-      getData(element, 'ownerUsername') ||
-      getData(element, 'username')
-  );
+  const title =
+    titleRaw
+      .replace(/\bI'?m interested\b/gi, '')
+      .replace(/\bInterested\b/gi, '')
+      .replace(/\bRemove interest\b/gi, '')
+      .replace(/\bRemove\b/gi, '')
+      .replace(/[\d,]+(?:\.\d+)?\s*IC/gi, '')
+      .replace(/\d+\s+verified users interested/gi, '')
+      .trim() || 'Item';
 
   return {
-    id,
+    id: vtText(reactItem.id || getData(element, ['itemId', 'id', 'listingId']) || readIdFromAttributes(element)),
     title,
-    price,
+    price: vtText(reactItem.price || extractPriceText(element)),
     src,
-    ownerId,
-    ownerUsername,
+    ownerId: vtText(reactItem.ownerId || getData(element, ['ownerId', 'userId', 'userid', 'sellerId'])),
+    ownerUsername: vtText(reactItem.ownerUsername || getData(element, ['ownerUsername', 'username', 'sellerUsername'])),
     rawElement: element
   };
 }
@@ -381,9 +353,7 @@ function isPrivileged(user) {
 function isOwner(user, item) {
   if (!user || !item) return false;
 
-  if (item.ownerId && user.id && String(item.ownerId) === String(user.id)) {
-    return true;
-  }
+  if (item.ownerId && user.id && String(item.ownerId) === String(user.id)) return true;
 
   if (
     item.ownerUsername &&
@@ -397,28 +367,26 @@ function isOwner(user, item) {
 }
 
 function userDisplayName(user) {
-  return vtText(
-    user?.username ||
-      user?.name ||
-      user?.displayName ||
-      user?.id,
-    'User'
-  );
+  return vtText(user?.username || user?.name || user?.displayName || user?.id, 'User');
 }
 
-function shouldIgnoreClick(target) {
-  const interactive = target?.closest?.(
-    'button, a, input, textarea, select, label, summary, details, [role="button"]'
-  );
+function isIgnoredClickTarget(target) {
+  if (target?.closest?.('.vt-item-popout')) return true;
 
+  const interactive = target?.closest?.('button, a, input, textarea, select, label, summary, details, [role="button"]');
   if (!interactive) return false;
 
   return !interactive.closest?.('.vt-unified-item-card');
 }
 
+async function toggleTopOnline(nextValue) {
+  const body = JSON.stringify({
+    showOnline: nextValue,
+    show_online: nextValue,
+    online: nextValue,
+    enabled: nextValue
+  });
 
-async function vtSetOnlineFromTopPill(nextValue) {
-  const body = JSON.stringify({ showOnline: nextValue, show_online: nextValue, online: nextValue, enabled: nextValue });
   const attempts = [
     ['/api/me/online', 'PUT'],
     ['/api/profile/online', 'PUT'],
@@ -438,17 +406,18 @@ async function vtSetOnlineFromTopPill(nextValue) {
     try {
       return await api(path, { method, body });
     } catch {
-      // Try next compatibility route.
+      // Try next route.
     }
   }
 
   return { ok: false, localOnly: true, online: nextValue };
 }
 
-function vtSyncOnlinePillText(nextValue) {
+function syncOnlinePills(nextValue) {
   document.querySelectorAll('button, .profile-toggle-pill, .inventory-status-pill, [class*="online" i]').forEach(element => {
     const text = vtText(element.textContent).trim().toLowerCase();
     if (text !== 'online' && text !== 'offline') return;
+
     element.classList.toggle('is-online', nextValue);
     element.classList.toggle('is-offline', !nextValue);
 
@@ -461,21 +430,10 @@ function vtSyncOnlinePillText(nextValue) {
         return;
       }
     }
-
-    if (!element.querySelector('.status-dot')) {
-      element.textContent = nextValue ? 'Online' : 'Offline';
-    }
   });
 }
 
 export default function UnifiedItemExperience({ currentUser }) {
-  const instanceIdRef = useRef(null);
-  if (instanceIdRef.current === null) {
-    vtUnifiedItemExperienceInstanceCounter += 1;
-    instanceIdRef.current = vtUnifiedItemExperienceInstanceCounter;
-    window.__VELKTRADE_ACTIVE_ITEM_EXPERIENCE_ID__ = instanceIdRef.current;
-  }
-
   const [item, setItem] = useState(null);
   const [price, setPrice] = useState('');
   const [interestedUsers, setInterestedUsers] = useState([]);
@@ -483,6 +441,14 @@ export default function UnifiedItemExperience({ currentUser }) {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
+    window.__VELKTRADE_OPEN_ITEM_POPUP__ = parsed => {
+      document.querySelectorAll('.vt-item-popout-backdrop').forEach(node => node.remove());
+      setItem(parsed);
+      setPrice(vtText(parsed.price));
+      setMessage('');
+      setInterestedUsers([]);
+    };
+
     function tagItems() {
       GRID_SELECTORS.forEach(selector => {
         document.querySelectorAll(selector).forEach(grid => {
@@ -492,22 +458,21 @@ export default function UnifiedItemExperience({ currentUser }) {
 
       const cards = new Set();
 
-      document.querySelectorAll(ITEM_CARD_SELECTOR).forEach(card => {
-        if (card.querySelector('img')) cards.add(card);
-      });
-
-      document.querySelectorAll('main img, section img, article img, .card img').forEach(image => {
-        const card = getLikelyItemCard(image);
+      document.querySelectorAll('main img, section img, article img, .card img, .panel img').forEach(image => {
+        if (!isProbablyItemImage(image)) return;
+        const card = nearestItemCard(image);
         if (card?.querySelector?.('img')) cards.add(card);
       });
 
       cards.forEach(card => {
         card.classList.add('vt-unified-item-card');
         const parsed = parseItem(card);
+
         if (parsed.id) {
           card.dataset.itemId = parsed.id;
           card.dataset.id = parsed.id;
         }
+
         if (parsed.title) card.dataset.title = parsed.title;
         if (parsed.price) card.dataset.vtPrice = parsed.price;
       });
@@ -518,12 +483,10 @@ export default function UnifiedItemExperience({ currentUser }) {
     const observer = new MutationObserver(tagItems);
     observer.observe(document.body, { childList: true, subtree: true });
 
-    function handleClick(event) {
-      if (window.__VELKTRADE_ACTIVE_ITEM_EXPERIENCE_ID__ !== instanceIdRef.current) return;
-      if (event.target?.closest?.('.vt-item-popout')) return;
-      if (shouldIgnoreClick(event.target)) return;
+    function handleItemClick(event) {
+      if (isIgnoredClickTarget(event.target)) return;
 
-      const card = getLikelyItemCard(event.target);
+      const card = nearestItemCard(event.target);
       if (!card) return;
 
       const parsed = parseItem(card);
@@ -532,11 +495,7 @@ export default function UnifiedItemExperience({ currentUser }) {
       event.preventDefault();
       event.stopPropagation();
 
-      document.querySelectorAll('.vt-item-popout-backdrop').forEach(node => node.remove());
-      setItem(parsed);
-      setPrice(vtText(parsed.price));
-      setMessage('');
-      setInterestedUsers([]);
+      window.__VELKTRADE_OPEN_ITEM_POPUP__?.(parsed);
     }
 
     async function handleTopOnlineClick(event) {
@@ -546,25 +505,29 @@ export default function UnifiedItemExperience({ currentUser }) {
       const text = vtText(pill.textContent).trim().toLowerCase();
       if (text !== 'online' && text !== 'offline') return;
 
-      const isInsideItem = pill.closest('.vt-unified-item-card, .vt-item-popout, .unified-player-panel, .presence-hub-panel, .safe-online-panel');
-      if (isInsideItem) return;
+      if (pill.closest('.vt-unified-item-card, .vt-item-popout, .unified-player-panel, .presence-hub-panel, .safe-online-panel')) {
+        return;
+      }
 
       event.preventDefault();
       event.stopPropagation();
 
       const next = text !== 'online';
       window.localStorage.setItem('velktrade-show-online', String(next));
-      vtSyncOnlinePillText(next);
-      await vtSetOnlineFromTopPill(next);
+      syncOnlinePills(next);
+      await toggleTopOnline(next);
     }
 
-    document.addEventListener('click', handleClick, true);
+    document.addEventListener('click', handleItemClick, true);
     document.addEventListener('click', handleTopOnlineClick, true);
 
     return () => {
       observer.disconnect();
-      document.removeEventListener('click', handleClick, true);
+      document.removeEventListener('click', handleItemClick, true);
       document.removeEventListener('click', handleTopOnlineClick, true);
+      if (window.__VELKTRADE_OPEN_ITEM_POPUP__) {
+        delete window.__VELKTRADE_OPEN_ITEM_POPUP__;
+      }
     };
   }, []);
 
@@ -575,28 +538,29 @@ export default function UnifiedItemExperience({ currentUser }) {
   const canInterest = useMemo(() => {
     return Boolean(item && !isOwner(currentUser, item));
   }, [currentUser, item]);
-  async function resolveItemIdFromApis() {
-    const targetImage = vtNormalizeImage(item?.src);
-    const targetTitle = vtNormalizeTitle(item?.title);
 
-    for (const endpoint of ITEM_CACHE_ENDPOINTS) {
+  async function resolveItemIdFromApis() {
+    const targetImage = normalizeImage(item?.src);
+    const targetTitle = normalizeTitle(item?.title);
+
+    for (const endpoint of ITEM_API_ENDPOINTS) {
       try {
         const data = await api(endpoint);
-        const candidates = vtArray(data);
+        const candidates = arrayFromPayload(data);
 
         for (const candidate of candidates) {
-          const id = vtCandidateId(candidate);
+          const id = candidateId(candidate);
           if (!id) continue;
 
-          const candidateImage = vtNormalizeImage(vtCandidateImage(candidate));
-          const candidateTitle = vtNormalizeTitle(vtCandidateTitle(candidate));
+          const candidateImg = normalizeImage(candidateImage(candidate));
+          const candidateName = normalizeTitle(candidateTitle(candidate));
 
-          if (targetImage && candidateImage && candidateImage === targetImage) return id;
-          if (targetTitle && candidateTitle && candidateTitle === targetTitle) return id;
-          if (targetImage && candidateImage && (candidateImage.includes(targetImage) || targetImage.includes(candidateImage))) return id;
+          if (targetImage && candidateImg && candidateImg === targetImage) return id;
+          if (targetTitle && candidateName && candidateName === targetTitle) return id;
+          if (targetImage && candidateImg && (candidateImg.includes(targetImage) || targetImage.includes(candidateImg))) return id;
         }
       } catch {
-        // Try the next compatibility endpoint.
+        // Try next endpoint.
       }
     }
 
@@ -612,10 +576,10 @@ export default function UnifiedItemExperience({ currentUser }) {
       return parsed.id;
     }
 
-    const resolvedFromApis = await resolveItemIdFromApis();
-    if (resolvedFromApis) {
-      setItem(previous => ({ ...previous, id: resolvedFromApis }));
-      return resolvedFromApis;
+    const fromApis = await resolveItemIdFromApis();
+    if (fromApis) {
+      setItem(previous => ({ ...previous, id: fromApis }));
+      return fromApis;
     }
 
     try {
@@ -628,13 +592,13 @@ export default function UnifiedItemExperience({ currentUser }) {
         })
       });
 
-      const resolvedId = vtText(data?.id || data?.itemId || data?.item?.id);
-      if (resolvedId) {
-        setItem(previous => ({ ...previous, id: resolvedId }));
-        return resolvedId;
+      const resolved = vtText(data?.id || data?.itemId || data?.item?.id);
+      if (resolved) {
+        setItem(previous => ({ ...previous, id: resolved }));
+        return resolved;
       }
     } catch {
-      // Optional route. Older backends will not have it.
+      // Optional backend route.
     }
 
     return '';
@@ -642,18 +606,18 @@ export default function UnifiedItemExperience({ currentUser }) {
 
   async function savePrice() {
     try {
-    const itemId = await ensureItemId();
-    if (!itemId) {
-      setMessage('Could not detect item id for price update.');
-      return;
-    }
+      const itemId = await ensureItemId();
+      if (!itemId) {
+        setMessage('Could not detect item id for price update.');
+        return;
+      }
 
-    await api(`/api/items/${encodeURIComponent(itemId)}/price`, {
-      method: 'PUT',
-      body: JSON.stringify({ price: vtText(price), title: vtText(item?.title), image: vtText(item?.src) })
-    });
+      await api(`/api/items/${encodeURIComponent(itemId)}/price`, {
+        method: 'PUT',
+        body: JSON.stringify({ price: vtText(price), title: vtText(item?.title), image: vtText(item?.src) })
+      });
 
-    setMessage('Price updated.');
+      setMessage('Price updated.');
     } catch (error) {
       console.error('savePrice failed:', error);
       setMessage('Request failed. The backend route may need redeploying.');
@@ -662,18 +626,18 @@ export default function UnifiedItemExperience({ currentUser }) {
 
   async function addInterest() {
     try {
-    const itemId = await ensureItemId();
-    if (!itemId) {
-      setMessage('Could not detect item id for interest.');
-      return;
-    }
+      const itemId = await ensureItemId();
+      if (!itemId) {
+        setMessage('Could not detect item id for interest.');
+        return;
+      }
 
-    await api(`/api/items/${encodeURIComponent(itemId)}/interest`, {
-      method: 'POST',
-      body: JSON.stringify({ title: vtText(item?.title), image: vtText(item?.src), price: vtText(item?.price) })
-    });
+      await api(`/api/items/${encodeURIComponent(itemId)}/interest`, {
+        method: 'POST',
+        body: JSON.stringify({ title: vtText(item?.title), image: vtText(item?.src), price: vtText(item?.price) })
+      });
 
-    setMessage('Interest added.');
+      setMessage('Interest added.');
     } catch (error) {
       console.error('addInterest failed:', error);
       setMessage('Request failed. The backend route may need redeploying.');
@@ -682,17 +646,17 @@ export default function UnifiedItemExperience({ currentUser }) {
 
   async function removeInterest() {
     try {
-    const itemId = await ensureItemId();
-    if (!itemId) {
-      setMessage('Could not detect item id for interest.');
-      return;
-    }
+      const itemId = await ensureItemId();
+      if (!itemId) {
+        setMessage('Could not detect item id for interest.');
+        return;
+      }
 
-    await api(`/api/items/${encodeURIComponent(itemId)}/interest`, {
-      method: 'DELETE'
-    });
+      await api(`/api/items/${encodeURIComponent(itemId)}/interest`, {
+        method: 'DELETE'
+      });
 
-    setMessage('Interest removed.');
+      setMessage('Interest removed.');
     } catch (error) {
       console.error('removeInterest failed:', error);
       setMessage('Request failed. The backend route may need redeploying.');
@@ -701,20 +665,20 @@ export default function UnifiedItemExperience({ currentUser }) {
 
   async function removeItem() {
     try {
-    const itemId = await ensureItemId();
-    if (!itemId) {
-      setMessage('Could not detect item id for removal.');
-      return;
-    }
+      const itemId = await ensureItemId();
+      if (!itemId) {
+        setMessage('Could not detect item id for removal.');
+        return;
+      }
 
-    if (!window.confirm('Remove this item/listing?')) return;
+      if (!window.confirm('Remove this item/listing?')) return;
 
-    await api(`/api/items/${encodeURIComponent(itemId)}`, {
-      method: 'DELETE'
-    });
+      await api(`/api/items/${encodeURIComponent(itemId)}`, {
+        method: 'DELETE'
+      });
 
-    setMessage('Item removed or listing disabled.');
-    item.rawElement?.remove?.();
+      setMessage('Item removed or listing disabled.');
+      item.rawElement?.remove?.();
     } catch (error) {
       console.error('removeItem failed:', error);
       setMessage('Request failed. The backend route may need redeploying.');
@@ -723,20 +687,20 @@ export default function UnifiedItemExperience({ currentUser }) {
 
   async function loadInterestedUsers() {
     try {
-    const itemId = await ensureItemId();
-    if (!itemId) {
-      setMessage('Could not detect item id for interested users.');
-      return;
-    }
+      const itemId = await ensureItemId();
+      if (!itemId) {
+        setMessage('Could not detect item id for interested users.');
+        return;
+      }
 
-    const data = await api(`/api/items/${encodeURIComponent(itemId)}/interest`);
-    const users = Array.isArray(data?.users)
-      ? data.users
-      : Array.isArray(data?.interestedUsers)
-        ? data.interestedUsers
-        : [];
+      const data = await api(`/api/items/${encodeURIComponent(itemId)}/interest`);
+      const users = Array.isArray(data?.users)
+        ? data.users
+        : Array.isArray(data?.interestedUsers)
+          ? data.interestedUsers
+          : [];
 
-    setInterestedUsers(users);
+      setInterestedUsers(users);
     } catch (error) {
       console.error('loadInterestedUsers failed:', error);
       setMessage('Request failed. The backend route may need redeploying.');
@@ -745,25 +709,25 @@ export default function UnifiedItemExperience({ currentUser }) {
 
   async function instantTrade() {
     try {
-    const itemId = await ensureItemId();
-    if (!itemId) {
-      setMessage('Could not detect item id for instant trade.');
-      return;
-    }
+      const itemId = await ensureItemId();
+      if (!itemId) {
+        setMessage('Could not detect item id for instant trade.');
+        return;
+      }
 
-    await api(`/api/items/${encodeURIComponent(itemId)}/instant-trade`, {
-      method: 'POST',
-      body: JSON.stringify({ price: vtText(price), title: vtText(item?.title), image: vtText(item?.src) })
-    });
+      await api(`/api/items/${encodeURIComponent(itemId)}/instant-trade`, {
+        method: 'POST',
+        body: JSON.stringify({ price: vtText(price), title: vtText(item?.title), image: vtText(item?.src) })
+      });
 
-    setMessage('Trade created and item marked trade pending.');
+      setMessage('Trade created and item marked trade pending.');
     } catch (error) {
       console.error('instantTrade failed:', error);
       setMessage('Request failed. The backend route may need redeploying.');
     }
   }
 
-  if (!item || window.__VELKTRADE_ACTIVE_ITEM_EXPERIENCE_ID__ !== instanceIdRef.current) return null;
+  if (!item) return null;
 
   const visibleInterested = verifiedOnly
     ? interestedUsers.filter(user => user?.isVerified || user?.is_verified || user?.isTrusted)
@@ -784,13 +748,9 @@ export default function UnifiedItemExperience({ currentUser }) {
             </button>
           </div>
 
-          {vtText(item.price) && (
-            <p className="admin-ic-line">{vtText(item.price)}</p>
-          )}
+          {vtText(item.price) && <p className="admin-ic-line">{vtText(item.price)}</p>}
 
-          {vtText(message) && (
-            <p className="vt-muted-note">{vtText(message)}</p>
-          )}
+          {vtText(message) && <p className="vt-muted-note">{vtText(message)}</p>}
 
           {canManage && (
             <label className="vt-price-editor">
