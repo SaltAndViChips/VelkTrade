@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
+import { auditClientEvent, velkToast } from '../velktrade-feature-foundation.js';
 import '../styles-unified-mosaic-overrides.css';
 
 function txt(value, fallback = '') {
@@ -59,29 +60,12 @@ function arraysFromPayload(value) {
   return output.flat();
 }
 
-function candidateId(value) {
-  return txt(value?.id ?? value?.itemId ?? value?.item_id ?? value?.listingId ?? value?.listing_id);
-}
-
-function candidateTitle(value) {
-  return txt(value?.title ?? value?.itemTitle ?? value?.item_title ?? value?.name ?? value?.itemName);
-}
-
-function candidateImage(value) {
-  return txt(value?.image ?? value?.itemImage ?? value?.item_image ?? value?.img ?? value?.src ?? value?.url ?? value?.imageUrl ?? value?.image_url);
-}
-
-function candidatePrice(value) {
-  return txt(value?.price ?? value?.itemPrice ?? value?.item_price ?? value?.priceAmount ?? value?.price_amount ?? value?.ic ?? value?.icPrice ?? value?.ic_price);
-}
-
-function candidateOwnerId(value) {
-  return txt(value?.ownerId ?? value?.owner_id ?? value?.userId ?? value?.user_id ?? value?.userid ?? value?.sellerId ?? value?.seller_id);
-}
-
-function candidateOwnerUsername(value) {
-  return txt(value?.ownerUsername ?? value?.owner_username ?? value?.username ?? value?.sellerUsername ?? value?.seller_username);
-}
+function candidateId(value) { return txt(value?.id ?? value?.itemId ?? value?.item_id ?? value?.listingId ?? value?.listing_id); }
+function candidateTitle(value) { return txt(value?.title ?? value?.itemTitle ?? value?.item_title ?? value?.name ?? value?.itemName); }
+function candidateImage(value) { return txt(value?.image ?? value?.itemImage ?? value?.item_image ?? value?.img ?? value?.src ?? value?.url ?? value?.imageUrl ?? value?.image_url); }
+function candidatePrice(value) { return txt(value?.price ?? value?.itemPrice ?? value?.item_price ?? value?.priceAmount ?? value?.price_amount ?? value?.ic ?? value?.icPrice ?? value?.ic_price); }
+function candidateOwnerId(value) { return txt(value?.ownerId ?? value?.owner_id ?? value?.userId ?? value?.user_id ?? value?.userid ?? value?.sellerId ?? value?.seller_id); }
+function candidateOwnerUsername(value) { return txt(value?.ownerUsername ?? value?.owner_username ?? value?.username ?? value?.sellerUsername ?? value?.seller_username); }
 
 function normalizeCandidate(value) {
   if (!value || typeof value !== 'object') return null;
@@ -184,10 +168,7 @@ function bindHoverPrice(card) {
   card.addEventListener('focusout', hide);
 }
 
-function itemImage(target) {
-  return target?.closest?.('img') || target?.querySelector?.('img') || null;
-}
-
+function itemImage(target) { return target?.closest?.('img') || target?.querySelector?.('img') || null; }
 function validItemImage(image) {
   if (!image) return false;
   if (image.closest('.vt-item-popout,.avatar,.profile-avatar,.user-avatar,.badge,.icon,.status-dot,.emoji,.logo,.favicon')) return false;
@@ -208,9 +189,7 @@ function nearestCard(target) {
     const imageCount = current.querySelectorAll?.('img')?.length || 0;
     const className = txt(current.className);
     const body = txt(current.textContent);
-    if (imageCount >= 1 && imageCount <= 6 && (/item|card|tile|listing|entry|slot|bazaar|inventory|trade|offer|log/i.test(className) || /IC|price|LVL|DMG|RPM|MAG|offers/i.test(body))) {
-      return current;
-    }
+    if (imageCount >= 1 && imageCount <= 6 && (/item|card|tile|listing|entry|slot|bazaar|inventory|trade|offer|log/i.test(className) || /IC|price|LVL|DMG|RPM|MAG|offers/i.test(body))) return current;
     current = current.parentElement;
     depth += 1;
   }
@@ -243,7 +222,8 @@ function parseItem(card) {
     src,
     ownerId: txt(react.ownerId || readData(card, ['ownerId', 'userId', 'userid', 'sellerId'])),
     ownerUsername: txt(react.ownerUsername || readData(card, ['ownerUsername', 'username', 'sellerUsername'])),
-    rawElement: card
+    rawElement: card,
+    locked: card.dataset?.vtLocked === 'true' || card.classList.contains('vt-item-locked')
   };
 }
 
@@ -323,20 +303,12 @@ export default function UnifiedItemExperience({ currentUser }) {
       cards.forEach(card => {
         card.classList.add('vt-unified-item-card');
         const parsed = parseItem(card);
-        if (parsed.id) {
-          card.dataset.itemId = parsed.id;
-          card.dataset.id = parsed.id;
-        }
-        if (parsed.title) {
-          card.dataset.title = parsed.title;
-          card.dataset.vtOriginalTitle = parsed.title;
-        }
-        if (parsed.price) {
-          card.dataset.vtPrice = parsed.price;
-          card.dataset.price = parsed.price;
-        }
+        if (parsed.id) { card.dataset.itemId = parsed.id; card.dataset.id = parsed.id; }
+        if (parsed.title) { card.dataset.title = parsed.title; card.dataset.vtOriginalTitle = parsed.title; }
+        if (parsed.price) { card.dataset.vtPrice = parsed.price; card.dataset.price = parsed.price; }
         bindHoverPrice(card);
       });
+      window.dispatchEvent(new CustomEvent('velktrade:scan-locks'));
       suppressLegacyPopups();
     }
 
@@ -375,11 +347,13 @@ export default function UnifiedItemExperience({ currentUser }) {
 
     window.addEventListener('click', handleItemClick, true);
     document.addEventListener('click', handleOnlineClick, true);
+    window.addEventListener('velktrade:scan-locks', tagItems);
 
     return () => {
       observer.disconnect();
       window.removeEventListener('click', handleItemClick, true);
       document.removeEventListener('click', handleOnlineClick, true);
+      window.removeEventListener('velktrade:scan-locks', tagItems);
       if (window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ === token) {
         delete window.__VELKTRADE_OPEN_ITEM_POPUP__;
         delete window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__;
@@ -388,10 +362,11 @@ export default function UnifiedItemExperience({ currentUser }) {
   }, []);
 
   const hasItemId = Boolean(txt(item?.id));
-  const ownerCanEditPrice = useMemo(() => Boolean(item && hasItemId && isOwner(currentUser, item)), [currentUser, item, hasItemId]);
-  const canRemoveListing = useMemo(() => Boolean(item && hasItemId && (isOwner(currentUser, item) || isPrivileged(currentUser))), [currentUser, item, hasItemId]);
+  const isLocked = Boolean(item?.locked);
+  const ownerCanEditPrice = useMemo(() => Boolean(item && hasItemId && !isLocked && isOwner(currentUser, item)), [currentUser, item, hasItemId, isLocked]);
+  const canRemoveListing = useMemo(() => Boolean(item && hasItemId && !isLocked && (isOwner(currentUser, item) || isPrivileged(currentUser))), [currentUser, item, hasItemId, isLocked]);
   const canShowInterested = useMemo(() => Boolean(item && hasItemId && (isOwner(currentUser, item) || isPrivileged(currentUser))), [currentUser, item, hasItemId]);
-  const canInterest = useMemo(() => Boolean(item && hasItemId && !isOwner(currentUser, item)), [currentUser, item, hasItemId]);
+  const canInterest = useMemo(() => Boolean(item && hasItemId && !isLocked && !isOwner(currentUser, item)), [currentUser, item, hasItemId, isLocked]);
 
   async function resolveItemIdFromApis() {
     const targetImage = norm(item?.src);
@@ -415,22 +390,13 @@ export default function UnifiedItemExperience({ currentUser }) {
   async function ensureItemId() {
     if (item?.id) return item.id;
     const parsed = item?.rawElement ? parseItem(item.rawElement) : null;
-    if (parsed?.id) {
-      setItem(previous => ({ ...previous, ...parsed }));
-      return parsed.id;
-    }
+    if (parsed?.id) { setItem(previous => ({ ...previous, ...parsed })); return parsed.id; }
     const apiId = await resolveItemIdFromApis();
-    if (apiId) {
-      setItem(previous => ({ ...previous, id: apiId }));
-      return apiId;
-    }
+    if (apiId) { setItem(previous => ({ ...previous, id: apiId })); return apiId; }
     try {
       const data = await api('/api/items/resolve', { method: 'POST', body: JSON.stringify({ title: txt(item?.title), image: txt(item?.src), price: txt(item?.price || price) }) });
       const resolved = txt(data?.id || data?.itemId || data?.item?.id);
-      if (resolved) {
-        setItem(previous => ({ ...previous, id: resolved }));
-        return resolved;
-      }
+      if (resolved) { setItem(previous => ({ ...previous, id: resolved })); return resolved; }
     } catch {}
     return '';
   }
@@ -442,11 +408,13 @@ export default function UnifiedItemExperience({ currentUser }) {
       const formatted = fmtPrice(price);
       await api(`/api/items/${encodeURIComponent(itemId)}/price`, { method: 'PUT', body: JSON.stringify({ price: formatted, title: txt(item?.title), image: txt(item?.src) }) });
       applyPrice(item?.rawElement, formatted);
+      auditClientEvent('item.price_updated', { itemId, price: formatted });
+      velkToast('Price updated.', 'success');
       setPrice(formatted);
       setItem(previous => ({ ...previous, id: itemId, price: formatted }));
-      setMessage('Price updated.');
     } catch (error) {
       console.error('savePrice failed:', error);
+      velkToast('Price update failed.', 'error');
       setMessage('Request failed. The backend route may need redeploying.');
     }
   }
@@ -456,10 +424,12 @@ export default function UnifiedItemExperience({ currentUser }) {
       const itemId = await ensureItemId();
       if (!itemId || !canInterest) return;
       await api(`/api/items/${encodeURIComponent(itemId)}/interest`, { method: 'POST', body: JSON.stringify({ title: txt(item?.title), image: txt(item?.src), price: txt(item?.price) }) });
+      auditClientEvent('item.interest_added', { itemId });
+      velkToast('Interest added.', 'success');
       setItem(previous => ({ ...previous, id: itemId }));
-      setMessage('Interest added.');
     } catch (error) {
       console.error('addInterest failed:', error);
+      velkToast('Could not add interest.', 'error');
       setMessage('Request failed. The backend route may need redeploying.');
     }
   }
@@ -469,10 +439,12 @@ export default function UnifiedItemExperience({ currentUser }) {
       const itemId = await ensureItemId();
       if (!itemId || !canInterest) return;
       await api(`/api/items/${encodeURIComponent(itemId)}/interest`, { method: 'DELETE' });
+      auditClientEvent('item.interest_removed', { itemId });
+      velkToast('Interest removed.', 'success');
       setItem(previous => ({ ...previous, id: itemId }));
-      setMessage('Interest removed.');
     } catch (error) {
       console.error('removeInterest failed:', error);
+      velkToast('Could not remove interest.', 'error');
       setMessage('Request failed. The backend route may need redeploying.');
     }
   }
@@ -483,11 +455,14 @@ export default function UnifiedItemExperience({ currentUser }) {
       if (!itemId || !canRemoveListing) return;
       if (!window.confirm('Remove this item/listing?')) return;
       await api(`/api/items/${encodeURIComponent(itemId)}`, { method: 'DELETE' });
+      auditClientEvent('item.removed', { itemId });
+      velkToast('Item removed.', 'success');
       item.rawElement?.remove?.();
       setItem(null);
       window.dispatchEvent(new CustomEvent('velktrade:item-removed', { detail: { itemId } }));
     } catch (error) {
       console.error('removeItem failed:', error);
+      velkToast('Item removal failed.', 'error');
       setMessage('Request failed. The backend route may need redeploying.');
     }
   }
@@ -502,12 +477,12 @@ export default function UnifiedItemExperience({ currentUser }) {
       setInterestedUsers(users);
     } catch (error) {
       console.error('loadInterestedUsers failed:', error);
+      velkToast('Could not load interested users.', 'error');
       setMessage('Request failed. The backend route may need redeploying.');
     }
   }
 
   if (!item) return null;
-
   const visibleInterested = verifiedOnly ? interestedUsers.filter(user => user?.isVerified || user?.is_verified || user?.isTrusted) : interestedUsers;
 
   return (
@@ -520,6 +495,7 @@ export default function UnifiedItemExperience({ currentUser }) {
             <button type="button" className="vt-icon-button" onClick={() => setItem(null)} aria-label="Close item menu">×</button>
           </div>
           {txt(item.price) && <p className="admin-ic-line">{txt(item.price)}</p>}
+          {isLocked && <p className="vt-muted-note">🔒 This item is locked because it is pending or already in a trade.</p>}
           {txt(message) && <p className="vt-muted-note">{txt(message)}</p>}
           {ownerCanEditPrice && <label className="vt-price-editor"><span>Edit price</span><input value={txt(price)} onChange={event => setPrice(event.target.value)} placeholder="Example: 500000 IC" /></label>}
           <div className="vt-item-popout-actions">
