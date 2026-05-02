@@ -26,68 +26,6 @@ html, body, #root {
   }
 }
 
-.safe-online-dropdown,
-.unified-player-menu,
-.presence-hub,
-.online-player-menu,
-.online-players-menu,
-.player-online-menu,
-.player-presence-menu {
-  position: fixed !important;
-  top: 56px !important;
-  right: 14px !important;
-  left: auto !important;
-  bottom: auto !important;
-  z-index: 99999 !important;
-  width: auto !important;
-  max-width: min(430px, calc(100vw - 28px)) !important;
-  transform: none !important;
-  margin: 0 !important;
-}
-
-.safe-online-toggle,
-.unified-player-trigger,
-.presence-hub-trigger,
-.online-player-toggle,
-.online-players-toggle,
-.player-online-toggle,
-button[aria-label*="Online players" i],
-button[title*="Online players" i] {
-  position: fixed !important;
-  top: 58px !important;
-  right: 12px !important;
-  left: auto !important;
-  bottom: auto !important;
-  z-index: 100000 !important;
-  width: 42px !important;
-  height: 42px !important;
-  min-width: 42px !important;
-  min-height: 42px !important;
-  margin: 0 !important;
-  transform: none !important;
-}
-
-.safe-online-panel,
-.unified-player-panel,
-.presence-hub-panel,
-.online-player-panel,
-.online-players-panel,
-.player-online-panel,
-.player-presence-panel {
-  position: fixed !important;
-  top: 108px !important;
-  right: 12px !important;
-  left: auto !important;
-  bottom: auto !important;
-  z-index: 99999 !important;
-  width: min(430px, calc(100vw - 24px)) !important;
-  max-width: min(430px, calc(100vw - 24px)) !important;
-  max-height: calc(100vh - 128px) !important;
-  overflow: auto !important;
-  transform: none !important;
-  margin: 0 !important;
-}
-
 .inventory-grid,
 .inventory-items,
 .items-grid,
@@ -209,7 +147,6 @@ button[title*="Online players" i] {
   align-self: start !important;
 }
 
-.vt-unified-item-card button,
 .vt-unified-item-card .inline-controls,
 .vt-unified-item-card .item-actions,
 .vt-unified-item-card .bazaar-interest-row,
@@ -220,6 +157,44 @@ button[title*="Online players" i] {
 .vt-unified-item-card .status-pill,
 .inventory-status-pill {
   display: none !important;
+}
+
+.vt-unified-item-card .bulk-select-pill {
+  display: inline-flex !important;
+  position: absolute !important;
+  top: 9px !important;
+  right: 9px !important;
+  z-index: 8 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 30px !important;
+  padding: 5px 10px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 220, 147, 0.65) !important;
+  background: rgba(8, 6, 14, 0.88) !important;
+  color: #ffdc93 !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+  box-shadow: 0 8px 18px rgba(0,0,0,.38) !important;
+}
+
+.vt-unified-item-card.bulk-selected {
+  outline: 2px solid rgba(255, 220, 147, 0.9) !important;
+  outline-offset: 3px !important;
+}
+
+.vt-unified-item-card > .item-title,
+.vt-unified-item-card .item-title,
+.vt-unified-item-card h3,
+.vt-unified-item-card h4,
+.vt-unified-item-card figcaption,
+.vt-unified-item-card > strong {
+  display: block !important;
+  width: 100% !important;
+  text-align: center !important;
+  margin: 6px 0 0 !important;
+  line-height: 1.2 !important;
 }
 
 .item-image,
@@ -280,6 +255,9 @@ button[title*="Online players" i] {
 
 /* Remove every hover item popup/preview. Hover only changes the item name text. */
 .vt-hover-price,
+.vt-price-badge,
+.item-price-badge,
+.price-badge,
 .vt-item-hover-preview,
 .item-hover-preview,
 .bazaar-full-preview,
@@ -307,14 +285,65 @@ button[title*="Online players" i] {
 .vt-unified-item-card.vt-hover-price-title figcaption,
 .vt-unified-item-card.vt-hover-price-title strong {
   color: #ffdc93 !important;
+  text-align: center !important;
 }
 
-body:has(.vt-item-popout-backdrop[data-vt-centered-popup="true"]) .vt-item-popout-backdrop:not([data-vt-centered-popup="true"]),
-body:has(.vt-item-popout-backdrop[data-vt-centered-popup="true"]) :is(.item-modal,.item-popup,.item-detail-modal,.item-preview-modal,.legacy-item-popout,.legacy-item-modal,.bazaar-full-preview):not(.vt-item-popout):not(.vt-item-popout-backdrop) {
-  display: none !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-  opacity: 0 !important;
+.inventory-folder-list {
+  display: grid !important;
+  gap: 16px !important;
+  margin: 18px 0 !important;
+}
+
+.inventory-folder-card {
+  border: 1px solid rgba(142, 113, 255, 0.28) !important;
+  border-radius: 18px !important;
+  background: rgba(10, 8, 18, 0.72) !important;
+  padding: 14px !important;
+  box-shadow: 0 12px 32px rgba(0,0,0,.28) !important;
+}
+
+.inventory-folder-cover {
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: 112px minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 14px !important;
+  text-align: left !important;
+  background: rgba(255,255,255,.035) !important;
+  border: 1px solid rgba(142, 113, 255, 0.2) !important;
+  border-radius: 15px !important;
+  padding: 10px !important;
+}
+
+.inventory-folder-stack {
+  width: 112px !important;
+  height: 86px !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 4px !important;
+  overflow: hidden !important;
+  border-radius: 12px !important;
+  background: rgba(0,0,0,.28) !important;
+}
+
+.inventory-folder-stack img {
+  width: 100% !important;
+  height: 41px !important;
+  object-fit: contain !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: rgba(0,0,0,.2) !important;
+}
+
+.inventory-folder-empty {
+  grid-column: 1 / -1 !important;
+  display: grid !important;
+  place-items: center !important;
+  font-size: 34px !important;
+}
+
+.inventory-folder-items {
+  margin-top: 14px !important;
 }
 
 .vt-item-popout-backdrop[data-vt-centered-popup="true"] {
@@ -351,69 +380,12 @@ body:has(.vt-item-popout-backdrop[data-vt-centered-popup="true"]) :is(.item-moda
   visibility: visible !important;
 }
 
-.vt-item-popout-image-wrap {
-  min-width: 0 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 0 !important;
-}
-
-.vt-item-popout-image-wrap img {
-  display: block !important;
-  width: auto !important;
-  max-width: min(42vw, 520px) !important;
-  height: auto !important;
-  max-height: min(72vh, 690px) !important;
-  object-fit: contain !important;
-  margin: 0 auto !important;
-  border-radius: 16px !important;
-  background: rgba(0, 0, 0, 0.28) !important;
-  border: 1px solid rgba(142, 113, 255, 0.28) !important;
-}
-
-.vt-item-popout-menu {
-  min-width: 0 !important;
-  max-width: 340px !important;
-  width: 100% !important;
-  justify-self: start !important;
-  align-self: center !important;
-  display: grid !important;
-  align-content: start !important;
-  gap: 12px !important;
-  padding: 16px !important;
-  border-radius: 18px !important;
-  background: rgba(7, 6, 14, 0.72) !important;
-  border: 1px solid rgba(142, 113, 255, 0.24) !important;
-}
-
-.vt-item-popout-header {
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) auto !important;
-  gap: 10px !important;
-  align-items: start !important;
-}
-
-.vt-item-popout-header h2 {
-  margin: 0 !important;
-  font-size: 1.65rem !important;
-  line-height: 1.1 !important;
-  overflow-wrap: anywhere !important;
-}
-
-.vt-icon-button {
-  width: 38px !important;
-  height: 38px !important;
-  min-height: 38px !important;
-  padding: 0 !important;
-  display: grid !important;
-  place-items: center !important;
-  border-radius: 999px !important;
-  background: rgba(255,255,255,.06) !important;
-  border: 1px solid rgba(142, 113, 255, 0.28) !important;
-  box-shadow: none !important;
-}
-
+.vt-item-popout-image-wrap { min-width: 0 !important; display: flex !important; align-items: center !important; justify-content: center !important; padding: 0 !important; }
+.vt-item-popout-image-wrap img { display: block !important; width: auto !important; max-width: min(42vw, 520px) !important; height: auto !important; max-height: min(72vh, 690px) !important; object-fit: contain !important; margin: 0 auto !important; border-radius: 16px !important; background: rgba(0, 0, 0, 0.28) !important; border: 1px solid rgba(142, 113, 255, 0.28) !important; }
+.vt-item-popout-menu { min-width: 0 !important; max-width: 340px !important; width: 100% !important; justify-self: start !important; align-self: center !important; display: grid !important; align-content: start !important; gap: 12px !important; padding: 16px !important; border-radius: 18px !important; background: rgba(7, 6, 14, 0.72) !important; border: 1px solid rgba(142, 113, 255, 0.24) !important; }
+.vt-item-popout-header { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; gap: 10px !important; align-items: start !important; }
+.vt-item-popout-header h2 { margin: 0 !important; font-size: 1.65rem !important; line-height: 1.1 !important; overflow-wrap: anywhere !important; }
+.vt-icon-button { width: 38px !important; height: 38px !important; min-height: 38px !important; padding: 0 !important; display: grid !important; place-items: center !important; border-radius: 999px !important; background: rgba(255,255,255,.06) !important; border: 1px solid rgba(142, 113, 255, 0.28) !important; box-shadow: none !important; }
 .vt-price-editor { display: grid !important; gap: 7px !important; }
 .vt-price-editor input { width: 100% !important; min-height: 42px !important; }
 .vt-item-popout-actions { display: grid !important; gap: 10px !important; }
@@ -426,26 +398,17 @@ body:has(.vt-item-popout-backdrop[data-vt-centered-popup="true"]) :is(.item-moda
 .vt-interested-list { max-height: 180px !important; overflow: auto !important; display: grid !important; gap: 6px !important; padding: 8px !important; border-radius: 12px !important; background: rgba(0,0,0,.24) !important; border: 1px solid rgba(142, 113, 255, 0.24) !important; }
 
 @media (max-width: 860px) {
-  .vt-item-popout {
-    width: min(96vw, 760px) !important;
-    grid-template-columns: 1fr !important;
-    max-height: 92vh !important;
-  }
-  .vt-item-popout-image-wrap img {
-    max-width: 100% !important;
-    max-height: 54vh !important;
-  }
-  .vt-item-popout-menu {
-    max-width: none !important;
-    justify-self: stretch !important;
-  }
+  .vt-item-popout { width: min(96vw, 760px) !important; grid-template-columns: 1fr !important; max-height: 92vh !important; }
+  .vt-item-popout-image-wrap img { max-width: 100% !important; max-height: 54vh !important; }
+  .vt-item-popout-menu { max-width: none !important; justify-self: stretch !important; }
 }
 
 @media (max-width: 760px) {
-  .safe-online-dropdown, .unified-player-menu, .presence-hub, .online-player-menu, .online-players-menu, .player-online-menu, .player-presence-menu { top: 12px !important; right: 10px !important; left: auto !important; }
-  .safe-online-toggle, .unified-player-trigger, .presence-hub-trigger, .online-player-toggle, .online-players-toggle, .player-online-toggle, button[aria-label*="Online players" i], button[title*="Online players" i] { top: 12px !important; right: 10px !important; }
-  .safe-online-panel, .unified-player-panel, .presence-hub-panel, .online-player-panel, .online-players-panel, .player-online-panel, .player-presence-panel { top: 62px !important; right: 10px !important; width: calc(100vw - 20px) !important; max-width: calc(100vw - 20px) !important; max-height: calc(100vh - 82px) !important; }
   section:has(> .vt-unified-item-card), div:has(> .vt-unified-item-card), ul:has(> .vt-unified-item-card), .inventory-grid, .inventory-items, .items-grid, .item-grid, .profile-items, .profile-inventory, .bazaar-grid, .bazaar-items, .bazaar-list, .trade-items-grid, .trade-inventory-grid, .trade-offer-grid, .trade-menu-items, .selected-items, .offer-items, .admin-trade-side ul, .vt-unified-mosaic-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; justify-content: stretch !important; gap: 8px !important; }
   .vt-unified-item-card, .inventory-grid > *, .inventory-items > *, .items-grid > *, .item-grid > *, .profile-items > *, .profile-inventory > *, .bazaar-grid > *, .bazaar-items > *, .bazaar-list > *, .trade-items-grid > *, .trade-inventory-grid > *, .trade-offer-grid > *, .trade-menu-items > *, .selected-items > *, .offer-items > *, .admin-trade-side li { width: auto !important; max-width: none !important; min-width: 0 !important; flex-basis: auto !important; }
   .vt-unified-item-card img, .inventory-grid img, .inventory-items img, .items-grid img, .item-grid img, .profile-items img, .profile-inventory img, .bazaar-grid img, .bazaar-items img, .bazaar-list img, .trade-items-grid img, .trade-inventory-grid img, .trade-offer-grid img, .trade-menu-items img, .selected-items img, .offer-items img, .admin-trade-side img, .admin-trade-item-thumb { height: clamp(135px, 42vw, 220px) !important; max-height: 220px !important; }
+  .inventory-folder-cover { grid-template-columns: 88px minmax(0, 1fr) !important; }
+  .inventory-folder-cover > span { grid-column: 2 !important; }
+  .inventory-folder-stack { width: 88px !important; height: 70px !important; }
+  .inventory-folder-stack img { height: 33px !important; }
 }
