@@ -1,14 +1,16 @@
 /*
-  VelkTrade hard delete route override.
+  VelkTrade hard delete route override + early compatibility route installer.
 
   Loaded with Node's -r flag before server.js. It patches Express route
   registration so every item-removal endpoint uses a consistent persistent
-  delete handler instead of legacy listing-only handlers.
+  delete handler instead of legacy listing-only handlers. It also installs the
+  item-lock route pack as soon as the Express app starts registering middleware.
 */
 
 const express = require('express');
 const { get, run } = require('./db');
 const { authMiddleware } = require('./auth');
+const installItemLockRoutes = require('./item-lock-routes');
 
 const TARGET_PATHS = new Set([
   '/api/items/:itemId',
@@ -54,22 +56,14 @@ async function robustRemoveItem(req, res) {
     const itemId = req.params.itemId || req.params.id;
 
     if (!isIntegerId(itemId)) {
-      return res.status(400).json({
-        error: 'Invalid item id',
-        itemId: itemId || ''
-      });
+      return res.status(400).json({ error: 'Invalid item id', itemId: itemId || '' });
     }
 
     const numericItemId = Number(itemId);
     const item = await get('SELECT * FROM items WHERE id = ?', [numericItemId]);
 
-    if (!item) {
-      return res.status(404).json({ error: 'Item not found', itemId: numericItemId });
-    }
-
-    if (!ownsItem(req, item) && !isAdminOrDeveloper(req)) {
-      return res.status(403).json({ error: 'Not allowed' });
-    }
+    if (!item) return res.status(404).json({ error: 'Item not found', itemId: numericItemId });
+    if (!ownsItem(req, item) && !isAdminOrDeveloper(req)) return res.status(403).json({ error: 'Not allowed' });
 
     await run('DELETE FROM buy_requests WHERE item_id = ?', [numericItemId]).catch(() => {});
 
@@ -78,19 +72,10 @@ async function robustRemoveItem(req, res) {
 
     if (count < 1) {
       const stillExists = await get('SELECT id FROM items WHERE id = ?', [numericItemId]).catch(() => null);
-      if (stillExists) {
-        return res.status(500).json({ error: 'Item delete did not persist', itemId: numericItemId });
-      }
+      if (stillExists) return res.status(500).json({ error: 'Item delete did not persist', itemId: numericItemId });
     }
 
-    return res.json({
-      ok: true,
-      itemId: numericItemId,
-      removed: true,
-      deleted: true,
-      hardDeleted: true,
-      item
-    });
+    return res.json({ ok: true, itemId: numericItemId, removed: true, deleted: true, hardDeleted: true, item });
   } catch (error) {
     console.error('Hard item delete failed:', error);
     return res.status(500).json({ error: error.message || 'Failed to remove item' });
@@ -99,6 +84,12 @@ async function robustRemoveItem(req, res) {
 
 function shouldOverride(path) {
   return typeof path === 'string' && TARGET_PATHS.has(path);
+}
+
+function installItemLockRoutesOnce(app) {
+  if (!app || app.__velktradeEarlyLockRoutesInstalled) return;
+  app.__velktradeEarlyLockRoutesInstalled = true;
+  installItemLockRoutes({ app, authMiddleware, run, get });
 }
 
 function installMethodOverride(methodName) {
@@ -113,7 +104,17 @@ function installMethodOverride(methodName) {
   };
 }
 
+function installUseHook() {
+  const originalUse = express.application.use;
+
+  express.application.use = function patchedUse(...args) {
+    installItemLockRoutesOnce(this);
+    return originalUse.call(this, ...args);
+  };
+}
+
 installMethodOverride('delete');
 installMethodOverride('post');
+installUseHook();
 
 module.exports = { robustRemoveItem };
