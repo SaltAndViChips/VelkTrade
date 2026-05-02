@@ -50,21 +50,18 @@ export default function Bazaar({ currentUser }) {
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
-
     if (search.trim()) params.set('search', search.trim());
     if (sort) params.set('sort', sort);
     if (verified && verified !== 'all') params.set('verified', verified);
     if (min !== '') params.set('min', min);
     if (max !== '') params.set('max', max);
     if (minInterest !== '') params.set('minInterest', minInterest);
-
     return params.toString();
   }, [search, sort, verified, min, max, minInterest]);
 
   async function loadBazaar() {
     setLoading(true);
     setError('');
-
     try {
       const data = await api(`/api/bazaar${queryString ? `?${queryString}` : ''}`);
       setItems(data.items || []);
@@ -80,32 +77,13 @@ export default function Bazaar({ currentUser }) {
     return () => window.clearTimeout(timer);
   }, [queryString]);
 
-  async function toggleInterest(item) {
-    setError('');
-
-    try {
-      if (item.viewerInterested) {
-        await api(`/api/bazaar/items/${item.id}/interest`, { method: 'DELETE' });
-      } else {
-        await api(`/api/bazaar/items/${item.id}/interest`, { method: 'POST' });
-      }
-
-      await loadBazaar();
-    } catch (err) {
-      setError(err.message || 'Could not update interest.');
-    }
-  }
-
   return (
     <section className="card bazaar-page">
       <div className="panel-title-row">
         <div>
           <h2>Bazaar</h2>
-          <p className="muted">
-            Valid IC listings from players active within the last 7 days.
-          </p>
+          <p className="muted">Valid IC listings from players active within the last 7 days.</p>
         </div>
-
         <button type="button" onClick={loadBazaar}>Refresh</button>
       </div>
 
@@ -118,51 +96,22 @@ export default function Bazaar({ currentUser }) {
             onChange={event => setSearch(event.target.value)}
             placeholder={currentUser?.isAdmin ? 'Search by item, IC price, or owner...' : 'Search by item or IC price...'}
           />
-
-          <input
-            value={min}
-            onChange={event => setMin(event.target.value.replace(/[^\d.]/g, ''))}
-            placeholder="Min IC"
-            inputMode="decimal"
-          />
-
-          <input
-            value={max}
-            onChange={event => setMax(event.target.value.replace(/[^\d.]/g, ''))}
-            placeholder="Max IC"
-            inputMode="decimal"
-          />
-
-          <input
-            value={minInterest}
-            onChange={event => setMinInterest(event.target.value.replace(/[^\d]/g, ''))}
-            placeholder="Min interest"
-            inputMode="numeric"
-          />
+          <input value={min} onChange={event => setMin(event.target.value.replace(/[^\d.]/g, ''))} placeholder="Min IC" inputMode="decimal" />
+          <input value={max} onChange={event => setMax(event.target.value.replace(/[^\d.]/g, ''))} placeholder="Max IC" inputMode="decimal" />
+          <input value={minInterest} onChange={event => setMinInterest(event.target.value.replace(/[^\d]/g, ''))} placeholder="Min interest" inputMode="numeric" />
         </div>
 
         <div className="bazaar-filter-row">
           <div className="segmented-control compact bazaar-sort-tabs">
             {SORTS.map(option => (
-              <button
-                type="button"
-                key={option.key}
-                className={sort === option.key ? 'active' : ''}
-                onClick={() => setSort(option.key)}
-              >
+              <button type="button" key={option.key} className={sort === option.key ? 'active' : ''} onClick={() => setSort(option.key)}>
                 {option.label}
               </button>
             ))}
           </div>
-
           <div className="segmented-control compact bazaar-verified-tabs">
             {VERIFIED_FILTERS.map(option => (
-              <button
-                type="button"
-                key={option.key}
-                className={verified === option.key ? 'active' : ''}
-                onClick={() => setVerified(option.key)}
-              >
+              <button type="button" key={option.key} className={verified === option.key ? 'active' : ''} onClick={() => setVerified(option.key)}>
                 {option.label}
               </button>
             ))}
@@ -170,20 +119,12 @@ export default function Bazaar({ currentUser }) {
         </div>
       </section>
 
-      <p className="muted tidy-count">
-        {loading ? 'Loading Bazaar...' : `Showing ${items.length} listing${items.length === 1 ? '' : 's'}.`}
-      </p>
-
-      {items.length === 0 && !loading && (
-        <p className="muted tidy-empty">
-          No valid IC listings found for recently active players.
-        </p>
-      )}
+      <p className="muted tidy-count">{loading ? 'Loading Bazaar...' : `Showing ${items.length} listing${items.length === 1 ? '' : 's'}.`}</p>
+      {items.length === 0 && !loading && <p className="muted tidy-empty">No valid IC listings found for recently active players.</p>}
 
       <div className="bazaar-grid">
         {items.map(item => {
           const verifiedInterestCount = Number(item.interestCount || 0);
-
           return (
             <article
               className="bazaar-item-card vt-unified-item-card"
@@ -198,38 +139,22 @@ export default function Bazaar({ currentUser }) {
               <div className="bazaar-image-wrap">
                 <img src={vtText(item.image)} alt={vtText(item.title, 'Item')} />
               </div>
-
               <div className="bazaar-item-body">
                 <h3>{vtText(item.title, 'Item')}</h3>
-
                 {currentUser?.isAdmin && item.ownerUsername && (
                   <p className="bazaar-admin-owner">
                     Owner: <strong>{item.ownerUsername}</strong>
                     {item.ownerVerified && <span className="verified-badge mini" title="Verified user">✓</span>}
                   </p>
                 )}
-
                 <strong className="bazaar-price">{formatNumber(item.priceAmount)} IC</strong>
-
                 {item.ownerVerified && !currentUser?.isAdmin && (
-                  <span className="bazaar-verified-owner">
-                    <span className="verified-badge mini" title="Verified user">✓</span> Verified seller
-                  </span>
+                  <span className="bazaar-verified-owner"><span className="verified-badge mini" title="Verified user">✓</span> Verified seller</span>
                 )}
-
                 <div className="bazaar-interest-row">
                   <span>{verifiedInterestCount} verified user{verifiedInterestCount === 1 ? '' : 's'} interested</span>
                   {item.viewerInterested && <span className="status-pill">you are interested</span>}
                 </div>
-              </div>
-
-              <div className="bazaar-full-preview" aria-hidden="true">
-                <img src={item.image} alt="" />
-                <strong>{item.title}</strong>
-                <em>{formatNumber(item.priceAmount)} IC</em>
-                {item.ownerVerified && (
-                  <span><span className="verified-badge mini" title="Verified user">✓</span> Verified seller</span>
-                )}
               </div>
             </article>
           );
