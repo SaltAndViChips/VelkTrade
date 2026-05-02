@@ -63,7 +63,6 @@ function arraysFromPayload(value) {
 function candidateId(value) { return txt(value?.id ?? value?.itemId ?? value?.item_id ?? value?.listingId ?? value?.listing_id); }
 function candidateTitle(value) { return txt(value?.title ?? value?.itemTitle ?? value?.item_title ?? value?.name ?? value?.itemName); }
 function candidateImage(value) { return txt(value?.image ?? value?.itemImage ?? value?.item_image ?? value?.img ?? value?.src ?? value?.url ?? value?.imageUrl ?? value?.image_url); }
-function candidatePrice(value) { return txt(value?.price ?? value?.itemPrice ?? value?.item_price ?? value?.priceAmount ?? value?.price_amount ?? value?.ic ?? value?.icPrice ?? value?.ic_price); }
 function candidateOwnerId(value) { return txt(value?.ownerId ?? value?.owner_id ?? value?.userId ?? value?.user_id ?? value?.userid ?? value?.sellerId ?? value?.seller_id); }
 function candidateOwnerUsername(value) { return txt(value?.ownerUsername ?? value?.owner_username ?? value?.username ?? value?.sellerUsername ?? value?.seller_username); }
 
@@ -72,7 +71,7 @@ function normalizeCandidate(value) {
   const id = candidateId(value);
   const title = candidateTitle(value);
   const src = candidateImage(value);
-  const price = candidatePrice(value);
+  const price = txt(value?.price ?? value?.itemPrice ?? value?.item_price ?? value?.priceAmount ?? value?.price_amount ?? value?.ic ?? value?.icPrice ?? value?.ic_price);
   const ownerId = candidateOwnerId(value);
   const ownerUsername = candidateOwnerUsername(value);
   if (!id && !title && !src && !price) return null;
@@ -282,6 +281,7 @@ export default function UnifiedItemExperience({ currentUser }) {
 
   useEffect(() => {
     const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    let tagQueued = false;
     window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ = token;
 
     window.__VELKTRADE_OPEN_ITEM_POPUP__ = nextItem => {
@@ -292,7 +292,8 @@ export default function UnifiedItemExperience({ currentUser }) {
       setInterestedUsers([]);
     };
 
-    function tagItems() {
+    function tagItemsNow() {
+      tagQueued = false;
       document.querySelectorAll('.inventory-grid,.inventory-items,.items-grid,.item-grid,.profile-items,.profile-inventory,.bazaar-grid,.bazaar-items,.bazaar-list,.trade-items-grid,.trade-inventory-grid,.trade-offer-grid,.trade-menu-items,.selected-items,.offer-items,.admin-trade-side ul,.admin-trade-items,.admin-trade-log,.trade-log').forEach(grid => grid.classList.add('vt-unified-mosaic-grid'));
       const cards = new Set();
       document.querySelectorAll('main img,section img,article img,.card img,.panel img,.admin-panel img,.trade-room img,.trade-log img').forEach(image => {
@@ -308,8 +309,13 @@ export default function UnifiedItemExperience({ currentUser }) {
         if (parsed.price) { card.dataset.vtPrice = parsed.price; card.dataset.price = parsed.price; }
         bindHoverPrice(card);
       });
-      window.dispatchEvent(new CustomEvent('velktrade:scan-locks'));
       suppressLegacyPopups();
+    }
+
+    function tagItems() {
+      if (tagQueued) return;
+      tagQueued = true;
+      window.requestAnimationFrame(tagItemsNow);
     }
 
     tagItems();
@@ -347,13 +353,11 @@ export default function UnifiedItemExperience({ currentUser }) {
 
     window.addEventListener('click', handleItemClick, true);
     document.addEventListener('click', handleOnlineClick, true);
-    window.addEventListener('velktrade:scan-locks', tagItems);
 
     return () => {
       observer.disconnect();
       window.removeEventListener('click', handleItemClick, true);
       document.removeEventListener('click', handleOnlineClick, true);
-      window.removeEventListener('velktrade:scan-locks', tagItems);
       if (window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ === token) {
         delete window.__VELKTRADE_OPEN_ITEM_POPUP__;
         delete window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__;
