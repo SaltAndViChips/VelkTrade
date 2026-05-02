@@ -28,6 +28,7 @@ const routeInstallers = [
   ['buy-offer-audit-price-routes', optionalInstaller('./buy-offer-audit-price-routes', 'buy-offer-audit-price-routes')],
   ['bazaar-watchlist-filter-routes', optionalInstaller('./bazaar-watchlist-filter-routes', 'bazaar-watchlist-filter-routes')],
   ['item-folder-note-routes', optionalInstaller('./item-folder-note-routes', 'item-folder-note-routes')],
+  ['item-folder-view-routes', optionalInstaller('./item-folder-view-routes', 'item-folder-view-routes')],
   ['inventory-bulk-cleanup-routes', optionalInstaller('./inventory-bulk-cleanup-routes', 'inventory-bulk-cleanup-routes')],
   ['developer-maintenance-routes', optionalInstaller('./developer-maintenance-routes', 'developer-maintenance-routes')],
   ['notification-preference-routes', optionalInstaller('./notification-preference-routes', 'notification-preference-routes')],
