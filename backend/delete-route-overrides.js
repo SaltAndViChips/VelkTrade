@@ -1,5 +1,9 @@
 /*
   VelkTrade hard delete route override + early compatibility route installer.
+
+  Important: this file is preloaded before server.js. Some compatibility routes
+  are registered before server.js reaches app.use(cors(...)), so this file also
+  installs an early API CORS middleware for those preloaded routes.
 */
 
 const express = require('express');
@@ -19,6 +23,45 @@ const TARGET_PATHS = new Set([
   '/api/bazaar/items/:itemId/remove',
   '/api/bazaar/items/:id/remove'
 ]);
+
+const ALLOWED_ORIGIN_PATTERNS = [
+  /^https:\/\/nicecock\.ca$/i,
+  /^https:\/\/www\.nicecock\.ca$/i,
+  /^https:\/\/saltandvichips\.github\.io$/i,
+  /^http:\/\/localhost:\d+$/i,
+  /^http:\/\/127\.0\.0\.1:\d+$/i
+];
+
+function allowedOrigin(origin) {
+  if (!origin) return '';
+
+  const configured = [
+    process.env.FRONTEND_ORIGIN,
+    process.env.PUBLIC_FRONTEND_URL,
+    process.env.CORS_ORIGIN
+  ].filter(Boolean).map(value => String(value).replace(/\/$/, ''));
+
+  const cleanOrigin = String(origin).replace(/\/$/, '');
+  if (configured.includes(cleanOrigin)) return cleanOrigin;
+  if (ALLOWED_ORIGIN_PATTERNS.some(pattern => pattern.test(cleanOrigin))) return cleanOrigin;
+  return configured[0] || 'https://nicecock.ca';
+}
+
+function velktradeEarlyCors(req, res, next) {
+  const origin = allowedOrigin(req.headers.origin);
+
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.setHeader('Access-Control-Max-Age', '86400');
+  }
+
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+}
 
 function isIntegerId(value) {
   return /^\d+$/.test(String(value || '').trim());
@@ -81,9 +124,17 @@ function shouldOverride(path) {
   return typeof path === 'string' && TARGET_PATHS.has(path);
 }
 
-function installFeatureRoutesOnce(app) {
+function installFeatureRoutesOnce(app, originalUse) {
   if (!app || app.__velktradeEarlyFeatureRoutesInstalled) return;
   app.__velktradeEarlyFeatureRoutesInstalled = true;
+
+  // Register CORS before preloaded API routes. This covers routes that are
+  // installed before server.js reaches its normal app.use(cors(...)).
+  if (typeof originalUse === 'function' && !app.__velktradeEarlyCorsInstalled) {
+    app.__velktradeEarlyCorsInstalled = true;
+    originalUse.call(app, '/api', velktradeEarlyCors);
+  }
+
   installItemLockRoutes({ app, authMiddleware, run, get });
   installBuyOfferAuditPriceRoutes({ app, authMiddleware });
   installBazaarWatchlistFilterRoutes({ app, authMiddleware });
@@ -92,15 +143,22 @@ function installFeatureRoutesOnce(app) {
 function installMethodOverride(methodName) {
   const original = express.application[methodName];
   express.application[methodName] = function patchedRoute(path, ...handlers) {
-    if (shouldOverride(path)) return original.call(this, path, authMiddleware, robustRemoveItem);
+    if (shouldOverride(path)) return original.call(this, path, velktradeEarlyCors, authMiddleware, robustRemoveItem);
     return original.call(this, path, ...handlers);
+  };
+}
+
+function installOptionsOverride() {
+  const originalOptions = express.application.options;
+  express.application.options = function patchedOptions(path, ...handlers) {
+    return originalOptions.call(this, path, velktradeEarlyCors, ...handlers);
   };
 }
 
 function installUseHook() {
   const originalUse = express.application.use;
   express.application.use = function patchedUse(...args) {
-    installFeatureRoutesOnce(this);
+    installFeatureRoutesOnce(this, originalUse);
     return originalUse.call(this, ...args);
   };
 }
@@ -109,6 +167,7 @@ installMethodOverride('delete');
 installMethodOverride('post');
 installMethodOverride('put');
 installMethodOverride('patch');
+installOptionsOverride();
 installUseHook();
 
-module.exports = { robustRemoveItem };
+module.exports = { robustRemoveItem, velktradeEarlyCors };
