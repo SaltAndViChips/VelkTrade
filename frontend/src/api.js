@@ -24,9 +24,15 @@ export async function api(path, options = {}) {
   const token = getToken();
   const headers = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}`, 'X-Auth-Token': token } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers || {})
   };
+
+  // Do not send X-Auth-Token here. The backend CORS preflight currently allows
+  // Authorization but not X-Auth-Token, so that custom header blocks normal GETs
+  // before the request reaches Express.
+  delete headers['X-Auth-Token'];
+  delete headers['x-auth-token'];
 
   const response = await fetch(`${API_URL}${path}`, {
     credentials: 'include',
@@ -39,7 +45,7 @@ export async function api(path, options = {}) {
     ? await response.json().catch(() => ({}))
     : { text: await response.text().catch(() => '') };
 
-  const responseError = data.error || data.message === 'Missing token' ? data.error || data.message : '';
+  const responseError = data.error || (data.message === 'Missing token' ? data.message : '');
 
   if (!response.ok || responseError) {
     const message = responseError || data.text || `Request failed with status ${response.status}`;
