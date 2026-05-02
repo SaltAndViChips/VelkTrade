@@ -155,7 +155,8 @@ html, body, #root {
 .vt-unified-item-card [class*="price" i]:not(.sr-only),
 .vt-unified-item-card .admin-ic-line,
 .vt-unified-item-card .status-pill,
-.inventory-status-pill {
+.inventory-status-pill,
+.inventory-folder-card .inventory-folder-count {
   display: none !important;
 }
 
@@ -289,61 +290,98 @@ html, body, #root {
 }
 
 .inventory-folder-list {
-  display: grid !important;
-  gap: 16px !important;
-  margin: 18px 0 !important;
+  display: contents !important;
 }
 
 .inventory-folder-card {
-  border: 1px solid rgba(142, 113, 255, 0.28) !important;
-  border-radius: 18px !important;
-  background: rgba(10, 8, 18, 0.72) !important;
-  padding: 14px !important;
-  box-shadow: 0 12px 32px rgba(0,0,0,.28) !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  cursor: pointer !important;
+}
+
+.inventory-folder-card::after,
+.inventory-folder-card::before {
+  content: none !important;
+  display: none !important;
 }
 
 .inventory-folder-cover {
   width: 100% !important;
-  display: grid !important;
-  grid-template-columns: 112px minmax(0, 1fr) auto !important;
-  align-items: center !important;
-  gap: 14px !important;
-  text-align: left !important;
-  background: rgba(255,255,255,.035) !important;
-  border: 1px solid rgba(142, 113, 255, 0.2) !important;
-  border-radius: 15px !important;
-  padding: 10px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  display: block !important;
+  text-align: center !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
 }
 
 .inventory-folder-stack {
-  width: 112px !important;
-  height: 86px !important;
+  width: 100% !important;
+  height: 300px !important;
+  max-height: 300px !important;
   display: grid !important;
-  grid-template-columns: repeat(2, 1fr) !important;
-  gap: 4px !important;
+  place-items: center !important;
   overflow: hidden !important;
-  border-radius: 12px !important;
-  background: rgba(0,0,0,.28) !important;
+  border-radius: 10px !important;
+  background: radial-gradient(circle at top, rgba(142,113,255,.24), transparent 58%), rgba(0, 0, 0, 0.24) !important;
+  border: 1px solid rgba(142, 113, 255, 0.28) !important;
+  position: relative !important;
+}
+
+.inventory-folder-main-icon {
+  display: grid !important;
+  place-items: center !important;
+  width: 120px !important;
+  height: 120px !important;
+  border-radius: 30px !important;
+  background: rgba(8, 6, 14, 0.74) !important;
+  border: 1px solid rgba(255, 220, 147, 0.34) !important;
+  color: #ffdc93 !important;
+  font-size: 56px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  box-shadow: 0 16px 36px rgba(0,0,0,.34) !important;
 }
 
 .inventory-folder-stack img {
-  width: 100% !important;
-  height: 41px !important;
+  position: absolute !important;
+  width: 42% !important;
+  height: 42% !important;
   object-fit: contain !important;
   border: 0 !important;
-  border-radius: 6px !important;
-  background: rgba(0,0,0,.2) !important;
+  border-radius: 8px !important;
+  background: rgba(0,0,0,.24) !important;
+  opacity: .36 !important;
+  pointer-events: none !important;
 }
-
-.inventory-folder-empty {
-  grid-column: 1 / -1 !important;
-  display: grid !important;
-  place-items: center !important;
-  font-size: 34px !important;
-}
+.inventory-folder-stack img:nth-of-type(1) { top: 10px !important; left: 10px !important; }
+.inventory-folder-stack img:nth-of-type(2) { top: 10px !important; right: 10px !important; }
+.inventory-folder-stack img:nth-of-type(3) { bottom: 10px !important; left: 10px !important; }
+.inventory-folder-stack img:nth-of-type(4) { bottom: 10px !important; right: 10px !important; }
 
 .inventory-folder-items {
   margin-top: 14px !important;
+  grid-column: 1 / -1 !important;
+}
+
+.folder-icon-select {
+  max-width: 92px !important;
+  min-width: 82px !important;
+  text-align: center !important;
+  font-size: 1.2rem !important;
+  font-weight: 900 !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(142, 113, 255, 0.36) !important;
+  background: rgba(8, 6, 14, 0.92) !important;
+  color: #ffdc93 !important;
 }
 
 .vt-item-popout-backdrop[data-vt-centered-popup="true"] {
@@ -407,8 +445,6 @@ html, body, #root {
   section:has(> .vt-unified-item-card), div:has(> .vt-unified-item-card), ul:has(> .vt-unified-item-card), .inventory-grid, .inventory-items, .items-grid, .item-grid, .profile-items, .profile-inventory, .bazaar-grid, .bazaar-items, .bazaar-list, .trade-items-grid, .trade-inventory-grid, .trade-offer-grid, .trade-menu-items, .selected-items, .offer-items, .admin-trade-side ul, .vt-unified-mosaic-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; justify-content: stretch !important; gap: 8px !important; }
   .vt-unified-item-card, .inventory-grid > *, .inventory-items > *, .items-grid > *, .item-grid > *, .profile-items > *, .profile-inventory > *, .bazaar-grid > *, .bazaar-items > *, .bazaar-list > *, .trade-items-grid > *, .trade-inventory-grid > *, .trade-offer-grid > *, .trade-menu-items > *, .selected-items > *, .offer-items > *, .admin-trade-side li { width: auto !important; max-width: none !important; min-width: 0 !important; flex-basis: auto !important; }
   .vt-unified-item-card img, .inventory-grid img, .inventory-items img, .items-grid img, .item-grid img, .profile-items img, .profile-inventory img, .bazaar-grid img, .bazaar-items img, .bazaar-list img, .trade-items-grid img, .trade-inventory-grid img, .trade-offer-grid img, .trade-menu-items img, .selected-items img, .offer-items img, .admin-trade-side img, .admin-trade-item-thumb { height: clamp(135px, 42vw, 220px) !important; max-height: 220px !important; }
-  .inventory-folder-cover { grid-template-columns: 88px minmax(0, 1fr) !important; }
-  .inventory-folder-cover > span { grid-column: 2 !important; }
-  .inventory-folder-stack { width: 88px !important; height: 70px !important; }
-  .inventory-folder-stack img { height: 33px !important; }
+  .inventory-folder-stack { height: clamp(135px, 42vw, 220px) !important; max-height: 220px !important; }
+  .inventory-folder-main-icon { width: 86px !important; height: 86px !important; font-size: 40px !important; border-radius: 22px !important; }
 }
