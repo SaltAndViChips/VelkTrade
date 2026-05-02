@@ -289,11 +289,10 @@ html, body, #root {
   text-align: center !important;
 }
 
-.inventory-folder-list {
-  display: contents !important;
-}
+.inventory-folder-list { display: contents !important; }
 
 .inventory-folder-card {
+  --folder-color: #ffdc93;
   border: 0 !important;
   border-radius: 12px !important;
   background: transparent !important;
@@ -304,10 +303,7 @@ html, body, #root {
 }
 
 .inventory-folder-card::after,
-.inventory-folder-card::before {
-  content: none !important;
-  display: none !important;
-}
+.inventory-folder-card::before { content: none !important; display: none !important; }
 
 .inventory-folder-cover {
   width: 100% !important;
@@ -323,6 +319,12 @@ html, body, #root {
   cursor: pointer !important;
 }
 
+.inventory-folder-card .item-title,
+.inventory-folder-card strong.item-title {
+  color: var(--folder-color) !important;
+  text-shadow: 0 0 14px color-mix(in srgb, var(--folder-color), transparent 52%) !important;
+}
+
 .inventory-folder-stack {
   width: 100% !important;
   height: 300px !important;
@@ -331,35 +333,39 @@ html, body, #root {
   place-items: center !important;
   overflow: hidden !important;
   border-radius: 10px !important;
-  background: radial-gradient(circle at top, rgba(142,113,255,.24), transparent 58%), rgba(0, 0, 0, 0.24) !important;
-  border: 1px solid rgba(142, 113, 255, 0.28) !important;
+  background: radial-gradient(circle at top, color-mix(in srgb, var(--folder-color), transparent 76%), transparent 58%), rgba(0, 0, 0, 0.30) !important;
+  border: 1px solid color-mix(in srgb, var(--folder-color), transparent 52%) !important;
   position: relative !important;
 }
 
 .inventory-folder-main-icon {
+  position: relative !important;
+  z-index: 5 !important;
   display: grid !important;
   place-items: center !important;
   width: 120px !important;
   height: 120px !important;
   border-radius: 30px !important;
-  background: rgba(8, 6, 14, 0.74) !important;
-  border: 1px solid rgba(255, 220, 147, 0.34) !important;
-  color: #ffdc93 !important;
+  background: #08060e !important;
+  border: 1px solid color-mix(in srgb, var(--folder-color), transparent 34%) !important;
+  color: var(--folder-color) !important;
   font-size: 56px !important;
   font-weight: 900 !important;
   line-height: 1 !important;
-  box-shadow: 0 16px 36px rgba(0,0,0,.34) !important;
+  box-shadow: 0 16px 36px rgba(0,0,0,.62), 0 0 26px color-mix(in srgb, var(--folder-color), transparent 64%) !important;
+  opacity: 1 !important;
 }
 
 .inventory-folder-stack img {
   position: absolute !important;
+  z-index: 1 !important;
   width: 42% !important;
   height: 42% !important;
   object-fit: contain !important;
   border: 0 !important;
   border-radius: 8px !important;
   background: rgba(0,0,0,.24) !important;
-  opacity: .36 !important;
+  opacity: .24 !important;
   pointer-events: none !important;
 }
 .inventory-folder-stack img:nth-of-type(1) { top: 10px !important; left: 10px !important; }
@@ -368,8 +374,34 @@ html, body, #root {
 .inventory-folder-stack img:nth-of-type(4) { bottom: 10px !important; right: 10px !important; }
 
 .inventory-folder-items {
-  margin-top: 14px !important;
   grid-column: 1 / -1 !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin-top: 14px !important;
+  padding: 14px !important;
+  border-radius: 16px !important;
+  border: 1px solid color-mix(in srgb, var(--folder-color), transparent 68%) !important;
+  background: rgba(8, 6, 14, 0.72) !important;
+}
+
+.inventory-folder-item-grid,
+.inventory-folder-items > .inventory-folder-item-grid,
+.inventory-folder-items .vt-unified-mosaic-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, 300px) !important;
+  justify-content: start !important;
+  align-items: start !important;
+  gap: 14px !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.inventory-folder-item-grid > .vt-unified-item-card,
+.inventory-folder-items .vt-unified-item-card {
+  width: 300px !important;
+  max-width: 300px !important;
+  min-width: 300px !important;
 }
 
 .folder-icon-select {
@@ -382,6 +414,38 @@ html, body, #root {
   border: 1px solid rgba(142, 113, 255, 0.36) !important;
   background: rgba(8, 6, 14, 0.92) !important;
   color: #ffdc93 !important;
+}
+
+.folder-color-input {
+  width: 48px !important;
+  min-width: 48px !important;
+  height: 42px !important;
+  padding: 3px !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(142, 113, 255, 0.36) !important;
+  background: rgba(8, 6, 14, 0.92) !important;
+}
+
+.folder-color-presets {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  margin: 8px 0 !important;
+}
+
+.folder-color-presets button {
+  width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  border-radius: 999px !important;
+  border: 2px solid rgba(255,255,255,.18) !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+.folder-color-presets button.active {
+  border-color: #fff !important;
+  transform: scale(1.08) !important;
 }
 
 .vt-item-popout-backdrop[data-vt-centered-popup="true"] {
@@ -447,4 +511,9 @@ html, body, #root {
   .vt-unified-item-card img, .inventory-grid img, .inventory-items img, .items-grid img, .item-grid img, .profile-items img, .profile-inventory img, .bazaar-grid img, .bazaar-items img, .bazaar-list img, .trade-items-grid img, .trade-inventory-grid img, .trade-offer-grid img, .trade-menu-items img, .selected-items img, .offer-items img, .admin-trade-side img, .admin-trade-item-thumb { height: clamp(135px, 42vw, 220px) !important; max-height: 220px !important; }
   .inventory-folder-stack { height: clamp(135px, 42vw, 220px) !important; max-height: 220px !important; }
   .inventory-folder-main-icon { width: 86px !important; height: 86px !important; font-size: 40px !important; border-radius: 22px !important; }
+  .inventory-folder-item-grid,
+  .inventory-folder-items > .inventory-folder-item-grid,
+  .inventory-folder-items .vt-unified-mosaic-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .inventory-folder-item-grid > .vt-unified-item-card,
+  .inventory-folder-items .vt-unified-item-card { width: auto !important; max-width: none !important; min-width: 0 !important; }
 }
