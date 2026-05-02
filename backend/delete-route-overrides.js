@@ -151,6 +151,12 @@ function installFeatureRoutesOnce(app, originalUse) {
     originalUse.call(app, '/api', velktradeEarlyCors);
   }
 
+  if (typeof originalUse === 'function' && !app.__velktradeEarlyBodyParsersInstalled) {
+    app.__velktradeEarlyBodyParsersInstalled = true;
+    originalUse.call(app, express.json({ limit: '10mb' }));
+    originalUse.call(app, express.urlencoded({ extended: true, limit: '10mb' }));
+  }
+
   for (const [label, installer] of routeInstallers) {
     try {
       installer({ app, authMiddleware, run, get });
