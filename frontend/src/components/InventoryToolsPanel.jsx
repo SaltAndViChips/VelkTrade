@@ -8,6 +8,8 @@ export const FOLDER_ICON_PRESETS = [
   '✦', '◆', '◇', '★', '☢', '☣', 'Ω', 'α', 'β', 'Δ', '#', '$', 'IC', 'S', 'A', 'B', 'C'
 ];
 
+const FOLDER_COLOR_PRESETS = ['#ffdc93', '#00fa9a', '#c200fa', '#8e71ff', '#5ddcff', '#ff5d77', '#ffd166', '#f4f4f5'];
+
 function formatPrice(value) {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -21,6 +23,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
   const [folders, setFolders] = useState([]);
   const [folderName, setFolderName] = useState('');
   const [folderIcon, setFolderIcon] = useState('📁');
+  const [folderColor, setFolderColor] = useState('#ffdc93');
   const [folderId, setFolderId] = useState('');
   const [bulkPrice, setBulkPrice] = useState('');
   const [cleanup, setCleanup] = useState(null);
@@ -34,6 +37,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
       if (!folderId && next[0]?.id) {
         setFolderId(String(next[0].id));
         setFolderIcon(next[0].icon || '📁');
+        setFolderColor(next[0].color || '#ffdc93');
       }
     } catch (error) {
       velkToast(error.message || 'Could not load folders.', 'error');
@@ -47,7 +51,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
     if (!name) return;
     setBusy(true);
     try {
-      const data = await api('/api/item-folders', { method: 'POST', body: JSON.stringify({ name, icon: folderIcon }) });
+      const data = await api('/api/item-folders', { method: 'POST', body: JSON.stringify({ name, icon: folderIcon, color: folderColor }) });
       setFolderName('');
       await loadFolders();
       if (data.folder?.id) setFolderId(String(data.folder.id));
@@ -61,18 +65,17 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
     }
   }
 
-  async function updateSelectedFolderIcon(icon = folderIcon) {
+  async function updateSelectedFolderStyle() {
     if (!folderId) return;
     setBusy(true);
     try {
-      await api(`/api/item-folders/${encodeURIComponent(folderId)}`, { method: 'PATCH', body: JSON.stringify({ icon }) });
-      setFolderIcon(icon);
+      await api(`/api/item-folders/${encodeURIComponent(folderId)}`, { method: 'PATCH', body: JSON.stringify({ icon: folderIcon, color: folderColor }) });
       await loadFolders();
       window.dispatchEvent(new CustomEvent('velktrade:folders-changed'));
       onRefresh?.();
-      velkToast('Folder icon updated.', 'success');
+      velkToast('Folder style updated.', 'success');
     } catch (error) {
-      velkToast(error.message || 'Could not update folder icon.', 'error');
+      velkToast(error.message || 'Could not update folder style.', 'error');
     } finally {
       setBusy(false);
     }
@@ -147,11 +150,13 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
               <select className="folder-icon-select" value={folderIcon} disabled={busy} onChange={event => setFolderIcon(event.target.value)} aria-label="Folder icon">
                 {FOLDER_ICON_PRESETS.map(icon => <option key={icon} value={icon}>{icon}</option>)}
               </select>
+              <input type="color" className="folder-color-input" value={folderColor} disabled={busy} onChange={event => setFolderColor(event.target.value)} aria-label="Folder color" />
               <input value={folderName} onChange={event => setFolderName(event.target.value)} placeholder="New folder name" />
               <button type="button" disabled={busy || !folderName.trim()} onClick={createFolder}>Create</button>
             </div>
-            <div className="inline-controls"><select value={folderId} onChange={event => { setFolderId(event.target.value); const next = folders.find(folder => String(folder.id) === event.target.value); if (next?.icon) setFolderIcon(next.icon); }}><option value="">Choose folder</option>{folders.map(folder => <option key={folder.id} value={folder.id}>{folder.icon || '📁'} {folder.name} ({folder.itemCount || 0})</option>)}</select><button type="button" disabled={busy || !folderId || !selectedIds.length} onClick={assignFolder}>Add Selected</button></div>
-            <div className="inline-controls"><button type="button" className="ghost" disabled={busy || !folderId} onClick={() => updateSelectedFolderIcon(folderIcon)}>Apply Icon To Folder</button></div>
+            <div className="folder-color-presets">{FOLDER_COLOR_PRESETS.map(color => <button key={color} type="button" disabled={busy} className={folderColor.toLowerCase() === color.toLowerCase() ? 'active' : ''} style={{ backgroundColor: color }} onClick={() => setFolderColor(color)} aria-label={`Set folder color ${color}`} />)}</div>
+            <div className="inline-controls"><select value={folderId} onChange={event => { setFolderId(event.target.value); const next = folders.find(folder => String(folder.id) === event.target.value); if (next?.icon) setFolderIcon(next.icon); if (next?.color) setFolderColor(next.color); }}><option value="">Choose folder</option>{folders.map(folder => <option key={folder.id} value={folder.id}>{folder.icon || '📁'} {folder.name} ({folder.itemCount || 0})</option>)}</select><button type="button" disabled={busy || !folderId || !selectedIds.length} onClick={assignFolder}>Add Selected</button></div>
+            <div className="inline-controls"><button type="button" className="ghost" disabled={busy || !folderId} onClick={updateSelectedFolderStyle}>Apply Icon/Color To Folder</button></div>
           </div>
           <div className="inventory-tool-card">
             <strong>Bulk Edit</strong>
