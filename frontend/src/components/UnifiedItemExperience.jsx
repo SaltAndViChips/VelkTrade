@@ -275,7 +275,11 @@ function syncOnlinePills(nextValue) {
 export default function UnifiedItemExperience({ currentUser }) {
   const [item, setItem] = useState(null);
   const [price, setPrice] = useState('');
+  const [buyOfferIc, setBuyOfferIc] = useState('');
+  const [buyOfferMessage, setBuyOfferMessage] = useState('');
   const [interestedUsers, setInterestedUsers] = useState([]);
+  const [priceHistory, setPriceHistory] = useState([]);
+  const [priceHistoryLoaded, setPriceHistoryLoaded] = useState(false);
   const [verifiedOnly, setVerifiedOnly] = useState(true);
   const [message, setMessage] = useState('');
 
@@ -288,8 +292,12 @@ export default function UnifiedItemExperience({ currentUser }) {
       suppressLegacyPopups();
       setItem(nextItem);
       setPrice(fmtPrice(nextItem.price || ''));
+      setBuyOfferIc(fmtPrice(nextItem.price || ''));
+      setBuyOfferMessage('');
       setMessage('');
       setInterestedUsers([]);
+      setPriceHistory([]);
+      setPriceHistoryLoaded(false);
     };
 
     function tagItemsNow() {
@@ -367,10 +375,13 @@ export default function UnifiedItemExperience({ currentUser }) {
 
   const hasItemId = Boolean(txt(item?.id));
   const isLocked = Boolean(item?.locked);
-  const ownerCanEditPrice = useMemo(() => Boolean(item && hasItemId && !isLocked && isOwner(currentUser, item)), [currentUser, item, hasItemId, isLocked]);
-  const canRemoveListing = useMemo(() => Boolean(item && hasItemId && !isLocked && (isOwner(currentUser, item) || isPrivileged(currentUser))), [currentUser, item, hasItemId, isLocked]);
-  const canShowInterested = useMemo(() => Boolean(item && hasItemId && (isOwner(currentUser, item) || isPrivileged(currentUser))), [currentUser, item, hasItemId]);
-  const canInterest = useMemo(() => Boolean(item && hasItemId && !isLocked && !isOwner(currentUser, item)), [currentUser, item, hasItemId, isLocked]);
+  const owner = isOwner(currentUser, item);
+  const privileged = isPrivileged(currentUser);
+  const ownerCanEditPrice = useMemo(() => Boolean(item && hasItemId && !isLocked && owner), [item, hasItemId, isLocked, owner]);
+  const canRemoveListing = useMemo(() => Boolean(item && hasItemId && !isLocked && (owner || privileged)), [item, hasItemId, isLocked, owner, privileged]);
+  const canShowInterested = useMemo(() => Boolean(item && hasItemId && (owner || privileged)), [item, hasItemId, owner, privileged]);
+  const canInterest = useMemo(() => Boolean(item && hasItemId && !isLocked && !owner), [item, hasItemId, isLocked, owner]);
+  const canViewPriceHistory = useMemo(() => Boolean(item && hasItemId && (owner || privileged)), [item, hasItemId, owner, privileged]);
 
   async function resolveItemIdFromApis() {
     const targetImage = norm(item?.src);
@@ -416,9 +427,35 @@ export default function UnifiedItemExperience({ currentUser }) {
       velkToast('Price updated.', 'success');
       setPrice(formatted);
       setItem(previous => ({ ...previous, id: itemId, price: formatted }));
+      setPriceHistoryLoaded(false);
     } catch (error) {
       console.error('savePrice failed:', error);
       velkToast('Price update failed.', 'error');
+      setMessage('Request failed. The backend route may need redeploying.');
+    }
+  }
+
+  async function createBuyOffer() {
+    try {
+      const itemId = await ensureItemId();
+      if (!itemId || !canInterest) return;
+      const offeredIc = fmtPrice(buyOfferIc || item?.price || '');
+      if (!offeredIc) {
+        setMessage('Enter an IC offer amount first.');
+        velkToast('Enter an IC offer amount first.', 'warning');
+        return;
+      }
+      await api(`/api/items/${encodeURIComponent(itemId)}/buy-offer`, {
+        method: 'POST',
+        body: JSON.stringify({ offeredIc, message: buyOfferMessage, title: txt(item?.title), image: txt(item?.src) })
+      });
+      auditClientEvent('buy_offer.created', { itemId, offeredIc });
+      velkToast('Buy offer sent to seller.', 'success');
+      setMessage('Buy offer sent. The seller can accept, counter, or decline it in their Trade tab.');
+      setItem(previous => ({ ...previous, id: itemId }));
+    } catch (error) {
+      console.error('createBuyOffer failed:', error);
+      velkToast('Could not send buy offer.', 'error');
       setMessage('Request failed. The backend route may need redeploying.');
     }
   }
@@ -486,6 +523,21 @@ export default function UnifiedItemExperience({ currentUser }) {
     }
   }
 
+  async function loadPriceHistory() {
+    try {
+      const itemId = await ensureItemId();
+      if (!itemId || !canViewPriceHistory) return;
+      const data = await api(`/api/items/${encodeURIComponent(itemId)}/price-history`);
+      const history = Array.isArray(data?.history) ? data.history : Array.isArray(data?.priceHistory) ? data.priceHistory : [];
+      setPriceHistory(history);
+      setPriceHistoryLoaded(true);
+    } catch (error) {
+      console.error('loadPriceHistory failed:', error);
+      velkToast('Could not load price history.', 'error');
+      setMessage('Request failed. The backend route may need redeploying.');
+    }
+  }
+
   if (!item) return null;
   const visibleInterested = verifiedOnly ? interestedUsers.filter(user => user?.isVerified || user?.is_verified || user?.isTrusted) : interestedUsers;
 
@@ -501,16 +553,42 @@ export default function UnifiedItemExperience({ currentUser }) {
           {txt(item.price) && <p className="admin-ic-line">{txt(item.price)}</p>}
           {isLocked && <p className="vt-muted-note">🔒 This item is locked because it is pending or already in a trade.</p>}
           {txt(message) && <p className="vt-muted-note">{txt(message)}</p>}
+
           {ownerCanEditPrice && <label className="vt-price-editor"><span>Edit price</span><input value={txt(price)} onChange={event => setPrice(event.target.value)} placeholder="Example: 500000 IC" /></label>}
+
+          {canInterest && (
+            <section className="vt-buy-offer-box">
+              <strong>Make buy offer</strong>
+              <label className="vt-price-editor"><span>IC offer</span><input value={txt(buyOfferIc)} onChange={event => setBuyOfferIc(event.target.value)} placeholder="Example: 500000 IC" /></label>
+              <textarea value={txt(buyOfferMessage)} onChange={event => setBuyOfferMessage(event.target.value)} placeholder="Optional message to seller" rows={3} />
+            </section>
+          )}
+
           <div className="vt-item-popout-actions">
             {ownerCanEditPrice && <button type="button" className="vt-primary-action" onClick={savePrice}>Save price</button>}
-            {canInterest && <button type="button" className="vt-primary-action" onClick={addInterest}>Interested</button>}
+            {canInterest && <button type="button" className="vt-primary-action" onClick={createBuyOffer}>Send buy offer</button>}
+            {canInterest && <button type="button" className="vt-secondary-action" onClick={addInterest}>Mark interested only</button>}
             {canInterest && <button type="button" className="vt-secondary-action" onClick={removeInterest}>Remove interest</button>}
             {canShowInterested && <button type="button" className="vt-secondary-action" onClick={loadInterestedUsers}>Show interested users</button>}
+            {canViewPriceHistory && <button type="button" className="vt-secondary-action" onClick={loadPriceHistory}>Show price history</button>}
             {canRemoveListing && <button type="button" className="vt-danger-button" onClick={removeItem}>Remove item/listing</button>}
           </div>
+
           {canShowInterested && interestedUsers.length > 0 && <label className="vt-checkbox-row"><input type="checkbox" checked={verifiedOnly} onChange={event => setVerifiedOnly(event.target.checked)} /><span>Verified users only</span></label>}
           {canShowInterested && interestedUsers.length > 0 && <div className="vt-interested-list">{visibleInterested.length === 0 ? <p className="vt-muted-note">No matching interested users.</p> : visibleInterested.map((user, index) => <p key={txt(user?.id || user?.username || index, String(index))}>{txt(user?.username || user?.name || user?.displayName || user?.id, 'User')}{(user?.isVerified || user?.is_verified || user?.isTrusted) ? ' ✓' : ''}</p>)}</div>}
+
+          {priceHistoryLoaded && (
+            <div className="vt-price-history-list">
+              <strong>Price history</strong>
+              {priceHistory.length === 0 ? <p className="vt-muted-note">No recorded price changes yet.</p> : priceHistory.map((entry, index) => (
+                <p key={entry.id || index}>
+                  <span>{txt(entry.old_price ?? entry.oldPrice, '—')} → {txt(entry.new_price ?? entry.newPrice, '—')}</span>
+                  <small>{txt(entry.changedByUsername || entry.changed_by_username || 'Unknown')} · {entry.created_at || entry.createdAt ? new Date(entry.created_at || entry.createdAt).toLocaleString() : ''}</small>
+                </p>
+              ))}
+            </div>
+          )}
+
           {!ownerCanEditPrice && !canInterest && !canShowInterested && !canRemoveListing && <p className="vt-muted-note">No actions available for this item.</p>}
         </aside>
       </section>
