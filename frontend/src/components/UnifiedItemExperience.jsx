@@ -2,15 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import '../styles-unified-mosaic-overrides.css';
 
-function text(value, fallback = '') {
+function txt(value, fallback = '') {
   if (value === undefined || value === null) return fallback;
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
-  if (Array.isArray(value)) return value.map(entry => text(entry)).filter(Boolean).join(', ');
+  if (Array.isArray(value)) return value.map(entry => txt(entry)).filter(Boolean).join(', ');
   if (typeof value === 'object') {
     if (typeof value.title === 'string') return value.title;
     if (typeof value.name === 'string') return value.name;
     if (typeof value.username === 'string') return value.username;
-    if (typeof value.message === 'string') return value.message;
     if (typeof value.value === 'string' || typeof value.value === 'number') return String(value.value);
     try {
       const json = JSON.stringify(value);
@@ -22,146 +21,69 @@ function text(value, fallback = '') {
   return fallback;
 }
 
-function normalizeImage(value) {
-  return text(value).replace(/^https?:\/\//i, '').replace(/\?.*$/, '').trim().toLowerCase();
-}
-
-function normalizeTitle(value) {
-  return text(value).replace(/\s+/g, ' ').trim().toLowerCase();
-}
-
-function asArray(value) {
-  if (Array.isArray(value)) return value;
-  for (const key of ['items', 'data', 'listings', 'bazaarItems', 'inventory', 'fromItemDetails', 'toItemDetails']) {
-    if (Array.isArray(value?.[key])) return value[key];
-  }
-  return [];
-}
-
-function formatPrice(value) {
-  const raw = text(value).trim();
+function fmtPrice(value) {
+  const raw = txt(value).trim();
   if (!raw) return '';
   if (/IC$/i.test(raw)) return raw;
   const number = Number(raw.replace(/[^\d.]/g, ''));
-  if (Number.isFinite(number) && number > 0) return `${number.toLocaleString()} IC`;
-  return raw;
+  return Number.isFinite(number) && number > 0 ? `${number.toLocaleString()} IC` : raw;
+}
+
+function norm(value) {
+  return txt(value).replace(/^https?:\/\//i, '').replace(/\?.*$/, '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function isPrivileged(user) {
+  const username = txt(user?.username).toLowerCase();
+  return Boolean(
+    user?.isAdmin || user?.is_admin || user?.admin ||
+    user?.isDeveloper || user?.is_developer || user?.developer ||
+    user?.role === 'admin' || user?.role === 'developer' ||
+    user?.rank === 'admin' || user?.rank === 'developer' ||
+    username === 'salt' || username === 'velkon'
+  );
+}
+
+function arraysFromPayload(value) {
+  const output = [];
+  if (Array.isArray(value)) output.push(value);
+  for (const key of ['items', 'data', 'listings', 'bazaarItems', 'inventory', 'fromItemDetails', 'toItemDetails', 'trades']) {
+    if (Array.isArray(value?.[key])) output.push(value[key]);
+  }
+  if (Array.isArray(value?.trades)) {
+    for (const trade of value.trades) {
+      if (Array.isArray(trade.fromItemDetails)) output.push(trade.fromItemDetails);
+      if (Array.isArray(trade.toItemDetails)) output.push(trade.toItemDetails);
+    }
+  }
+  return output.flat();
 }
 
 function candidateId(value) {
-  return text(value?.id ?? value?.itemId ?? value?.item_id ?? value?.listingId ?? value?.listing_id);
+  return txt(value?.id ?? value?.itemId ?? value?.item_id ?? value?.listingId ?? value?.listing_id);
 }
 
 function candidateTitle(value) {
-  return text(value?.title ?? value?.itemTitle ?? value?.item_title ?? value?.name ?? value?.itemName);
+  return txt(value?.title ?? value?.itemTitle ?? value?.item_title ?? value?.name ?? value?.itemName);
 }
 
 function candidateImage(value) {
-  return text(value?.image ?? value?.itemImage ?? value?.item_image ?? value?.img ?? value?.src ?? value?.url ?? value?.imageUrl ?? value?.image_url);
+  return txt(value?.image ?? value?.itemImage ?? value?.item_image ?? value?.img ?? value?.src ?? value?.url ?? value?.imageUrl ?? value?.image_url);
 }
 
 function candidatePrice(value) {
-  return text(value?.price ?? value?.itemPrice ?? value?.item_price ?? value?.priceAmount ?? value?.price_amount ?? value?.ic ?? value?.icPrice ?? value?.ic_price);
+  return txt(value?.price ?? value?.itemPrice ?? value?.item_price ?? value?.priceAmount ?? value?.price_amount ?? value?.ic ?? value?.icPrice ?? value?.ic_price);
 }
 
 function candidateOwnerId(value) {
-  return text(value?.ownerId ?? value?.owner_id ?? value?.userId ?? value?.user_id ?? value?.userid ?? value?.sellerId ?? value?.seller_id);
+  return txt(value?.ownerId ?? value?.owner_id ?? value?.userId ?? value?.user_id ?? value?.userid ?? value?.sellerId ?? value?.seller_id);
 }
 
 function candidateOwnerUsername(value) {
-  return text(value?.ownerUsername ?? value?.owner_username ?? value?.username ?? value?.sellerUsername ?? value?.seller_username);
+  return txt(value?.ownerUsername ?? value?.owner_username ?? value?.username ?? value?.sellerUsername ?? value?.seller_username);
 }
 
-const ITEM_API_ENDPOINTS = [
-  '/api/bazaar/items',
-  '/api/items',
-  '/api/inventory',
-  '/api/me/inventory',
-  '/api/users/me/inventory',
-  '/api/profile/inventory',
-  '/api/admin/trades',
-  '/api/trades'
-];
-
-const ITEM_AREA_SELECTORS = [
-  '.inventory-grid', '.inventory-items', '.items-grid', '.item-grid', '.profile-items', '.profile-inventory',
-  '.bazaar-grid', '.bazaar-items', '.bazaar-list', '.trade-items-grid', '.trade-inventory-grid',
-  '.trade-offer-grid', '.trade-menu-items', '.selected-items', '.offer-items', '.admin-trade-side ul',
-  '.admin-trade-items', '.admin-trade-log', '.trade-log'
-];
-
-function currentImageFromTarget(target) {
-  if (!target?.closest && !target?.querySelector) return null;
-  return target.closest?.('img') || target.querySelector?.('img') || null;
-}
-
-function isItemImage(image) {
-  if (!image) return false;
-  if (image.closest('.avatar,.profile-avatar,.user-avatar,.badge,.icon,.status-dot,.emoji,.logo,.favicon,.vt-item-popout')) return false;
-  const src = text(image.currentSrc || image.src);
-  if (!src) return false;
-  const rect = image.getBoundingClientRect?.();
-  if (rect && (rect.width < 32 || rect.height < 32)) return false;
-  return Boolean(image.closest('.inventory,.inventory-page,.profile,.profile-page,.bazaar,.bazaar-page,.trade-room,.trade-menu,.trade-panel,.admin-panel,.admin-trade-side,.admin-trade-log,.trade-log,main,section'));
-}
-
-function nearestItemCard(target) {
-  const image = currentImageFromTarget(target);
-  if (!isItemImage(image)) return null;
-
-  const explicit = image.closest('.vt-unified-item-card,article,li,.item-card,.inventory-item,.bazaar-item-card,.bazaar-item,.trade-item,.admin-trade-item,.admin-trade-side li,.admin-trade-image-frame,.admin-trade-image-button');
-  if (explicit?.querySelector?.('img')) return explicit;
-
-  let current = image.parentElement;
-  let depth = 0;
-  while (current && current !== document.body && depth < 12) {
-    const className = text(current.className);
-    const imgCount = current.querySelectorAll?.('img')?.length || 0;
-    const bodyText = text(current.textContent);
-    const classLooksRight = /item|card|tile|listing|entry|slot|bazaar|inventory|trade|offer|log/i.test(className);
-    const textLooksRight = /IC|price|interested|remove|LVL|DMG|RPM|MAG|offers/i.test(bodyText);
-    if (imgCount >= 1 && imgCount <= 6 && (classLooksRight || textLooksRight)) return current;
-    current = current.parentElement;
-    depth += 1;
-  }
-  return image.parentElement;
-}
-
-function dataFrom(element, keys) {
-  let current = element;
-  while (current && current !== document.body) {
-    for (const key of keys) {
-      if (current.dataset?.[key] !== undefined) return current.dataset[key];
-    }
-    for (const attr of Array.from(current.attributes || [])) {
-      const name = attr.name.toLowerCase().replace(/^data-/, '').replace(/-/g, '');
-      if (keys.some(key => name === key.toLowerCase())) return attr.value;
-    }
-    current = current.parentElement;
-  }
-  return '';
-}
-
-function idFromAttributes(element) {
-  let current = element;
-  while (current && current !== document.body) {
-    for (const attr of Array.from(current.attributes || [])) {
-      const name = attr.name.toLowerCase();
-      const value = text(attr.value);
-      if (['data-item-id', 'data-id', 'item-id', 'itemid', 'listing-id', 'data-listing-id'].includes(name)) {
-        return value.match(/\d+/)?.[0] || value;
-      }
-      if ((name.includes('item') || name.includes('listing') || name.endsWith('id')) && /\d+/.test(value)) {
-        return value.match(/\d+/)?.[0] || value;
-      }
-      const route = value.match(/(?:items?|bazaar\/items|inventory)\/(\d+)/i);
-      if (route) return route[1];
-    }
-    current = current.parentElement;
-  }
-  return '';
-}
-
-function normalizeReactCandidate(value) {
+function normalizeCandidate(value) {
   if (!value || typeof value !== 'object') return null;
   const id = candidateId(value);
   const title = candidateTitle(value);
@@ -174,17 +96,17 @@ function normalizeReactCandidate(value) {
 }
 
 function findReactItem(value, seen = new WeakSet(), depth = 0) {
-  if (!value || typeof value !== 'object' || depth > 6) return null;
+  if (!value || typeof value !== 'object' || depth > 5) return null;
   if (seen.has(value)) return null;
   seen.add(value);
   if (value instanceof Element || value instanceof Window || value instanceof Document) return null;
-  const direct = normalizeReactCandidate(value);
+  const direct = normalizeCandidate(value);
   if (direct && (direct.id || direct.title || direct.src)) return direct;
-  for (const key of ['item', 'listing', 'bazaarItem', 'inventoryItem', 'tradeItem', 'fromItemDetails', 'toItemDetails', 'data', 'payload', 'props', 'children']) {
+  for (const key of ['item', 'listing', 'bazaarItem', 'inventoryItem', 'tradeItem', 'data', 'payload', 'props', 'children']) {
     const found = findReactItem(value[key], seen, depth + 1);
     if (found) return found;
   }
-  for (const key of Object.keys(value).slice(0, 48)) {
+  for (const key of Object.keys(value).slice(0, 40)) {
     if (['stateNode', 'return', 'alternate', '_owner'].includes(key)) continue;
     const found = findReactItem(value[key], seen, depth + 1);
     if (found) return found;
@@ -195,7 +117,7 @@ function findReactItem(value, seen = new WeakSet(), depth = 0) {
 function reactItemData(element) {
   let current = element;
   let depth = 0;
-  while (current && current !== document.body && depth < 12) {
+  while (current && current !== document.body && depth < 10) {
     for (const key of Object.keys(current)) {
       if (!key.startsWith('__reactProps$') && !key.startsWith('__reactFiber$')) continue;
       const found = findReactItem(current[key]);
@@ -207,69 +129,105 @@ function reactItemData(element) {
   return null;
 }
 
-function cardText(element, selectors) {
-  for (const selector of selectors) {
-    const found = element.querySelector(selector);
-    const value = found?.textContent?.trim();
-    if (value) return value;
+function readData(element, keys) {
+  let current = element;
+  while (current && current !== document.body) {
+    for (const key of keys) {
+      if (current.dataset?.[key] !== undefined) return current.dataset[key];
+    }
+    for (const attr of Array.from(current.attributes || [])) {
+      const name = attr.name.toLowerCase().replace(/^data-/, '').replace(/-/g, '');
+      if (keys.some(key => name === key.toLowerCase())) return attr.value;
+      if ((name.includes('item') || name.includes('listing') || name.endsWith('id')) && /\d+/.test(attr.value)) return attr.value.match(/\d+/)?.[0] || attr.value;
+    }
+    current = current.parentElement;
   }
   return '';
-}
-
-function priceFromCard(element) {
-  const direct = dataFrom(element, ['price', 'itemPrice', 'vtPrice']) || cardText(element, ['.price', '.item-price', '.bazaar-price']);
-  if (direct) return text(direct);
-  const match = text(element.textContent).match(/[\d,]+(?:\.\d+)?\s*IC/i);
-  return match ? match[0] : '';
 }
 
 function titleNode(card) {
   for (const selector of ['.item-title', '.title', '.inventory-item-title', '.bazaar-item-title', '.trade-item-title', '.admin-trade-item-title', 'h3', 'h4', 'figcaption', 'strong']) {
     const node = card.querySelector(selector);
-    const value = text(node?.textContent).trim();
+    const value = txt(node?.textContent).trim();
     if (value && !/interested|remove|show interested|save price|no items/i.test(value)) return node;
   }
   const nodes = Array.from(card.querySelectorAll('p, span, small, div')).filter(node => {
-    const value = text(node.textContent).trim();
-    return node.children.length === 0 && value && value.length < 80 && !/interested|remove|show interested|save price|verified users|IC price/i.test(value);
+    const value = txt(node.textContent).trim();
+    return node.children.length === 0 && value && value.length < 80 && !/interested|remove|save price|verified users/i.test(value);
   });
   return nodes[nodes.length - 1] || null;
 }
 
-function bindHoverPriceTitle(card) {
+function bindHoverPrice(card) {
   if (!card || card.dataset.vtHoverSwapBound === 'true') return;
   card.dataset.vtHoverSwapBound = 'true';
   const node = titleNode(card);
   if (!node) return;
-  const original = text(node.textContent).trim();
+  const original = txt(node.textContent).trim();
   if (original) card.dataset.vtOriginalTitle = original;
-  const showPrice = () => {
-    const nextPrice = formatPrice(card.dataset.vtPrice || card.dataset.price || card.dataset.itemPrice || '');
+  const show = () => {
+    const price = fmtPrice(card.dataset.vtPrice || card.dataset.price || card.dataset.itemPrice || '');
+    if (!price) return;
     card.dataset.vtHoveringPrice = 'true';
-    if (!nextPrice) return;
-    if (!card.dataset.vtOriginalTitle) card.dataset.vtOriginalTitle = text(node.textContent).trim();
-    node.textContent = nextPrice;
+    if (!card.dataset.vtOriginalTitle) card.dataset.vtOriginalTitle = txt(node.textContent).trim();
+    node.textContent = price;
     card.classList.add('vt-hover-price-title');
   };
-  const restoreTitle = () => {
+  const hide = () => {
     card.dataset.vtHoveringPrice = 'false';
     card.classList.remove('vt-hover-price-title');
     if (card.dataset.vtOriginalTitle) node.textContent = card.dataset.vtOriginalTitle;
   };
-  card.addEventListener('mouseenter', showPrice);
-  card.addEventListener('mouseleave', restoreTitle);
-  card.addEventListener('focusin', showPrice);
-  card.addEventListener('focusout', restoreTitle);
+  card.addEventListener('mouseenter', show);
+  card.addEventListener('mouseleave', hide);
+  card.addEventListener('focusin', show);
+  card.addEventListener('focusout', hide);
+}
+
+function itemImage(target) {
+  return target?.closest?.('img') || target?.querySelector?.('img') || null;
+}
+
+function validItemImage(image) {
+  if (!image) return false;
+  if (image.closest('.vt-item-popout,.avatar,.profile-avatar,.user-avatar,.badge,.icon,.status-dot,.emoji,.logo,.favicon')) return false;
+  if (!txt(image.currentSrc || image.src)) return false;
+  const rect = image.getBoundingClientRect?.();
+  if (rect && (rect.width < 32 || rect.height < 32)) return false;
+  return Boolean(image.closest('.inventory,.inventory-page,.profile,.profile-page,.bazaar,.bazaar-page,.trade-room,.trade-menu,.trade-panel,.admin-panel,.admin-trade-side,.admin-trade-log,.trade-log,main,section'));
+}
+
+function nearestCard(target) {
+  const image = itemImage(target);
+  if (!validItemImage(image)) return null;
+  const explicit = image.closest('.vt-unified-item-card,article,li,.item-card,.inventory-item,.bazaar-item-card,.bazaar-item,.trade-item,.admin-trade-item,.admin-trade-side li,.admin-trade-image-frame,.admin-trade-image-button');
+  if (explicit?.querySelector?.('img')) return explicit;
+  let current = image.parentElement;
+  let depth = 0;
+  while (current && current !== document.body && depth < 12) {
+    const imageCount = current.querySelectorAll?.('img')?.length || 0;
+    const className = txt(current.className);
+    const body = txt(current.textContent);
+    if (imageCount >= 1 && imageCount <= 6 && (/item|card|tile|listing|entry|slot|bazaar|inventory|trade|offer|log/i.test(className) || /IC|price|LVL|DMG|RPM|MAG|offers/i.test(body))) {
+      return current;
+    }
+    current = current.parentElement;
+    depth += 1;
+  }
+  return image.parentElement;
+}
+
+function cardPrice(card) {
+  const direct = readData(card, ['price', 'itemPrice', 'vtPrice']) || txt(card.querySelector('.price,.item-price,.bazaar-price')?.textContent);
+  if (direct) return direct;
+  return txt(card.textContent).match(/[\d,]+(?:\.\d+)?\s*IC/i)?.[0] || '';
 }
 
 function parseItem(card) {
-  const reactItem = reactItemData(card) || {};
+  const react = reactItemData(card) || {};
   const img = card.querySelector('img');
-  const src = text(reactItem.src || img?.currentSrc || img?.src);
-  const rawTitle = text(
-    reactItem.title || dataFrom(card, ['title', 'itemTitle']) || cardText(card, ['.item-title', '.title', 'h3', 'h4', 'strong']) || img?.alt,
-    'Item'
-  );
+  const src = txt(react.src || img?.currentSrc || img?.src);
+  const rawTitle = txt(react.title || readData(card, ['title', 'itemTitle']) || txt(titleNode(card)?.textContent) || img?.alt, 'Item');
   const title = rawTitle
     .replace(/\bI'?m interested\b/gi, '')
     .replace(/\bInterested\b/gi, '')
@@ -279,23 +237,14 @@ function parseItem(card) {
     .replace(/\d+\s+verified users interested/gi, '')
     .trim() || 'Item';
   return {
-    id: text(reactItem.id || dataFrom(card, ['itemId', 'id', 'listingId']) || idFromAttributes(card)),
+    id: txt(react.id || readData(card, ['itemId', 'id', 'listingId'])),
     title,
-    price: text(reactItem.price || priceFromCard(card)),
+    price: txt(react.price || cardPrice(card)),
     src,
-    ownerId: text(reactItem.ownerId || dataFrom(card, ['ownerId', 'userId', 'userid', 'sellerId'])),
-    ownerUsername: text(reactItem.ownerUsername || dataFrom(card, ['ownerUsername', 'username', 'sellerUsername'])),
+    ownerId: txt(react.ownerId || readData(card, ['ownerId', 'userId', 'userid', 'sellerId'])),
+    ownerUsername: txt(react.ownerUsername || readData(card, ['ownerUsername', 'username', 'sellerUsername'])),
     rawElement: card
   };
-}
-
-function isPrivileged(user) {
-  const username = text(user?.username).toLowerCase();
-  return Boolean(
-    user?.isAdmin || user?.is_admin || user?.admin || user?.isDeveloper || user?.is_developer || user?.developer ||
-    user?.role === 'admin' || user?.role === 'developer' || user?.rank === 'admin' || user?.rank === 'developer' ||
-    username === 'salt' || username === 'velkon'
-  );
 }
 
 function isOwner(user, item) {
@@ -304,12 +253,8 @@ function isOwner(user, item) {
   return Boolean(item.ownerUsername && user.username && item.ownerUsername.toLowerCase() === user.username.toLowerCase());
 }
 
-function userDisplayName(user) {
-  return text(user?.username || user?.name || user?.displayName || user?.id, 'User');
-}
-
-function suppressLegacyItemPopups() {
-  document.querySelectorAll('.item-modal,.item-popup,.item-detail-modal,.item-preview-modal,.legacy-item-popout,.legacy-item-modal,.bazaar-full-preview').forEach(node => {
+function suppressLegacyPopups() {
+  document.querySelectorAll('.item-modal,.item-popup,.item-detail-modal,.item-preview-modal,.legacy-item-popout,.legacy-item-modal,.bazaar-full-preview,[class*="hover-preview" i],[class*="full-preview" i]').forEach(node => {
     if (!node.closest('.vt-item-popout-backdrop[data-vt-centered-popup="true"]')) {
       node.setAttribute('aria-hidden', 'true');
       node.classList.add('vt-kill-legacy-item-popup');
@@ -317,49 +262,34 @@ function suppressLegacyItemPopups() {
   });
 }
 
-function isIgnoredTarget(target) {
-  if (target?.closest?.('.vt-item-popout')) return true;
-  const interactive = target?.closest?.('button,a,input,textarea,select,label,summary,details,[role="button"]');
-  return Boolean(interactive && !interactive.closest('.vt-unified-item-card'));
-}
-
-function applyPriceToCard(card, nextPrice) {
+function applyPrice(card, nextPrice) {
   if (!card) return;
-  const formatted = formatPrice(nextPrice);
+  const formatted = fmtPrice(nextPrice);
   card.dataset.vtPrice = formatted;
   card.dataset.price = formatted;
   card.dataset.itemPrice = formatted;
-  const visiblePrice = card.querySelector('.price,.item-price,.bazaar-price');
-  if (visiblePrice) visiblePrice.textContent = formatted;
+  const visible = card.querySelector('.price,.item-price,.bazaar-price');
+  if (visible) visible.textContent = formatted;
   const node = titleNode(card);
   if (node && card.dataset.vtHoveringPrice === 'true') node.textContent = formatted || card.dataset.vtOriginalTitle || node.textContent;
 }
 
 async function toggleOnline(nextValue) {
   const body = JSON.stringify({ showOnline: nextValue, show_online: nextValue, online: nextValue, enabled: nextValue });
-  const attempts = [
-    ['/api/me/online', 'PUT'], ['/api/profile/online', 'PUT'], ['/api/users/me/online', 'PUT'], ['/api/inventory/online', 'PUT'],
-    ['/api/me/online', 'PATCH'], ['/api/profile/online', 'PATCH'], ['/api/users/me/online', 'PATCH'], ['/api/inventory/online', 'PATCH'],
-    ['/api/me/online', 'POST'], ['/api/profile/online', 'POST'], ['/api/users/me/online', 'POST'], ['/api/inventory/online', 'POST']
-  ];
-  for (const [path, method] of attempts) {
-    try { return await api(path, { method, body }); } catch {}
+  for (const method of ['PUT', 'PATCH', 'POST']) {
+    for (const path of ['/api/me/online', '/api/profile/online', '/api/users/me/online', '/api/inventory/online']) {
+      try { return await api(path, { method, body }); } catch {}
+    }
   }
   return { ok: false, localOnly: true, online: nextValue };
 }
 
 function syncOnlinePills(nextValue) {
   document.querySelectorAll('button,.profile-toggle-pill,.inventory-status-pill,[class*="online" i]').forEach(element => {
-    const value = text(element.textContent).trim().toLowerCase();
+    const value = txt(element.textContent).trim().toLowerCase();
     if (value !== 'online' && value !== 'offline') return;
     element.classList.toggle('is-online', nextValue);
     element.classList.toggle('is-offline', !nextValue);
-    for (const node of Array.from(element.childNodes)) {
-      if (node.nodeType === Node.TEXT_NODE && /online|offline/i.test(node.textContent)) {
-        node.textContent = nextValue ? 'Online' : 'Offline';
-        break;
-      }
-    }
   });
 }
 
@@ -371,26 +301,23 @@ export default function UnifiedItemExperience({ currentUser }) {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    const handlerToken = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ = handlerToken;
-    let blockLegacyClickUntil = 0;
+    const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ = token;
 
-    window.__VELKTRADE_OPEN_ITEM_POPUP__ = parsed => {
-      suppressLegacyItemPopups();
-      setItem(parsed);
-      setPrice(formatPrice(parsed.price || ''));
+    window.__VELKTRADE_OPEN_ITEM_POPUP__ = nextItem => {
+      suppressLegacyPopups();
+      setItem(nextItem);
+      setPrice(fmtPrice(nextItem.price || ''));
       setMessage('');
       setInterestedUsers([]);
     };
 
     function tagItems() {
-      ITEM_AREA_SELECTORS.forEach(selector => {
-        document.querySelectorAll(selector).forEach(grid => grid.classList.add('vt-unified-mosaic-grid'));
-      });
+      document.querySelectorAll('.inventory-grid,.inventory-items,.items-grid,.item-grid,.profile-items,.profile-inventory,.bazaar-grid,.bazaar-items,.bazaar-list,.trade-items-grid,.trade-inventory-grid,.trade-offer-grid,.trade-menu-items,.selected-items,.offer-items,.admin-trade-side ul,.admin-trade-items,.admin-trade-log,.trade-log').forEach(grid => grid.classList.add('vt-unified-mosaic-grid'));
       const cards = new Set();
       document.querySelectorAll('main img,section img,article img,.card img,.panel img,.admin-panel img,.trade-room img,.trade-log img').forEach(image => {
-        if (!isItemImage(image)) return;
-        const card = nearestItemCard(image);
+        if (!validItemImage(image)) return;
+        const card = nearestCard(image);
         if (card?.querySelector?.('img')) cards.add(card);
       });
       cards.forEach(card => {
@@ -408,48 +335,34 @@ export default function UnifiedItemExperience({ currentUser }) {
           card.dataset.vtPrice = parsed.price;
           card.dataset.price = parsed.price;
         }
-        bindHoverPriceTitle(card);
+        bindHoverPrice(card);
       });
-      suppressLegacyItemPopups();
+      suppressLegacyPopups();
     }
 
     tagItems();
     const observer = new MutationObserver(tagItems);
     observer.observe(document.body, { childList: true, subtree: true });
 
-    function openFromEvent(event) {
-      if (window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ !== handlerToken) return false;
-      if (isIgnoredTarget(event.target)) return false;
-      const card = nearestItemCard(event.target);
-      if (!card) return false;
+    function handleItemClick(event) {
+      if (window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ !== token) return;
+      if (event.target?.closest?.('.vt-item-popout')) return;
+      const interactive = event.target?.closest?.('button,a,input,textarea,select,label,summary,details,[role="button"]');
+      if (interactive && !interactive.closest('.vt-unified-item-card')) return;
+      const card = nearestCard(event.target);
+      if (!card) return;
       const parsed = parseItem(card);
-      if (!parsed.src) return false;
+      if (!parsed.src) return;
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation?.();
-      blockLegacyClickUntil = Date.now() + 900;
       window.__VELKTRADE_OPEN_ITEM_POPUP__?.(parsed);
-      return true;
-    }
-
-    function handlePointerDown(event) {
-      openFromEvent(event);
-    }
-
-    function handleClick(event) {
-      if (Date.now() < blockLegacyClickUntil) {
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation?.();
-        return;
-      }
-      openFromEvent(event);
     }
 
     async function handleOnlineClick(event) {
       const pill = event.target?.closest?.('button,.profile-toggle-pill,.inventory-status-pill,[class*="online" i]');
       if (!pill) return;
-      const value = text(pill.textContent).trim().toLowerCase();
+      const value = txt(pill.textContent).trim().toLowerCase();
       if (value !== 'online' && value !== 'offline') return;
       if (pill.closest('.vt-unified-item-card,.vt-item-popout,.unified-player-panel,.presence-hub-panel,.safe-online-panel')) return;
       event.preventDefault();
@@ -460,39 +373,37 @@ export default function UnifiedItemExperience({ currentUser }) {
       await toggleOnline(next);
     }
 
-    window.addEventListener('pointerdown', handlePointerDown, true);
-    window.addEventListener('click', handleClick, true);
+    window.addEventListener('click', handleItemClick, true);
     document.addEventListener('click', handleOnlineClick, true);
 
     return () => {
       observer.disconnect();
-      window.removeEventListener('pointerdown', handlePointerDown, true);
-      window.removeEventListener('click', handleClick, true);
+      window.removeEventListener('click', handleItemClick, true);
       document.removeEventListener('click', handleOnlineClick, true);
-      if (window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ === handlerToken) {
+      if (window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ === token) {
         delete window.__VELKTRADE_OPEN_ITEM_POPUP__;
         delete window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__;
       }
     };
   }, []);
 
-  const hasItemId = Boolean(text(item?.id));
+  const hasItemId = Boolean(txt(item?.id));
   const ownerCanEditPrice = useMemo(() => Boolean(item && hasItemId && isOwner(currentUser, item)), [currentUser, item, hasItemId]);
   const canRemoveListing = useMemo(() => Boolean(item && hasItemId && (isOwner(currentUser, item) || isPrivileged(currentUser))), [currentUser, item, hasItemId]);
   const canShowInterested = useMemo(() => Boolean(item && hasItemId && (isOwner(currentUser, item) || isPrivileged(currentUser))), [currentUser, item, hasItemId]);
   const canInterest = useMemo(() => Boolean(item && hasItemId && !isOwner(currentUser, item)), [currentUser, item, hasItemId]);
 
   async function resolveItemIdFromApis() {
-    const targetImage = normalizeImage(item?.src);
-    const targetTitle = normalizeTitle(item?.title);
-    for (const endpoint of ITEM_API_ENDPOINTS) {
+    const targetImage = norm(item?.src);
+    const targetTitle = norm(item?.title);
+    for (const endpoint of ['/api/bazaar/items', '/api/items', '/api/inventory', '/api/me/inventory', '/api/users/me/inventory', '/api/profile/inventory', '/api/admin/trades', '/api/trades']) {
       try {
         const data = await api(endpoint);
-        for (const candidate of asArray(data)) {
+        for (const candidate of arraysFromPayload(data)) {
           const id = candidateId(candidate);
           if (!id) continue;
-          const candidateImg = normalizeImage(candidateImage(candidate));
-          const candidateName = normalizeTitle(candidateTitle(candidate));
+          const candidateImg = norm(candidateImage(candidate));
+          const candidateName = norm(candidateTitle(candidate));
           if (targetImage && candidateImg && (candidateImg === targetImage || candidateImg.includes(targetImage) || targetImage.includes(candidateImg))) return id;
           if (targetTitle && candidateName && candidateName === targetTitle) return id;
         }
@@ -508,17 +419,14 @@ export default function UnifiedItemExperience({ currentUser }) {
       setItem(previous => ({ ...previous, ...parsed }));
       return parsed.id;
     }
-    const fromApis = await resolveItemIdFromApis();
-    if (fromApis) {
-      setItem(previous => ({ ...previous, id: fromApis }));
-      return fromApis;
+    const apiId = await resolveItemIdFromApis();
+    if (apiId) {
+      setItem(previous => ({ ...previous, id: apiId }));
+      return apiId;
     }
     try {
-      const data = await api('/api/items/resolve', {
-        method: 'POST',
-        body: JSON.stringify({ title: text(item?.title), image: text(item?.src), price: text(item?.price || price) })
-      });
-      const resolved = text(data?.id || data?.itemId || data?.item?.id);
+      const data = await api('/api/items/resolve', { method: 'POST', body: JSON.stringify({ title: txt(item?.title), image: txt(item?.src), price: txt(item?.price || price) }) });
+      const resolved = txt(data?.id || data?.itemId || data?.item?.id);
       if (resolved) {
         setItem(previous => ({ ...previous, id: resolved }));
         return resolved;
@@ -531,12 +439,9 @@ export default function UnifiedItemExperience({ currentUser }) {
     try {
       const itemId = await ensureItemId();
       if (!itemId || !ownerCanEditPrice) return;
-      const formatted = formatPrice(price);
-      await api(`/api/items/${encodeURIComponent(itemId)}/price`, {
-        method: 'PUT',
-        body: JSON.stringify({ price: formatted, title: text(item?.title), image: text(item?.src) })
-      });
-      applyPriceToCard(item?.rawElement, formatted);
+      const formatted = fmtPrice(price);
+      await api(`/api/items/${encodeURIComponent(itemId)}/price`, { method: 'PUT', body: JSON.stringify({ price: formatted, title: txt(item?.title), image: txt(item?.src) }) });
+      applyPrice(item?.rawElement, formatted);
       setPrice(formatted);
       setItem(previous => ({ ...previous, id: itemId, price: formatted }));
       setMessage('Price updated.');
@@ -550,7 +455,7 @@ export default function UnifiedItemExperience({ currentUser }) {
     try {
       const itemId = await ensureItemId();
       if (!itemId || !canInterest) return;
-      await api(`/api/items/${encodeURIComponent(itemId)}/interest`, { method: 'POST', body: JSON.stringify({ title: text(item?.title), image: text(item?.src), price: text(item?.price) }) });
+      await api(`/api/items/${encodeURIComponent(itemId)}/interest`, { method: 'POST', body: JSON.stringify({ title: txt(item?.title), image: txt(item?.src), price: txt(item?.price) }) });
       setItem(previous => ({ ...previous, id: itemId }));
       setMessage('Interest added.');
     } catch (error) {
@@ -580,6 +485,7 @@ export default function UnifiedItemExperience({ currentUser }) {
       await api(`/api/items/${encodeURIComponent(itemId)}`, { method: 'DELETE' });
       item.rawElement?.remove?.();
       setItem(null);
+      window.dispatchEvent(new CustomEvent('velktrade:item-removed', { detail: { itemId } }));
     } catch (error) {
       console.error('removeItem failed:', error);
       setMessage('Request failed. The backend route may need redeploying.');
@@ -605,37 +511,17 @@ export default function UnifiedItemExperience({ currentUser }) {
   const visibleInterested = verifiedOnly ? interestedUsers.filter(user => user?.isVerified || user?.is_verified || user?.isTrusted) : interestedUsers;
 
   return (
-    <div
-      className="vt-item-popout-backdrop"
-      data-vt-centered-popup="true"
-      onMouseDown={event => {
-        if (event.target === event.currentTarget) setItem(null);
-      }}
-      onClick={event => {
-        if (event.target === event.currentTarget) setItem(null);
-      }}
-    >
+    <div className="vt-item-popout-backdrop" data-vt-centered-popup="true" onMouseDown={event => { if (event.target === event.currentTarget) setItem(null); }} onClick={event => { if (event.target === event.currentTarget) setItem(null); }}>
       <section className="vt-item-popout" onMouseDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
-        <div className="vt-item-popout-image-wrap">
-          <img src={text(item.src)} alt={text(item.title, 'Item')} />
-        </div>
-
+        <div className="vt-item-popout-image-wrap"><img src={txt(item.src)} alt={txt(item.title, 'Item')} /></div>
         <aside className="vt-item-popout-menu">
           <div className="vt-item-popout-header">
-            <h2>{text(item.title, 'Item')}</h2>
+            <h2>{txt(item.title, 'Item')}</h2>
             <button type="button" className="vt-icon-button" onClick={() => setItem(null)} aria-label="Close item menu">×</button>
           </div>
-
-          {text(item.price) && <p className="admin-ic-line">{text(item.price)}</p>}
-          {text(message) && <p className="vt-muted-note">{text(message)}</p>}
-
-          {ownerCanEditPrice && (
-            <label className="vt-price-editor">
-              <span>Edit price</span>
-              <input value={text(price)} onChange={event => setPrice(event.target.value)} placeholder="Example: 500000 IC" />
-            </label>
-          )}
-
+          {txt(item.price) && <p className="admin-ic-line">{txt(item.price)}</p>}
+          {txt(message) && <p className="vt-muted-note">{txt(message)}</p>}
+          {ownerCanEditPrice && <label className="vt-price-editor"><span>Edit price</span><input value={txt(price)} onChange={event => setPrice(event.target.value)} placeholder="Example: 500000 IC" /></label>}
           <div className="vt-item-popout-actions">
             {ownerCanEditPrice && <button type="button" className="vt-primary-action" onClick={savePrice}>Save price</button>}
             {canInterest && <button type="button" className="vt-primary-action" onClick={addInterest}>Interested</button>}
@@ -643,24 +529,8 @@ export default function UnifiedItemExperience({ currentUser }) {
             {canShowInterested && <button type="button" className="vt-secondary-action" onClick={loadInterestedUsers}>Show interested users</button>}
             {canRemoveListing && <button type="button" className="vt-danger-button" onClick={removeItem}>Remove item/listing</button>}
           </div>
-
-          {canShowInterested && interestedUsers.length > 0 && (
-            <label className="vt-checkbox-row">
-              <input type="checkbox" checked={verifiedOnly} onChange={event => setVerifiedOnly(event.target.checked)} />
-              <span>Verified users only</span>
-            </label>
-          )}
-
-          {canShowInterested && interestedUsers.length > 0 && (
-            <div className="vt-interested-list">
-              {visibleInterested.length === 0 ? <p className="vt-muted-note">No matching interested users.</p> : visibleInterested.map((user, index) => (
-                <p key={text(user?.id || user?.username || index, String(index))}>
-                  {userDisplayName(user)}{(user?.isVerified || user?.is_verified || user?.isTrusted) ? ' ✓' : ''}
-                </p>
-              ))}
-            </div>
-          )}
-
+          {canShowInterested && interestedUsers.length > 0 && <label className="vt-checkbox-row"><input type="checkbox" checked={verifiedOnly} onChange={event => setVerifiedOnly(event.target.checked)} /><span>Verified users only</span></label>}
+          {canShowInterested && interestedUsers.length > 0 && <div className="vt-interested-list">{visibleInterested.length === 0 ? <p className="vt-muted-note">No matching interested users.</p> : visibleInterested.map((user, index) => <p key={txt(user?.id || user?.username || index, String(index))}>{txt(user?.username || user?.name || user?.displayName || user?.id, 'User')}{(user?.isVerified || user?.is_verified || user?.isTrusted) ? ' ✓' : ''}</p>)}</div>}
           {!ownerCanEditPrice && !canInterest && !canShowInterested && !canRemoveListing && <p className="vt-muted-note">No actions available for this item.</p>}
         </aside>
       </section>
