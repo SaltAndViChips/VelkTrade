@@ -1,10 +1,9 @@
 /*
   VelkTrade hard delete route override.
 
-  This file is loaded with Node's -r flag before server.js. It patches Express
-  route registration so every legacy item-removal endpoint uses one consistent
-  persistent delete handler instead of the older handlers that only cleared price
-  or marked trade_pending.
+  Loaded with Node's -r flag before server.js. It patches Express route
+  registration so every item-removal endpoint uses a consistent persistent
+  delete handler instead of legacy listing-only handlers.
 */
 
 const express = require('express');
@@ -22,6 +21,10 @@ const TARGET_PATHS = new Set([
   '/api/bazaar/items/:id/remove'
 ]);
 
+function isIntegerId(value) {
+  return /^\d+$/.test(String(value || '').trim());
+}
+
 function currentUserId(req) {
   return req.user?.id || req.userId || req.session?.user?.id || req.session?.userId;
 }
@@ -29,16 +32,10 @@ function currentUserId(req) {
 function isAdminOrDeveloper(req) {
   const username = String(req.user?.username || req.session?.user?.username || '').trim().toLowerCase();
   return Boolean(
-    req.user?.isAdmin ||
-    req.user?.is_admin ||
-    req.user?.admin ||
-    req.user?.isDeveloper ||
-    req.user?.is_developer ||
-    req.user?.developer ||
-    req.user?.role === 'admin' ||
-    req.user?.role === 'developer' ||
-    username === 'salt' ||
-    username === 'velkon'
+    req.user?.isAdmin || req.user?.is_admin || req.user?.admin ||
+    req.user?.isDeveloper || req.user?.is_developer || req.user?.developer ||
+    req.user?.role === 'admin' || req.user?.role === 'developer' ||
+    username === 'salt' || username === 'velkon'
   );
 }
 
@@ -56,35 +53,43 @@ async function robustRemoveItem(req, res) {
   try {
     const itemId = req.params.itemId || req.params.id;
 
-    if (!itemId) {
-      return res.status(400).json({ error: 'Missing item id' });
+    if (!isIntegerId(itemId)) {
+      return res.status(400).json({
+        error: 'Invalid item id',
+        itemId: itemId || ''
+      });
     }
 
-    const item = await get('SELECT * FROM items WHERE id = ?', [itemId]);
+    const numericItemId = Number(itemId);
+    const item = await get('SELECT * FROM items WHERE id = ?', [numericItemId]);
 
     if (!item) {
-      return res.status(404).json({ error: 'Item not found' });
+      return res.status(404).json({ error: 'Item not found', itemId: numericItemId });
     }
 
     if (!ownsItem(req, item) && !isAdminOrDeveloper(req)) {
       return res.status(403).json({ error: 'Not allowed' });
     }
 
-    await run('DELETE FROM buy_requests WHERE item_id = ?', [itemId]).catch(() => {});
+    await run('DELETE FROM buy_requests WHERE item_id = ?', [numericItemId]).catch(() => {});
 
-    const deleted = await run('DELETE FROM items WHERE id = ? RETURNING id', [itemId]);
-    const deletedCount = Number(deleted?.rowCount || deleted?.rows?.length || 0);
+    const deleted = await run('DELETE FROM items WHERE id = ?', [numericItemId]);
+    const count = Number(deleted?.rowCount || deleted?.changes || deleted?.affectedRows || 0);
 
-    if (deletedCount < 1) {
-      return res.status(404).json({ error: 'Item not deleted' });
+    if (count < 1) {
+      const stillExists = await get('SELECT id FROM items WHERE id = ?', [numericItemId]).catch(() => null);
+      if (stillExists) {
+        return res.status(500).json({ error: 'Item delete did not persist', itemId: numericItemId });
+      }
     }
 
     return res.json({
       ok: true,
-      itemId: Number(itemId),
+      itemId: numericItemId,
       removed: true,
       deleted: true,
-      hardDeleted: true
+      hardDeleted: true,
+      item
     });
   } catch (error) {
     console.error('Hard item delete failed:', error);
