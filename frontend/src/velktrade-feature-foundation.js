@@ -1,5 +1,6 @@
 const TOAST_ROOT_ID = 'velktrade-toast-root';
 const TOAST_STYLE_ID = 'velktrade-toast-styles';
+const AUDIT_STORAGE_KEY = 'velktrade-pending-audit-events';
 
 function safeText(value, fallback = '') {
   if (value === undefined || value === null) return fallback;
@@ -28,7 +29,6 @@ function installToastStyles() {
       width: min(380px, calc(100vw - 28px));
       pointer-events: none;
     }
-
     .velktrade-toast {
       pointer-events: auto;
       display: grid;
@@ -46,12 +46,10 @@ function installToastStyles() {
       font-size: 14px;
       line-height: 1.35;
     }
-
     .velktrade-toast.success { border-color: rgba(97, 217, 139, 0.62); }
     .velktrade-toast.error { border-color: rgba(255, 93, 119, 0.72); }
     .velktrade-toast.warning { border-color: rgba(255, 202, 96, 0.72); }
     .velktrade-toast.info { border-color: rgba(142, 113, 255, 0.5); }
-
     .velktrade-toast button {
       width: 28px;
       height: 28px;
@@ -66,11 +64,8 @@ function installToastStyles() {
       padding: 0;
       box-shadow: none;
     }
-
     .velktrade-toast.leaving { animation: velktrade-toast-out 150ms ease-in forwards; }
-
     .vt-item-locked { filter: saturate(0.74); }
-
     .vt-item-locked::after {
       content: '🔒 Locked';
       position: absolute;
@@ -86,18 +81,14 @@ function installToastStyles() {
       font-weight: 800;
       pointer-events: none;
     }
-
     .vt-lock-badge { display: none !important; }
-
     @keyframes velktrade-toast-in {
       from { opacity: 0; transform: translateY(8px) scale(0.98); }
       to { opacity: 1; transform: translateY(0) scale(1); }
     }
-
     @keyframes velktrade-toast-out {
       to { opacity: 0; transform: translateY(8px) scale(0.98); }
     }
-
     @media (max-width: 760px) {
       .velktrade-toast-root {
         right: 10px;
@@ -111,10 +102,8 @@ function installToastStyles() {
 
 function ensureToastRoot() {
   installToastStyles();
-
   let root = document.getElementById(TOAST_ROOT_ID);
   if (root) return root;
-
   root = document.createElement('section');
   root.id = TOAST_ROOT_ID;
   root.className = 'velktrade-toast-root';
@@ -126,28 +115,22 @@ function ensureToastRoot() {
 
 export function velkToast(message, variant = 'info', timeout = 3600) {
   if (typeof window === 'undefined' || typeof document === 'undefined') return null;
-
   const root = ensureToastRoot();
   const toast = document.createElement('article');
   toast.className = `velktrade-toast ${variant || 'info'}`;
-
   const body = document.createElement('span');
   body.textContent = safeText(message, 'Done.');
-
   const close = document.createElement('button');
   close.type = 'button';
   close.textContent = '×';
   close.setAttribute('aria-label', 'Dismiss notification');
-
   const dismiss = () => {
     toast.classList.add('leaving');
     window.setTimeout(() => toast.parentNode?.removeChild(toast), 155);
   };
-
   close.addEventListener('click', dismiss);
   toast.append(body, close);
   root.appendChild(toast);
-
   if (timeout > 0) window.setTimeout(dismiss, timeout);
   return toast;
 }
@@ -169,23 +152,16 @@ let lockScannerObserver = null;
 
 function runItemLockScan() {
   lockScanQueued = false;
-
   if (lockScannerObserver) lockScannerObserver.disconnect();
-
-  document.querySelectorAll('.vt-lock-badge').forEach(badge => {
-    badge.parentNode?.removeChild(badge);
-  });
-
+  document.querySelectorAll('.vt-lock-badge').forEach(badge => badge.parentNode?.removeChild(badge));
   document.querySelectorAll('.vt-unified-item-card, .inventory-item, .bazaar-item-card, .bazaar-item, .trade-item, [data-item-id]').forEach(card => {
     const shouldLock = cardLooksLocked(card);
     const alreadyLocked = card.classList.contains('vt-item-locked') && card.dataset.vtLocked === 'true';
-
     if (shouldLock && !alreadyLocked) {
       card.classList.add('vt-item-locked');
       card.dataset.vtLocked = 'true';
     }
   });
-
   if (lockScannerObserver) lockScannerObserver.observe(document.body, { childList: true, subtree: true });
 }
 
@@ -196,40 +172,72 @@ export function scanItemLocks() {
   window.requestAnimationFrame(runItemLockScan);
 }
 
+function readPendingAuditEvents() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(AUDIT_STORAGE_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePendingAuditEvents(events) {
+  try {
+    window.localStorage.setItem(AUDIT_STORAGE_KEY, JSON.stringify(events.slice(0, 100)));
+  } catch {}
+}
+
+export async function flushAuditEvents() {
+  if (typeof window === 'undefined') return;
+  const pending = readPendingAuditEvents();
+  if (!pending.length) return;
+
+  try {
+    const base = window.__API_BASE__ || window.API_BASE || 'https://velktrade.onrender.com';
+    const response = await fetch(`${base}/api/audit-logs/client`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ events: pending.slice(0, 25) })
+    });
+    if (!response.ok) return;
+    writePendingAuditEvents(pending.slice(25));
+  } catch {
+    // Best-effort audit flush; offline/local events remain queued.
+  }
+}
+
 export function auditClientEvent(type, payload = {}) {
   const detail = { type, payload, createdAt: new Date().toISOString() };
   window.dispatchEvent(new CustomEvent('velktrade:audit-event', { detail }));
-
-  try {
-    const pending = JSON.parse(window.localStorage.getItem('velktrade-pending-audit-events') || '[]');
-    pending.unshift(detail);
-    window.localStorage.setItem('velktrade-pending-audit-events', JSON.stringify(pending.slice(0, 100)));
-  } catch {
-    // Local storage is optional.
-  }
+  const pending = readPendingAuditEvents();
+  pending.unshift(detail);
+  writePendingAuditEvents(pending);
+  window.setTimeout(flushAuditEvents, 200);
 }
 
 function installFoundation() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
   installToastStyles();
-
   if (window.__VELKTRADE_FEATURE_FOUNDATION_INSTALLED__) return;
   window.__VELKTRADE_FEATURE_FOUNDATION_INSTALLED__ = true;
-
   window.velkToast = velkToast;
   window.velktradeToast = velkToast;
   window.velkAudit = auditClientEvent;
+  window.velkFlushAudit = flushAuditEvents;
 
   window.addEventListener('velktrade:toast', event => {
     const detail = event.detail || {};
     velkToast(detail.message || detail.text || 'Done.', detail.variant || detail.type || 'info', detail.timeout ?? 3600);
   });
-
   window.addEventListener('velktrade:scan-locks', scanItemLocks);
+  window.addEventListener('online', flushAuditEvents);
+  window.setInterval(flushAuditEvents, 30000);
 
   lockScannerObserver = new MutationObserver(scanItemLocks);
   lockScannerObserver.observe(document.body, { childList: true, subtree: true });
   scanItemLocks();
+  window.setTimeout(flushAuditEvents, 1500);
 }
 
 installFoundation();
