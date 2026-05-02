@@ -42,6 +42,8 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
       await loadFolders();
       if (data.folder?.id) setFolderId(String(data.folder.id));
       velkToast('Folder created.', 'success');
+      window.dispatchEvent(new CustomEvent('velktrade:folders-changed'));
+      onRefresh?.();
     } catch (error) {
       velkToast(error.message || 'Could not create folder.', 'error');
     } finally {
@@ -68,6 +70,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
     try {
       await api('/api/inventory/bulk-update', { method: 'POST', body: JSON.stringify({ itemIds: selectedIds, ...payload }) });
       velkToast(message, 'success');
+      window.dispatchEvent(new CustomEvent('velktrade:folders-changed'));
       onRefresh?.();
     } catch (error) {
       velkToast(error.message || 'Bulk update failed.', 'error');
@@ -83,7 +86,10 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
     try {
       await api('/api/inventory/bulk-folder', { method: 'POST', body: JSON.stringify({ itemIds: selectedIds, folderId }) });
       velkToast('Selected items added to folder.', 'success');
+      setSelectedIds([]);
       await loadFolders();
+      window.dispatchEvent(new CustomEvent('velktrade:folders-changed'));
+      onRefresh?.();
     } catch (error) {
       velkToast(error.message || 'Folder assignment failed.', 'error');
     } finally {
@@ -100,60 +106,27 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
         </div>
         <button type="button" className="ghost" onClick={() => setOpen(value => !value)}>{open ? 'Hide Tools' : 'Show Tools'}</button>
       </div>
-
-      {open && (
-        <>
-          <div className="tidy-toolbar inventory-tools-toolbar">
-            <button type="button" disabled={busy} onClick={() => setSelectedIds(items.map(item => item.id).filter(Boolean))}>Select All</button>
-            <button type="button" className="ghost" disabled={busy} onClick={() => setSelectedIds([])}>Clear</button>
-            <span className="status-pill">{selectedIds.length} selected</span>
-            <button type="button" disabled={busy} onClick={scanCleanup}>Run Cleanup Scan</button>
+      {open && <>
+        <div className="tidy-toolbar inventory-tools-toolbar">
+          <button type="button" disabled={busy} onClick={() => setSelectedIds(items.map(item => item.id).filter(Boolean))}>Select All</button>
+          <button type="button" className="ghost" disabled={busy} onClick={() => setSelectedIds([])}>Clear</button>
+          <span className="status-pill">{selectedIds.length} selected</span>
+          <button type="button" disabled={busy} onClick={scanCleanup}>Run Cleanup Scan</button>
+        </div>
+        <div className="inventory-tools-grid">
+          <div className="inventory-tool-card">
+            <strong>Folders</strong>
+            <div className="inline-controls"><input value={folderName} onChange={event => setFolderName(event.target.value)} placeholder="New folder name" /><button type="button" disabled={busy || !folderName.trim()} onClick={createFolder}>Create</button></div>
+            <div className="inline-controls"><select value={folderId} onChange={event => setFolderId(event.target.value)}><option value="">Choose folder</option>{folders.map(folder => <option key={folder.id} value={folder.id}>{folder.name} ({folder.itemCount || 0})</option>)}</select><button type="button" disabled={busy || !folderId || !selectedIds.length} onClick={assignFolder}>Add Selected</button></div>
           </div>
-
-          <div className="inventory-tools-grid">
-            <div className="inventory-tool-card">
-              <strong>Folders</strong>
-              <div className="inline-controls">
-                <input value={folderName} onChange={event => setFolderName(event.target.value)} placeholder="New folder name" />
-                <button type="button" disabled={busy || !folderName.trim()} onClick={createFolder}>Create</button>
-              </div>
-              <div className="inline-controls">
-                <select value={folderId} onChange={event => setFolderId(event.target.value)}>
-                  <option value="">Choose folder</option>
-                  {folders.map(folder => <option key={folder.id} value={folder.id}>{folder.name} ({folder.itemCount || 0})</option>)}
-                </select>
-                <button type="button" disabled={busy || !folderId || !selectedIds.length} onClick={assignFolder}>Add Selected</button>
-              </div>
-            </div>
-
-            <div className="inventory-tool-card">
-              <strong>Bulk Edit</strong>
-              <div className="inline-controls">
-                <input value={bulkPrice} onChange={event => setBulkPrice(event.target.value)} placeholder="Set selected price" />
-                <button type="button" disabled={busy || !selectedIds.length || !bulkPrice.trim()} onClick={() => bulkUpdate({ price: formatPrice(bulkPrice) }, 'Bulk price updated.')}>Set Price</button>
-              </div>
-              <div className="inline-controls">
-                <button type="button" disabled={busy || !selectedIds.length} onClick={() => bulkUpdate({ showBazaar: true }, 'Selected items shown on Bazaar.')}>Show Bazaar</button>
-                <button type="button" disabled={busy || !selectedIds.length} onClick={() => bulkUpdate({ showBazaar: false }, 'Selected items hidden from Bazaar.')}>Hide Bazaar</button>
-              </div>
-            </div>
+          <div className="inventory-tool-card">
+            <strong>Bulk Edit</strong>
+            <div className="inline-controls"><input value={bulkPrice} onChange={event => setBulkPrice(event.target.value)} placeholder="Set selected price" /><button type="button" disabled={busy || !selectedIds.length || !bulkPrice.trim()} onClick={() => bulkUpdate({ price: formatPrice(bulkPrice) }, 'Bulk price updated.')}>Set Price</button></div>
+            <div className="inline-controls"><button type="button" disabled={busy || !selectedIds.length} onClick={() => bulkUpdate({ showBazaar: true }, 'Selected items shown on Bazaar.')}>Show Bazaar</button><button type="button" disabled={busy || !selectedIds.length} onClick={() => bulkUpdate({ showBazaar: false }, 'Selected items hidden from Bazaar.')}>Hide Bazaar</button></div>
           </div>
-
-          {cleanup && (
-            <div className="inventory-cleanup-results">
-              <strong>Cleanup Results</strong>
-              <div className="tidy-meta-grid">
-                <span><strong>Total</strong>{cleanup.summary?.totalItems ?? 0}</span>
-                <span><strong>Duplicate Groups</strong>{cleanup.summary?.duplicateImageGroups ?? 0}</span>
-                <span><strong>Missing Titles</strong>{cleanup.summary?.missingTitles ?? 0}</span>
-                <span><strong>Missing Images</strong>{cleanup.summary?.missingImages ?? 0}</span>
-                <span><strong>Blank Prices</strong>{cleanup.summary?.blankPrices ?? 0}</span>
-                <span><strong>Bad Imgur Links</strong>{cleanup.summary?.brokenImgurLinks ?? 0}</span>
-              </div>
-            </div>
-          )}
-        </>
-      )}
+        </div>
+        {cleanup && <div className="inventory-cleanup-results"><strong>Cleanup Results</strong><div className="tidy-meta-grid"><span><strong>Total</strong>{cleanup.summary?.totalItems ?? 0}</span><span><strong>Duplicate Groups</strong>{cleanup.summary?.duplicateImageGroups ?? 0}</span><span><strong>Missing Titles</strong>{cleanup.summary?.missingTitles ?? 0}</span><span><strong>Missing Images</strong>{cleanup.summary?.missingImages ?? 0}</span><span><strong>Blank Prices</strong>{cleanup.summary?.blankPrices ?? 0}</span><span><strong>Bad Imgur Links</strong>{cleanup.summary?.brokenImgurLinks ?? 0}</span></div></div>}
+      </>}
     </section>
   );
 }
