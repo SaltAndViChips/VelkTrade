@@ -4,13 +4,15 @@
   Loaded with Node's -r flag before server.js. It patches Express route
   registration so every item-removal endpoint uses a consistent persistent
   delete handler instead of legacy listing-only handlers. It also installs the
-  item-lock route pack as soon as the Express app starts registering middleware.
+  item-lock and buy-offer/audit/price-history route packs as soon as the Express
+  app starts registering middleware.
 */
 
 const express = require('express');
 const { get, run } = require('./db');
 const { authMiddleware } = require('./auth');
 const installItemLockRoutes = require('./item-lock-routes');
+const installBuyOfferAuditPriceRoutes = require('./buy-offer-audit-price-routes');
 
 const TARGET_PATHS = new Set([
   '/api/items/:itemId',
@@ -86,10 +88,11 @@ function shouldOverride(path) {
   return typeof path === 'string' && TARGET_PATHS.has(path);
 }
 
-function installItemLockRoutesOnce(app) {
-  if (!app || app.__velktradeEarlyLockRoutesInstalled) return;
-  app.__velktradeEarlyLockRoutesInstalled = true;
+function installFeatureRoutesOnce(app) {
+  if (!app || app.__velktradeEarlyFeatureRoutesInstalled) return;
+  app.__velktradeEarlyFeatureRoutesInstalled = true;
   installItemLockRoutes({ app, authMiddleware, run, get });
+  installBuyOfferAuditPriceRoutes({ app, authMiddleware });
 }
 
 function installMethodOverride(methodName) {
@@ -108,13 +111,15 @@ function installUseHook() {
   const originalUse = express.application.use;
 
   express.application.use = function patchedUse(...args) {
-    installItemLockRoutesOnce(this);
+    installFeatureRoutesOnce(this);
     return originalUse.call(this, ...args);
   };
 }
 
 installMethodOverride('delete');
 installMethodOverride('post');
+installMethodOverride('put');
+installMethodOverride('patch');
 installUseHook();
 
 module.exports = { robustRemoveItem };
