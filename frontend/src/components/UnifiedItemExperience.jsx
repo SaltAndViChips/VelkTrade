@@ -115,9 +115,7 @@ function reactItemData(element) {
 function readData(element, keys) {
   let current = element;
   while (current && current !== document.body) {
-    for (const key of keys) {
-      if (current.dataset?.[key] !== undefined) return current.dataset[key];
-    }
+    for (const key of keys) if (current.dataset?.[key] !== undefined) return current.dataset[key];
     for (const attr of Array.from(current.attributes || [])) {
       const name = attr.name.toLowerCase().replace(/^data-/, '').replace(/-/g, '');
       if (keys.some(key => name === key.toLowerCase())) return attr.value;
@@ -206,14 +204,7 @@ function parseItem(card) {
   const img = card.querySelector('img');
   const src = txt(react.src || img?.currentSrc || img?.src);
   const rawTitle = txt(react.title || readData(card, ['title', 'itemTitle']) || txt(titleNode(card)?.textContent) || img?.alt, 'Item');
-  const title = rawTitle
-    .replace(/\bI'?m interested\b/gi, '')
-    .replace(/\bInterested\b/gi, '')
-    .replace(/\bRemove interest\b/gi, '')
-    .replace(/\bRemove\b/gi, '')
-    .replace(/[\d,]+(?:\.\d+)?\s*IC/gi, '')
-    .replace(/\d+\s+verified users interested/gi, '')
-    .trim() || 'Item';
+  const title = rawTitle.replace(/\bI'?m interested\b/gi, '').replace(/\bInterested\b/gi, '').replace(/\bRemove interest\b/gi, '').replace(/\bRemove\b/gi, '').replace(/[\d,]+(?:\.\d+)?\s*IC/gi, '').replace(/\d+\s+verified users interested/gi, '').trim() || 'Item';
   return {
     id: txt(react.id || readData(card, ['itemId', 'id', 'listingId'])),
     title,
@@ -263,6 +254,26 @@ async function toggleOnline(nextValue) {
   return { ok: false, localOnly: true, online: nextValue };
 }
 
+async function updatePriceWithFallbacks(itemId, formatted, item) {
+  const body = JSON.stringify({ price: formatted, title: txt(item?.title), image: txt(item?.src) });
+  const attempts = [
+    [`/api/items/${encodeURIComponent(itemId)}/price`, 'PUT'],
+    [`/api/items/${encodeURIComponent(itemId)}/price`, 'PATCH'],
+    [`/api/items/${encodeURIComponent(itemId)}/price`, 'POST'],
+    [`/api/items/${encodeURIComponent(itemId)}`, 'PATCH']
+  ];
+  let lastError;
+  for (const [path, method] of attempts) {
+    try {
+      const data = await api(path, { method, body });
+      return data;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('Price update failed.');
+}
+
 function syncOnlinePills(nextValue) {
   document.querySelectorAll('button,.profile-toggle-pill,.inventory-status-pill,[class*="online" i]').forEach(element => {
     const value = txt(element.textContent).trim().toLowerCase();
@@ -287,7 +298,6 @@ export default function UnifiedItemExperience({ currentUser }) {
     const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     let tagQueued = false;
     window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ = token;
-
     window.__VELKTRADE_OPEN_ITEM_POPUP__ = nextItem => {
       suppressLegacyPopups();
       setItem(nextItem);
@@ -299,7 +309,6 @@ export default function UnifiedItemExperience({ currentUser }) {
       setPriceHistory([]);
       setPriceHistoryLoaded(false);
     };
-
     function tagItemsNow() {
       tagQueued = false;
       document.querySelectorAll('.inventory-grid,.inventory-items,.items-grid,.item-grid,.profile-items,.profile-inventory,.bazaar-grid,.bazaar-items,.bazaar-list,.trade-items-grid,.trade-inventory-grid,.trade-offer-grid,.trade-menu-items,.selected-items,.offer-items,.admin-trade-side ul,.admin-trade-items,.admin-trade-log,.trade-log').forEach(grid => grid.classList.add('vt-unified-mosaic-grid'));
@@ -319,17 +328,14 @@ export default function UnifiedItemExperience({ currentUser }) {
       });
       suppressLegacyPopups();
     }
-
     function tagItems() {
       if (tagQueued) return;
       tagQueued = true;
       window.requestAnimationFrame(tagItemsNow);
     }
-
     tagItems();
     const observer = new MutationObserver(tagItems);
     observer.observe(document.body, { childList: true, subtree: true });
-
     function handleItemClick(event) {
       if (window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ !== token) return;
       if (event.target?.closest?.('.vt-item-popout')) return;
@@ -344,7 +350,6 @@ export default function UnifiedItemExperience({ currentUser }) {
       event.stopImmediatePropagation?.();
       window.__VELKTRADE_OPEN_ITEM_POPUP__?.(parsed);
     }
-
     async function handleOnlineClick(event) {
       const pill = event.target?.closest?.('button,.profile-toggle-pill,.inventory-status-pill,[class*="online" i]');
       if (!pill) return;
@@ -358,10 +363,8 @@ export default function UnifiedItemExperience({ currentUser }) {
       syncOnlinePills(next);
       await toggleOnline(next);
     }
-
     window.addEventListener('click', handleItemClick, true);
     document.addEventListener('click', handleOnlineClick, true);
-
     return () => {
       observer.disconnect();
       window.removeEventListener('click', handleItemClick, true);
@@ -421,7 +424,7 @@ export default function UnifiedItemExperience({ currentUser }) {
       const itemId = await ensureItemId();
       if (!itemId || !ownerCanEditPrice) return;
       const formatted = fmtPrice(price);
-      await api(`/api/items/${encodeURIComponent(itemId)}/price`, { method: 'PUT', body: JSON.stringify({ price: formatted, title: txt(item?.title), image: txt(item?.src) }) });
+      await updatePriceWithFallbacks(itemId, formatted, item);
       applyPrice(item?.rawElement, formatted);
       auditClientEvent('item.price_updated', { itemId, price: formatted });
       velkToast('Price updated.', 'success');
@@ -430,8 +433,9 @@ export default function UnifiedItemExperience({ currentUser }) {
       setPriceHistoryLoaded(false);
     } catch (error) {
       console.error('savePrice failed:', error);
-      velkToast('Price update failed.', 'error');
-      setMessage('Request failed. The backend route may need redeploying.');
+      const message = txt(error?.message, 'Price update failed.');
+      velkToast(message, 'error', 7000);
+      setMessage(message);
     }
   }
 
@@ -440,24 +444,13 @@ export default function UnifiedItemExperience({ currentUser }) {
       const itemId = await ensureItemId();
       if (!itemId || !canInterest) return;
       const offeredIc = fmtPrice(buyOfferIc || item?.price || '');
-      if (!offeredIc) {
-        setMessage('Enter an IC offer amount first.');
-        velkToast('Enter an IC offer amount first.', 'warning');
-        return;
-      }
-      await api(`/api/items/${encodeURIComponent(itemId)}/buy-offer`, {
-        method: 'POST',
-        body: JSON.stringify({ offeredIc, message: buyOfferMessage, title: txt(item?.title), image: txt(item?.src) })
-      });
+      if (!offeredIc) { setMessage('Enter an IC offer amount first.'); velkToast('Enter an IC offer amount first.', 'warning'); return; }
+      await api(`/api/items/${encodeURIComponent(itemId)}/buy-offer`, { method: 'POST', body: JSON.stringify({ offeredIc, message: buyOfferMessage, title: txt(item?.title), image: txt(item?.src) }) });
       auditClientEvent('buy_offer.created', { itemId, offeredIc });
       velkToast('Buy offer sent to seller.', 'success');
       setMessage('Buy offer sent. The seller can accept, counter, or decline it in their Trade tab.');
       setItem(previous => ({ ...previous, id: itemId }));
-    } catch (error) {
-      console.error('createBuyOffer failed:', error);
-      velkToast('Could not send buy offer.', 'error');
-      setMessage('Request failed. The backend route may need redeploying.');
-    }
+    } catch (error) { console.error('createBuyOffer failed:', error); velkToast('Could not send buy offer.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); }
   }
 
   async function addInterest() {
@@ -468,11 +461,7 @@ export default function UnifiedItemExperience({ currentUser }) {
       auditClientEvent('item.interest_added', { itemId });
       velkToast('Interest added.', 'success');
       setItem(previous => ({ ...previous, id: itemId }));
-    } catch (error) {
-      console.error('addInterest failed:', error);
-      velkToast('Could not add interest.', 'error');
-      setMessage('Request failed. The backend route may need redeploying.');
-    }
+    } catch (error) { console.error('addInterest failed:', error); velkToast('Could not add interest.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); }
   }
 
   async function removeInterest() {
@@ -483,11 +472,7 @@ export default function UnifiedItemExperience({ currentUser }) {
       auditClientEvent('item.interest_removed', { itemId });
       velkToast('Interest removed.', 'success');
       setItem(previous => ({ ...previous, id: itemId }));
-    } catch (error) {
-      console.error('removeInterest failed:', error);
-      velkToast('Could not remove interest.', 'error');
-      setMessage('Request failed. The backend route may need redeploying.');
-    }
+    } catch (error) { console.error('removeInterest failed:', error); velkToast('Could not remove interest.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); }
   }
 
   async function removeItem() {
@@ -501,11 +486,7 @@ export default function UnifiedItemExperience({ currentUser }) {
       item.rawElement?.remove?.();
       setItem(null);
       window.dispatchEvent(new CustomEvent('velktrade:item-removed', { detail: { itemId } }));
-    } catch (error) {
-      console.error('removeItem failed:', error);
-      velkToast('Item removal failed.', 'error');
-      setMessage('Request failed. The backend route may need redeploying.');
-    }
+    } catch (error) { console.error('removeItem failed:', error); velkToast('Item removal failed.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); }
   }
 
   async function loadInterestedUsers() {
@@ -516,11 +497,7 @@ export default function UnifiedItemExperience({ currentUser }) {
       const users = Array.isArray(data?.users) ? data.users : Array.isArray(data?.interestedUsers) ? data.interestedUsers : [];
       setItem(previous => ({ ...previous, id: itemId }));
       setInterestedUsers(users);
-    } catch (error) {
-      console.error('loadInterestedUsers failed:', error);
-      velkToast('Could not load interested users.', 'error');
-      setMessage('Request failed. The backend route may need redeploying.');
-    }
+    } catch (error) { console.error('loadInterestedUsers failed:', error); velkToast('Could not load interested users.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); }
   }
 
   async function loadPriceHistory() {
@@ -531,11 +508,7 @@ export default function UnifiedItemExperience({ currentUser }) {
       const history = Array.isArray(data?.history) ? data.history : Array.isArray(data?.priceHistory) ? data.priceHistory : [];
       setPriceHistory(history);
       setPriceHistoryLoaded(true);
-    } catch (error) {
-      console.error('loadPriceHistory failed:', error);
-      velkToast('Could not load price history.', 'error');
-      setMessage('Request failed. The backend route may need redeploying.');
-    }
+    } catch (error) { console.error('loadPriceHistory failed:', error); velkToast('Could not load price history.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); }
   }
 
   if (!item) return null;
@@ -546,24 +519,12 @@ export default function UnifiedItemExperience({ currentUser }) {
       <section className="vt-item-popout" onMouseDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
         <div className="vt-item-popout-image-wrap"><img src={txt(item.src)} alt={txt(item.title, 'Item')} /></div>
         <aside className="vt-item-popout-menu">
-          <div className="vt-item-popout-header">
-            <h2>{txt(item.title, 'Item')}</h2>
-            <button type="button" className="vt-icon-button" onClick={() => setItem(null)} aria-label="Close item menu">×</button>
-          </div>
+          <div className="vt-item-popout-header"><h2>{txt(item.title, 'Item')}</h2><button type="button" className="vt-icon-button" onClick={() => setItem(null)} aria-label="Close item menu">×</button></div>
           {txt(item.price) && <p className="admin-ic-line">{txt(item.price)}</p>}
           {isLocked && <p className="vt-muted-note">🔒 This item is locked because it is pending or already in a trade.</p>}
           {txt(message) && <p className="vt-muted-note">{txt(message)}</p>}
-
           {ownerCanEditPrice && <label className="vt-price-editor"><span>Edit price</span><input value={txt(price)} onChange={event => setPrice(event.target.value)} placeholder="Example: 500000 IC" /></label>}
-
-          {canInterest && (
-            <section className="vt-buy-offer-box">
-              <strong>Make buy offer</strong>
-              <label className="vt-price-editor"><span>IC offer</span><input value={txt(buyOfferIc)} onChange={event => setBuyOfferIc(event.target.value)} placeholder="Example: 500000 IC" /></label>
-              <textarea value={txt(buyOfferMessage)} onChange={event => setBuyOfferMessage(event.target.value)} placeholder="Optional message to seller" rows={3} />
-            </section>
-          )}
-
+          {canInterest && <section className="vt-buy-offer-box"><strong>Make buy offer</strong><label className="vt-price-editor"><span>IC offer</span><input value={txt(buyOfferIc)} onChange={event => setBuyOfferIc(event.target.value)} placeholder="Example: 500000 IC" /></label><textarea value={txt(buyOfferMessage)} onChange={event => setBuyOfferMessage(event.target.value)} placeholder="Optional message to seller" rows={3} /></section>}
           <div className="vt-item-popout-actions">
             {ownerCanEditPrice && <button type="button" className="vt-primary-action" onClick={savePrice}>Save price</button>}
             {canInterest && <button type="button" className="vt-primary-action" onClick={createBuyOffer}>Send buy offer</button>}
@@ -573,22 +534,9 @@ export default function UnifiedItemExperience({ currentUser }) {
             {canViewPriceHistory && <button type="button" className="vt-secondary-action" onClick={loadPriceHistory}>Show price history</button>}
             {canRemoveListing && <button type="button" className="vt-danger-button" onClick={removeItem}>Remove item/listing</button>}
           </div>
-
           {canShowInterested && interestedUsers.length > 0 && <label className="vt-checkbox-row"><input type="checkbox" checked={verifiedOnly} onChange={event => setVerifiedOnly(event.target.checked)} /><span>Verified users only</span></label>}
           {canShowInterested && interestedUsers.length > 0 && <div className="vt-interested-list">{visibleInterested.length === 0 ? <p className="vt-muted-note">No matching interested users.</p> : visibleInterested.map((user, index) => <p key={txt(user?.id || user?.username || index, String(index))}>{txt(user?.username || user?.name || user?.displayName || user?.id, 'User')}{(user?.isVerified || user?.is_verified || user?.isTrusted) ? ' ✓' : ''}</p>)}</div>}
-
-          {priceHistoryLoaded && (
-            <div className="vt-price-history-list">
-              <strong>Price history</strong>
-              {priceHistory.length === 0 ? <p className="vt-muted-note">No recorded price changes yet.</p> : priceHistory.map((entry, index) => (
-                <p key={entry.id || index}>
-                  <span>{txt(entry.old_price ?? entry.oldPrice, '—')} → {txt(entry.new_price ?? entry.newPrice, '—')}</span>
-                  <small>{txt(entry.changedByUsername || entry.changed_by_username || 'Unknown')} · {entry.created_at || entry.createdAt ? new Date(entry.created_at || entry.createdAt).toLocaleString() : ''}</small>
-                </p>
-              ))}
-            </div>
-          )}
-
+          {priceHistoryLoaded && <div className="vt-price-history-list"><strong>Price history</strong>{priceHistory.length === 0 ? <p className="vt-muted-note">No recorded price changes yet.</p> : priceHistory.map((entry, index) => <p key={entry.id || index}><span>{txt(entry.old_price ?? entry.oldPrice, '—')} → {txt(entry.new_price ?? entry.newPrice, '—')}</span><small>{txt(entry.changedByUsername || entry.changed_by_username || 'Unknown')} · {entry.created_at || entry.createdAt ? new Date(entry.created_at || entry.createdAt).toLocaleString() : ''}</small></p>)}</div>}
           {!ownerCanEditPrice && !canInterest && !canShowInterested && !canRemoveListing && <p className="vt-muted-note">No actions available for this item.</p>}
         </aside>
       </section>
