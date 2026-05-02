@@ -43,37 +43,13 @@ function formatPriceDisplay(price) {
   return withoutDollar;
 }
 
-async function saveOnlineVisibility(nextValue) {
-  const body = JSON.stringify({ showOnline: nextValue, show_online: nextValue, online: nextValue, enabled: nextValue });
-  const attempts = [
-    ['/api/me/online', 'PUT'], ['/api/profile/online', 'PUT'], ['/api/users/me/online', 'PUT'], ['/api/inventory/online', 'PUT'],
-    ['/api/me/online', 'PATCH'], ['/api/profile/online', 'PATCH'], ['/api/users/me/online', 'PATCH'], ['/api/inventory/online', 'PATCH'],
-    ['/api/me/online', 'POST'], ['/api/profile/online', 'POST'], ['/api/users/me/online', 'POST'], ['/api/inventory/online', 'POST'],
-    ['/api/me', 'PATCH'], ['/api/profile', 'PATCH']
-  ];
-  for (const [path, method] of attempts) {
-    try {
-      return await api(path, { method, body });
-    } catch {
-      // Keep trying compatibility routes. UI stays optimistic even on old backend deployments.
-    }
-  }
-  return { ok: false, showOnline: nextValue, show_online: nextValue, online: nextValue, localOnly: true };
-}
-
-function OnlineInventoryToggle() {
-  return null;
-}
+function OnlineInventoryToggle() { return null; }
 
 function DraggableItem({ item, onDoubleClickItem, selectable = false, selected = false, onToggleSelected }) {
   const title = vtText(item.title, 'Item');
   const image = vtText(item.image);
   const displayPrice = formatPriceDisplay(item.price);
-
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `inventory-item-${item.id}`,
-    data: { itemId: item.id, source: 'inventory' }
-  });
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `inventory-item-${item.id}`, data: { itemId: item.id, source: 'inventory' } });
 
   function handleDoubleClick(event) {
     event.preventDefault();
@@ -88,24 +64,8 @@ function DraggableItem({ item, onDoubleClickItem, selectable = false, selected =
   }
 
   return (
-    <div
-      ref={setNodeRef}
-      className={`item-card vt-unified-item-card ${isDragging ? 'is-dragging' : ''} ${selected ? 'bulk-selected' : ''}`}
-      data-item-id={item.id}
-      data-id={item.id}
-      data-title={title}
-      data-price={displayPrice}
-      data-owner-id={item.userId || item.userid || item.ownerId || item.owner_id || ''}
-      data-owner-username={item.ownerUsername || item.owner_username || item.username || ''}
-      onDoubleClick={handleDoubleClick}
-      {...attributes}
-      {...listeners}
-    >
-      {selectable && (
-        <button type="button" className="bulk-select-pill" onPointerDown={event => event.stopPropagation()} onClick={handleSelection}>
-          {selected ? '✓ Selected' : 'Select'}
-        </button>
-      )}
+    <div ref={setNodeRef} className={`item-card vt-unified-item-card ${isDragging ? 'is-dragging' : ''} ${selected ? 'bulk-selected' : ''}`} data-item-id={item.id} data-id={item.id} data-title={title} data-price={displayPrice} data-owner-id={item.userId || item.userid || item.ownerId || item.owner_id || ''} data-owner-username={item.ownerUsername || item.owner_username || item.username || ''} onDoubleClick={handleDoubleClick} {...attributes} {...listeners}>
+      {selectable && <button type="button" className="bulk-select-pill" onPointerDown={event => event.stopPropagation()} onMouseDown={event => event.stopPropagation()} onClick={handleSelection}>{selected ? '✓ Selected' : 'Select'}</button>}
       {image && <img src={image} alt={title} draggable="false" />}
       <span className="item-title">{title}</span>
       {displayPrice && <span className="sr-only item-price">{displayPrice}</span>}
@@ -117,12 +77,23 @@ function ReadOnlyItem({ item }) {
   const title = vtText(item.title, 'Item');
   const image = vtText(item.image);
   const displayPrice = formatPriceDisplay(item.price);
+  return <div className="item-card readonly vt-unified-item-card" data-item-id={item.id} data-id={item.id} data-title={title} data-price={displayPrice} data-owner-id={item.userId || item.userid || item.ownerId || item.owner_id || ''} data-owner-username={item.ownerUsername || item.owner_username || item.username || ''}>{image && <img src={image} alt={title} />}<span className="item-title">{title}</span>{displayPrice && <span className="sr-only item-price">{displayPrice}</span>}</div>;
+}
+
+function InventoryFolder({ folder, folderItems, selectedIds, toggleSelected, onDoubleClickItem }) {
+  const [open, setOpen] = useState(false);
+  const coverItems = folderItems.slice(0, 4);
   return (
-    <div className="item-card readonly vt-unified-item-card" data-item-id={item.id} data-id={item.id} data-title={title} data-price={displayPrice} data-owner-id={item.userId || item.userid || item.ownerId || item.owner_id || ''} data-owner-username={item.ownerUsername || item.owner_username || item.username || ''}>
-      {image && <img src={image} alt={title} />}
-      <span className="item-title">{title}</span>
-      {displayPrice && <span className="sr-only item-price">{displayPrice}</span>}
-    </div>
+    <section className={`inventory-folder-card ${open ? 'open' : ''}`}>
+      <button type="button" className="inventory-folder-cover" onClick={() => setOpen(value => !value)}>
+        <div className="inventory-folder-stack">
+          {coverItems.length ? coverItems.map(item => <img key={item.id || item.image} src={item.image} alt="" />) : <span className="inventory-folder-empty">📁</span>}
+        </div>
+        <strong>{folder.name}</strong>
+        <span>{folderItems.length} item{folderItems.length === 1 ? '' : 's'}</span>
+      </button>
+      {open && <div className="item-grid inventory-grid vt-unified-mosaic-grid inventory-folder-items">{folderItems.map(item => <DraggableItem key={item.id || item.image || vtText(item.title)} item={item} onDoubleClickItem={onDoubleClickItem} selectable selected={selectedIds.includes(item.id)} onToggleSelected={toggleSelected} />)}</div>}
+    </section>
   );
 }
 
@@ -133,14 +104,29 @@ export default function Inventory({ title, items = [], droppableId, readOnly = f
   const [bulkStatus, setBulkStatus] = useState('');
   const [bulkBusy, setBulkBusy] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [folders, setFolders] = useState([]);
+  const [folderRefreshKey, setFolderRefreshKey] = useState(0);
 
   const parsedBulkUrls = useMemo(() => parseBulkUrls(bulkText), [bulkText]);
   const isMyInventory = !readOnly && /my inventory|your inventory/i.test(vtText(title));
+  const { setNodeRef, isOver } = useDroppable({ id: droppableId || 'readonly', data: { zone: droppableId || 'readonly' } });
 
-  const { setNodeRef, isOver } = useDroppable({
-    id: droppableId || 'readonly',
-    data: { zone: droppableId || 'readonly' }
-  });
+  async function loadFoldersWithItems() {
+    if (!isMyInventory) return;
+    try {
+      const data = await api('/api/item-folders-with-items');
+      setFolders(Array.isArray(data.folders) ? data.folders : []);
+    } catch {
+      setFolders([]);
+    }
+  }
+
+  useEffect(() => { loadFoldersWithItems(); }, [isMyInventory, items.length, folderRefreshKey]);
+  useEffect(() => {
+    function refreshFolders() { setFolderRefreshKey(value => value + 1); }
+    window.addEventListener('velktrade:folders-changed', refreshFolders);
+    return () => window.removeEventListener('velktrade:folders-changed', refreshFolders);
+  }, []);
 
   async function submitItem(event) {
     event.preventDefault();
@@ -152,71 +138,29 @@ export default function Inventory({ title, items = [], droppableId, readOnly = f
   async function submitBulkItems(event) {
     event.preventDefault();
     if (!parsedBulkUrls.length || !onAddImgurItem) return;
-    setBulkBusy(true);
-    setBulkStatus('');
-    let added = 0;
-    const failed = [];
+    setBulkBusy(true); setBulkStatus('');
+    let added = 0; const failed = [];
     for (const url of parsedBulkUrls) {
-      try {
-        await onAddImgurItem(url);
-        added += 1;
-      } catch (error) {
-        failed.push(`${url} (${error.message || 'failed'})`);
-      }
+      try { await onAddImgurItem(url); added += 1; } catch (error) { failed.push(`${url} (${error.message || 'failed'})`); }
     }
     setBulkBusy(false);
-    if (failed.length === 0) {
-      setBulkText('');
-      setBulkStatus(`Added ${added} item${added === 1 ? '' : 's'}.`);
-    } else {
-      setBulkStatus(`Added ${added}. Failed ${failed.length}: ${failed.join(', ')}`);
-    }
+    if (failed.length === 0) { setBulkText(''); setBulkStatus(`Added ${added} item${added === 1 ? '' : 's'}.`); } else setBulkStatus(`Added ${added}. Failed ${failed.length}: ${failed.join(', ')}`);
   }
 
-  function toggleSelected(id) {
-    setSelectedIds(current => current.includes(id) ? current.filter(existing => existing !== id) : [...current, id]);
-  }
+  function toggleSelected(id) { setSelectedIds(current => current.includes(id) ? current.filter(existing => existing !== id) : [...current, id]); }
+  function refreshAfterTools() { setFolderRefreshKey(value => value + 1); window.dispatchEvent(new CustomEvent('velktrade:inventory-tools-refresh')); }
 
-  function refreshAfterTools() {
-    window.dispatchEvent(new CustomEvent('velktrade:inventory-tools-refresh'));
-  }
+  const folderItemIds = useMemo(() => new Set(folders.flatMap(folder => Array.isArray(folder.itemIds) ? folder.itemIds.map(Number) : [])), [folders]);
+  const visibleItems = isMyInventory ? items.filter(item => !folderItemIds.has(Number(item.id))) : items;
+  const folderViews = useMemo(() => folders.map(folder => ({ folder, items: items.filter(item => (folder.itemIds || []).map(Number).includes(Number(item.id))) })).filter(entry => entry.items.length > 0), [folders, items]);
 
   return (
     <section className="card inventory-card-section">
-      <div className="inventory-title-row">
-        <h2>{vtText(title, 'Inventory')}</h2>
-        {isMyInventory && <OnlineInventoryToggle />}
-      </div>
-
-      {!readOnly && onAddImgurItem && (
-        <>
-          <form className="inline-controls inventory-add-form" onSubmit={submitItem}>
-            <input value={imgurUrl} onChange={event => setImgurUrl(event.target.value)} placeholder="https://imgur.com/6hUs12E" />
-            <button type="submit">Add Item</button>
-            <button type="button" className="ghost" onClick={() => setBulkOpen(open => !open)}>{bulkOpen ? '▼' : '▶'} Bulk Add</button>
-          </form>
-
-          {bulkOpen && (
-            <form onSubmit={submitBulkItems}>
-              <textarea className="trade-message-box" value={bulkText} onChange={event => setBulkText(event.target.value)} placeholder="Paste multiple Imgur links here, separated by new lines, commas, or spaces." rows={5} />
-              <div className="inline-controls">
-                <button type="submit" disabled={bulkBusy || parsedBulkUrls.length === 0}>{bulkBusy ? 'Adding...' : `Add ${parsedBulkUrls.length} Item${parsedBulkUrls.length === 1 ? '' : 's'}`}</button>
-                <button type="button" className="ghost" onClick={() => setBulkText('')} disabled={bulkBusy}>Clear</button>
-              </div>
-              {bulkStatus && <p className={bulkStatus.includes('Failed') ? 'error' : 'success'}>{bulkStatus}</p>}
-            </form>
-          )}
-
-          {isMyInventory && <InventoryToolsPanel items={items} selectedIds={selectedIds} setSelectedIds={setSelectedIds} onRefresh={refreshAfterTools} />}
-        </>
-      )}
-
+      <div className="inventory-title-row"><h2>{vtText(title, 'Inventory')}</h2>{isMyInventory && <OnlineInventoryToggle />}</div>
+      {!readOnly && onAddImgurItem && <><form className="inline-controls inventory-add-form" onSubmit={submitItem}><input value={imgurUrl} onChange={event => setImgurUrl(event.target.value)} placeholder="https://imgur.com/6hUs12E" /><button type="submit">Add Item</button><button type="button" className="ghost" onClick={() => setBulkOpen(open => !open)}>{bulkOpen ? '▼' : '▶'} Bulk Add</button></form>{bulkOpen && <form onSubmit={submitBulkItems}><textarea className="trade-message-box" value={bulkText} onChange={event => setBulkText(event.target.value)} placeholder="Paste multiple Imgur links here, separated by new lines, commas, or spaces." rows={5} /><div className="inline-controls"><button type="submit" disabled={bulkBusy || parsedBulkUrls.length === 0}>{bulkBusy ? 'Adding...' : `Add ${parsedBulkUrls.length} Item${parsedBulkUrls.length === 1 ? '' : 's'}`}</button><button type="button" className="ghost" onClick={() => setBulkText('')} disabled={bulkBusy}>Clear</button></div>{bulkStatus && <p className={bulkStatus.includes('Failed') ? 'error' : 'success'}>{bulkStatus}</p>}</form>}{isMyInventory && <InventoryToolsPanel items={items} selectedIds={selectedIds} setSelectedIds={setSelectedIds} onRefresh={refreshAfterTools} />}</>}
       {readOnly && onSearch && <div className="inline-controls"><input value={usernameValue || ''} onChange={event => onUsernameChange?.(event.target.value)} placeholder="Username" /><button type="button" onClick={onSearch}>View</button></div>}
-
-      <div ref={setNodeRef} className={`item-grid inventory-grid vt-unified-mosaic-grid drop-zone ${isOver ? 'drop-zone-active' : ''}`}>
-        {items.length === 0 && <p className="muted">No items here.</p>}
-        {items.map(item => readOnly ? <ReadOnlyItem key={item.id || item.image || vtText(item.title)} item={item} /> : <DraggableItem key={item.id || item.image || vtText(item.title)} item={item} onDoubleClickItem={onDoubleClickItem} selectable={isMyInventory} selected={selectedIds.includes(item.id)} onToggleSelected={toggleSelected} />)}
-      </div>
+      {isMyInventory && folderViews.length > 0 && <div className="inventory-folder-list">{folderViews.map(({ folder, items: folderItems }) => <InventoryFolder key={folder.id} folder={folder} folderItems={folderItems} selectedIds={selectedIds} toggleSelected={toggleSelected} onDoubleClickItem={onDoubleClickItem} />)}</div>}
+      <div ref={setNodeRef} className={`item-grid inventory-grid vt-unified-mosaic-grid drop-zone ${isOver ? 'drop-zone-active' : ''}`}>{visibleItems.length === 0 && folderViews.length === 0 && <p className="muted">No items here.</p>}{visibleItems.map(item => readOnly ? <ReadOnlyItem key={item.id || item.image || vtText(item.title)} item={item} /> : <DraggableItem key={item.id || item.image || vtText(item.title)} item={item} onDoubleClickItem={onDoubleClickItem} selectable={isMyInventory} selected={selectedIds.includes(item.id)} onToggleSelected={toggleSelected} />)}</div>
     </section>
   );
 }
