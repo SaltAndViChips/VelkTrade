@@ -1,9 +1,8 @@
 /*
   VelkTrade safe preload.
 
-  This file is loaded before server.js through Node's -r flag. Keep it extremely
-  defensive: a broken experimental route pack must never stop Render from
-  starting the backend.
+  This file is loaded before server.js through Node's -r flag. Keep it defensive:
+  a broken experimental route pack must never stop Render from starting the backend.
 */
 
 const express = require('express');
@@ -34,13 +33,16 @@ const routeInstallers = [
   ['notification-preference-routes', optionalInstaller('./notification-preference-routes', 'notification-preference-routes')]
 ].filter(([, installer]) => typeof installer === 'function');
 
-const TARGET_PATHS = new Set([
+const DELETE_PATHS = new Set([
   '/api/items/:itemId',
   '/api/items/:id',
+  '/api/bazaar/items/:itemId',
+  '/api/bazaar/items/:id'
+]);
+
+const REMOVE_ACTION_PATHS = new Set([
   '/api/items/:itemId/remove',
   '/api/items/:id/remove',
-  '/api/bazaar/items/:itemId',
-  '/api/bazaar/items/:id',
   '/api/bazaar/items/:itemId/remove',
   '/api/bazaar/items/:id/remove'
 ]);
@@ -132,8 +134,11 @@ async function robustRemoveItem(req, res) {
   }
 }
 
-function shouldOverride(path) {
-  return typeof path === 'string' && TARGET_PATHS.has(path);
+function shouldOverride(methodName, path) {
+  if (typeof path !== 'string') return false;
+  const method = String(methodName || '').toLowerCase();
+  if (method === 'delete') return DELETE_PATHS.has(path) || REMOVE_ACTION_PATHS.has(path);
+  return REMOVE_ACTION_PATHS.has(path);
 }
 
 function installFeatureRoutesOnce(app, originalUse) {
@@ -159,7 +164,7 @@ function installMethodOverride(methodName) {
   const original = express.application[methodName];
   if (typeof original !== 'function') return;
   express.application[methodName] = function patchedRoute(path, ...handlers) {
-    if (shouldOverride(path)) return original.call(this, path, velktradeEarlyCors, authMiddleware, robustRemoveItem);
+    if (shouldOverride(methodName, path)) return original.call(this, path, velktradeEarlyCors, authMiddleware, robustRemoveItem);
     return original.call(this, path, ...handlers);
   };
 }
