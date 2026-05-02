@@ -67,15 +67,12 @@ function installToastStyles() {
       box-shadow: none;
     }
 
-    .velktrade-toast.leaving {
-      animation: velktrade-toast-out 150ms ease-in forwards;
-    }
+    .velktrade-toast.leaving { animation: velktrade-toast-out 150ms ease-in forwards; }
 
-    .vt-item-locked {
-      filter: saturate(0.74);
-    }
+    .vt-item-locked { filter: saturate(0.74); }
 
-    .vt-lock-badge {
+    .vt-item-locked::after {
+      content: '🔒 Locked';
       position: absolute;
       top: 10px;
       left: 10px;
@@ -89,6 +86,8 @@ function installToastStyles() {
       font-weight: 800;
       pointer-events: none;
     }
+
+    .vt-lock-badge { display: none !important; }
 
     @keyframes velktrade-toast-in {
       from { opacity: 0; transform: translateY(8px) scale(0.98); }
@@ -142,7 +141,7 @@ export function velkToast(message, variant = 'info', timeout = 3600) {
 
   const dismiss = () => {
     toast.classList.add('leaving');
-    window.setTimeout(() => toast.remove(), 155);
+    window.setTimeout(() => toast.parentNode?.removeChild(toast), 155);
   };
 
   close.addEventListener('click', dismiss);
@@ -168,17 +167,14 @@ function cardLooksLocked(card) {
 export function scanItemLocks() {
   if (typeof document === 'undefined') return;
 
+  document.querySelectorAll('.vt-lock-badge').forEach(badge => {
+    badge.parentNode?.removeChild(badge);
+  });
+
   document.querySelectorAll('.vt-unified-item-card, .inventory-item, .bazaar-item-card, .bazaar-item, .trade-item, [data-item-id]').forEach(card => {
     if (!cardLooksLocked(card)) return;
     card.classList.add('vt-item-locked');
     card.dataset.vtLocked = 'true';
-
-    if (!card.querySelector(':scope > .vt-lock-badge')) {
-      const badge = document.createElement('span');
-      badge.className = 'vt-lock-badge';
-      badge.textContent = '🔒 Locked';
-      card.appendChild(badge);
-    }
   });
 }
 
