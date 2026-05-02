@@ -14,6 +14,7 @@ const installBuyOfferAuditPriceRoutes = require('./buy-offer-audit-price-routes'
 const installBazaarWatchlistFilterRoutes = require('./bazaar-watchlist-filter-routes');
 const installItemFolderNoteRoutes = require('./item-folder-note-routes');
 const installInventoryBulkCleanupRoutes = require('./inventory-bulk-cleanup-routes');
+const installDeveloperMaintenanceRoutes = require('./developer-maintenance-routes');
 
 const TARGET_PATHS = new Set([
   '/api/items/:itemId',
@@ -106,6 +107,7 @@ function installFeatureRoutesOnce(app, originalUse) {
   installBazaarWatchlistFilterRoutes({ app, authMiddleware });
   installItemFolderNoteRoutes({ app, authMiddleware });
   installInventoryBulkCleanupRoutes({ app, authMiddleware });
+  installDeveloperMaintenanceRoutes({ app, authMiddleware });
 }
 
 function installMethodOverride(methodName) {
