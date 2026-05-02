@@ -1,11 +1,5 @@
 /*
   VelkTrade hard delete route override + early compatibility route installer.
-
-  Loaded with Node's -r flag before server.js. It patches Express route
-  registration so every item-removal endpoint uses a consistent persistent
-  delete handler instead of legacy listing-only handlers. It also installs the
-  item-lock and buy-offer/audit/price-history route packs as soon as the Express
-  app starts registering middleware.
 */
 
 const express = require('express');
@@ -13,6 +7,7 @@ const { get, run } = require('./db');
 const { authMiddleware } = require('./auth');
 const installItemLockRoutes = require('./item-lock-routes');
 const installBuyOfferAuditPriceRoutes = require('./buy-offer-audit-price-routes');
+const installBazaarWatchlistFilterRoutes = require('./bazaar-watchlist-filter-routes');
 
 const TARGET_PATHS = new Set([
   '/api/items/:itemId',
@@ -57,9 +52,7 @@ async function robustRemoveItem(req, res) {
   try {
     const itemId = req.params.itemId || req.params.id;
 
-    if (!isIntegerId(itemId)) {
-      return res.status(400).json({ error: 'Invalid item id', itemId: itemId || '' });
-    }
+    if (!isIntegerId(itemId)) return res.status(400).json({ error: 'Invalid item id', itemId: itemId || '' });
 
     const numericItemId = Number(itemId);
     const item = await get('SELECT * FROM items WHERE id = ?', [numericItemId]);
@@ -93,23 +86,19 @@ function installFeatureRoutesOnce(app) {
   app.__velktradeEarlyFeatureRoutesInstalled = true;
   installItemLockRoutes({ app, authMiddleware, run, get });
   installBuyOfferAuditPriceRoutes({ app, authMiddleware });
+  installBazaarWatchlistFilterRoutes({ app, authMiddleware });
 }
 
 function installMethodOverride(methodName) {
   const original = express.application[methodName];
-
   express.application[methodName] = function patchedRoute(path, ...handlers) {
-    if (shouldOverride(path)) {
-      return original.call(this, path, authMiddleware, robustRemoveItem);
-    }
-
+    if (shouldOverride(path)) return original.call(this, path, authMiddleware, robustRemoveItem);
     return original.call(this, path, ...handlers);
   };
 }
 
 function installUseHook() {
   const originalUse = express.application.use;
-
   express.application.use = function patchedUse(...args) {
     installFeatureRoutesOnce(this);
     return originalUse.call(this, ...args);
