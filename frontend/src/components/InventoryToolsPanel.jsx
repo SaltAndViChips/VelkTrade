@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { velkToast } from '../velktrade-feature-foundation.js';
 
+export const FOLDER_ICON_PRESETS = ['📁', '⭐', '🔥', '💎', '🪐', '🌌', '⚔️', '🛡️', '☠️', '👑', '🎯', '⚡', '✦', '◆', '★', '☢', 'Ω', '#', '$', 'IC'];
+
 function formatPrice(value) {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -14,6 +16,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
   const [open, setOpen] = useState(false);
   const [folders, setFolders] = useState([]);
   const [folderName, setFolderName] = useState('');
+  const [folderIcon, setFolderIcon] = useState('📁');
   const [folderId, setFolderId] = useState('');
   const [bulkPrice, setBulkPrice] = useState('');
   const [cleanup, setCleanup] = useState(null);
@@ -37,7 +40,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
     if (!name) return;
     setBusy(true);
     try {
-      const data = await api('/api/item-folders', { method: 'POST', body: JSON.stringify({ name }) });
+      const data = await api('/api/item-folders', { method: 'POST', body: JSON.stringify({ name, icon: folderIcon }) });
       setFolderName('');
       await loadFolders();
       if (data.folder?.id) setFolderId(String(data.folder.id));
@@ -46,6 +49,23 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
       onRefresh?.();
     } catch (error) {
       velkToast(error.message || 'Could not create folder.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function updateSelectedFolderIcon(icon) {
+    if (!folderId) return;
+    setFolderIcon(icon);
+    setBusy(true);
+    try {
+      await api(`/api/item-folders/${encodeURIComponent(folderId)}`, { method: 'PATCH', body: JSON.stringify({ icon }) });
+      await loadFolders();
+      window.dispatchEvent(new CustomEvent('velktrade:folders-changed'));
+      onRefresh?.();
+      velkToast('Folder icon updated.', 'success');
+    } catch (error) {
+      velkToast(error.message || 'Could not update folder icon.', 'error');
     } finally {
       setBusy(false);
     }
@@ -117,7 +137,9 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
           <div className="inventory-tool-card">
             <strong>Folders</strong>
             <div className="inline-controls"><input value={folderName} onChange={event => setFolderName(event.target.value)} placeholder="New folder name" /><button type="button" disabled={busy || !folderName.trim()} onClick={createFolder}>Create</button></div>
-            <div className="inline-controls"><select value={folderId} onChange={event => setFolderId(event.target.value)}><option value="">Choose folder</option>{folders.map(folder => <option key={folder.id} value={folder.id}>{folder.name} ({folder.itemCount || 0})</option>)}</select><button type="button" disabled={busy || !folderId || !selectedIds.length} onClick={assignFolder}>Add Selected</button></div>
+            <div className="folder-icon-picker" aria-label="Folder icon presets">{FOLDER_ICON_PRESETS.map(icon => <button key={icon} type="button" className={folderIcon === icon ? 'active' : ''} disabled={busy} onClick={() => setFolderIcon(icon)}>{icon}</button>)}</div>
+            <div className="inline-controls"><select value={folderId} onChange={event => { setFolderId(event.target.value); const next = folders.find(folder => String(folder.id) === event.target.value); if (next?.icon) setFolderIcon(next.icon); }}><option value="">Choose folder</option>{folders.map(folder => <option key={folder.id} value={folder.id}>{folder.icon || '📁'} {folder.name} ({folder.itemCount || 0})</option>)}</select><button type="button" disabled={busy || !folderId || !selectedIds.length} onClick={assignFolder}>Add Selected</button></div>
+            <div className="inline-controls"><button type="button" className="ghost" disabled={busy || !folderId} onClick={() => updateSelectedFolderIcon(folderIcon)}>Set Icon On Selected Folder</button></div>
           </div>
           <div className="inventory-tool-card">
             <strong>Bulk Edit</strong>
