@@ -2,7 +2,11 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { velkToast } from '../velktrade-feature-foundation.js';
 
-export const FOLDER_ICON_PRESETS = ['📁', '⭐', '🔥', '💎', '🪐', '🌌', '⚔️', '🛡️', '☠️', '👑', '🎯', '⚡', '✦', '◆', '★', '☢', 'Ω', '#', '$', 'IC'];
+export const FOLDER_ICON_PRESETS = [
+  '📁', '🗂️', '📦', '🧰', '🏷️', '⭐', '✨', '🔥', '💎', '🪐', '🌌', '☄️', '🌙', '☀️',
+  '⚔️', '🛡️', '🏹', '🎯', '💣', '☠️', '👑', '💰', '🪙', '⚡', '🔮', '🧪', '🧬', '🕯️',
+  '✦', '◆', '◇', '★', '☢', '☣', 'Ω', 'α', 'β', 'Δ', '#', '$', 'IC', 'S', 'A', 'B', 'C'
+];
 
 function formatPrice(value) {
   const raw = String(value || '').trim();
@@ -27,7 +31,10 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
       const data = await api('/api/item-folders');
       const next = Array.isArray(data.folders) ? data.folders : [];
       setFolders(next);
-      if (!folderId && next[0]?.id) setFolderId(String(next[0].id));
+      if (!folderId && next[0]?.id) {
+        setFolderId(String(next[0].id));
+        setFolderIcon(next[0].icon || '📁');
+      }
     } catch (error) {
       velkToast(error.message || 'Could not load folders.', 'error');
     }
@@ -54,12 +61,12 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
     }
   }
 
-  async function updateSelectedFolderIcon(icon) {
+  async function updateSelectedFolderIcon(icon = folderIcon) {
     if (!folderId) return;
-    setFolderIcon(icon);
     setBusy(true);
     try {
       await api(`/api/item-folders/${encodeURIComponent(folderId)}`, { method: 'PATCH', body: JSON.stringify({ icon }) });
+      setFolderIcon(icon);
       await loadFolders();
       window.dispatchEvent(new CustomEvent('velktrade:folders-changed'));
       onRefresh?.();
@@ -136,10 +143,15 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
         <div className="inventory-tools-grid">
           <div className="inventory-tool-card">
             <strong>Folders</strong>
-            <div className="inline-controls"><input value={folderName} onChange={event => setFolderName(event.target.value)} placeholder="New folder name" /><button type="button" disabled={busy || !folderName.trim()} onClick={createFolder}>Create</button></div>
-            <div className="folder-icon-picker" aria-label="Folder icon presets">{FOLDER_ICON_PRESETS.map(icon => <button key={icon} type="button" className={folderIcon === icon ? 'active' : ''} disabled={busy} onClick={() => setFolderIcon(icon)}>{icon}</button>)}</div>
+            <div className="inline-controls">
+              <select className="folder-icon-select" value={folderIcon} disabled={busy} onChange={event => setFolderIcon(event.target.value)} aria-label="Folder icon">
+                {FOLDER_ICON_PRESETS.map(icon => <option key={icon} value={icon}>{icon}</option>)}
+              </select>
+              <input value={folderName} onChange={event => setFolderName(event.target.value)} placeholder="New folder name" />
+              <button type="button" disabled={busy || !folderName.trim()} onClick={createFolder}>Create</button>
+            </div>
             <div className="inline-controls"><select value={folderId} onChange={event => { setFolderId(event.target.value); const next = folders.find(folder => String(folder.id) === event.target.value); if (next?.icon) setFolderIcon(next.icon); }}><option value="">Choose folder</option>{folders.map(folder => <option key={folder.id} value={folder.id}>{folder.icon || '📁'} {folder.name} ({folder.itemCount || 0})</option>)}</select><button type="button" disabled={busy || !folderId || !selectedIds.length} onClick={assignFolder}>Add Selected</button></div>
-            <div className="inline-controls"><button type="button" className="ghost" disabled={busy || !folderId} onClick={() => updateSelectedFolderIcon(folderIcon)}>Set Icon On Selected Folder</button></div>
+            <div className="inline-controls"><button type="button" className="ghost" disabled={busy || !folderId} onClick={() => updateSelectedFolderIcon(folderIcon)}>Apply Icon To Folder</button></div>
           </div>
           <div className="inventory-tool-card">
             <strong>Bulk Edit</strong>
