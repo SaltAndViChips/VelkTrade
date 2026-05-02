@@ -1,18 +1,12 @@
-/* VelkTrade unified item mosaic + centered item popup overrides. */
+/* VelkTrade unified item mosaic + compact centered item popup overrides. */
 
-html,
-body,
-#root {
+html, body, #root {
   width: 100% !important;
   max-width: none !important;
   overflow-x: hidden;
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
+*, *::before, *::after { box-sizing: border-box; }
 
 @media (min-width: 1000px) {
   body #root,
@@ -162,31 +156,16 @@ button[title*="Online players" i] {
     grid-template-columns: repeat(auto-fill, 300px) !important;
     justify-content: start !important;
     align-items: start !important;
-    gap: 14px !important;
     width: 100% !important;
     max-width: none !important;
   }
 
-  .inventory-grid > *,
-  .inventory-items > *,
-  .items-grid > *,
-  .item-grid > *,
-  .profile-items > *,
-  .profile-inventory > *,
-  .bazaar-grid > *,
-  .bazaar-items > *,
-  .bazaar-list > *,
-  .trade-items-grid > *,
-  .trade-inventory-grid > *,
-  .trade-offer-grid > *,
-  .trade-menu-items > *,
-  .selected-items > *,
-  .offer-items > *,
-  .admin-trade-side li,
-  .admin-trade-items > *,
-  .admin-trade-log > *,
-  .trade-log > *,
-  .vt-unified-item-card {
+  .vt-unified-item-card,
+  .inventory-grid > *, .inventory-items > *, .items-grid > *, .item-grid > *,
+  .profile-items > *, .profile-inventory > *, .bazaar-grid > *, .bazaar-items > *, .bazaar-list > *,
+  .trade-items-grid > *, .trade-inventory-grid > *, .trade-offer-grid > *, .trade-menu-items > *,
+  .selected-items > *, .offer-items > *, .admin-trade-side li, .admin-trade-items > *,
+  .admin-trade-log > *, .trade-log > * {
     width: 300px !important;
     max-width: 300px !important;
     min-width: 300px !important;
@@ -196,52 +175,20 @@ button[title*="Online players" i] {
 }
 
 @media (min-width: 1600px) {
-  section:has(> .vt-unified-item-card),
-  div:has(> .vt-unified-item-card),
-  ul:has(> .vt-unified-item-card),
-  .inventory-grid,
-  .inventory-items,
-  .items-grid,
-  .item-grid,
-  .profile-items,
-  .profile-inventory,
-  .bazaar-grid,
-  .bazaar-items,
-  .bazaar-list,
-  .trade-items-grid,
-  .trade-inventory-grid,
-  .trade-offer-grid,
-  .trade-menu-items,
-  .selected-items,
-  .offer-items,
-  .admin-trade-side ul,
-  .admin-trade-items,
-  .admin-trade-log,
-  .trade-log,
-  .vt-unified-mosaic-grid {
+  section:has(> .vt-unified-item-card), div:has(> .vt-unified-item-card), ul:has(> .vt-unified-item-card),
+  .inventory-grid, .inventory-items, .items-grid, .item-grid, .profile-items, .profile-inventory,
+  .bazaar-grid, .bazaar-items, .bazaar-list, .trade-items-grid, .trade-inventory-grid,
+  .trade-offer-grid, .trade-menu-items, .selected-items, .offer-items, .admin-trade-side ul,
+  .admin-trade-items, .admin-trade-log, .trade-log, .vt-unified-mosaic-grid {
     grid-template-columns: repeat(auto-fill, 285px) !important;
   }
 
-  .inventory-grid > *,
-  .inventory-items > *,
-  .items-grid > *,
-  .item-grid > *,
-  .profile-items > *,
-  .profile-inventory > *,
-  .bazaar-grid > *,
-  .bazaar-items > *,
-  .bazaar-list > *,
-  .trade-items-grid > *,
-  .trade-inventory-grid > *,
-  .trade-offer-grid > *,
-  .trade-menu-items > *,
-  .selected-items > *,
-  .offer-items > *,
-  .admin-trade-side li,
-  .admin-trade-items > *,
-  .admin-trade-log > *,
-  .trade-log > *,
-  .vt-unified-item-card {
+  .vt-unified-item-card,
+  .inventory-grid > *, .inventory-items > *, .items-grid > *, .item-grid > *,
+  .profile-items > *, .profile-inventory > *, .bazaar-grid > *, .bazaar-items > *, .bazaar-list > *,
+  .trade-items-grid > *, .trade-inventory-grid > *, .trade-offer-grid > *, .trade-menu-items > *,
+  .selected-items > *, .offer-items > *, .admin-trade-side li, .admin-trade-items > *,
+  .admin-trade-log > *, .trade-log > * {
     width: 285px !important;
     max-width: 285px !important;
     min-width: 285px !important;
@@ -301,26 +248,11 @@ button[title*="Online players" i] {
 }
 
 .vt-unified-item-card img,
-.inventory-grid img,
-.inventory-items img,
-.items-grid img,
-.item-grid img,
-.profile-items img,
-.profile-inventory img,
-.bazaar-grid img,
-.bazaar-items img,
-.bazaar-list img,
-.trade-items-grid img,
-.trade-inventory-grid img,
-.trade-offer-grid img,
-.trade-menu-items img,
-.selected-items img,
-.offer-items img,
-.admin-trade-side img,
-.admin-trade-items img,
-.admin-trade-log img,
-.trade-log img,
-.admin-trade-item-thumb {
+.inventory-grid img, .inventory-items img, .items-grid img, .item-grid img,
+.profile-items img, .profile-inventory img, .bazaar-grid img, .bazaar-items img, .bazaar-list img,
+.trade-items-grid img, .trade-inventory-grid img, .trade-offer-grid img, .trade-menu-items img,
+.selected-items img, .offer-items img, .admin-trade-side img, .admin-trade-items img,
+.admin-trade-log img, .trade-log img, .admin-trade-item-thumb {
   width: 100% !important;
   height: 300px !important;
   max-height: 300px !important;
@@ -336,31 +268,17 @@ button[title*="Online players" i] {
 
 @media (min-width: 1600px) {
   .vt-unified-item-card img,
-  .inventory-grid img,
-  .inventory-items img,
-  .items-grid img,
-  .item-grid img,
-  .profile-items img,
-  .profile-inventory img,
-  .bazaar-grid img,
-  .bazaar-items img,
-  .bazaar-list img,
-  .trade-items-grid img,
-  .trade-inventory-grid img,
-  .trade-offer-grid img,
-  .trade-menu-items img,
-  .selected-items img,
-  .offer-items img,
-  .admin-trade-side img,
-  .admin-trade-items img,
-  .admin-trade-log img,
-  .trade-log img,
-  .admin-trade-item-thumb {
+  .inventory-grid img, .inventory-items img, .items-grid img, .item-grid img,
+  .profile-items img, .profile-inventory img, .bazaar-grid img, .bazaar-items img, .bazaar-list img,
+  .trade-items-grid img, .trade-inventory-grid img, .trade-offer-grid img, .trade-menu-items img,
+  .selected-items img, .offer-items img, .admin-trade-side img, .admin-trade-items img,
+  .admin-trade-log img, .trade-log img, .admin-trade-item-thumb {
     height: 285px !important;
     max-height: 285px !important;
   }
 }
 
+/* Remove every hover item popup/preview. Hover only changes the item name text. */
 .vt-hover-price,
 .vt-item-hover-preview,
 .item-hover-preview,
@@ -371,10 +289,15 @@ button[title*="Online players" i] {
 .admin-trade-hover-preview,
 .admin-image-preview-backdrop,
 .admin-image-preview-modal,
-.vt-kill-legacy-item-popup {
+.vt-kill-legacy-item-popup,
+[class*="hover-preview" i],
+[class*="full-preview" i],
+[class*="item-preview" i]:not(.vt-item-popout),
+[class*="image-preview" i]:not(.vt-item-popout-image-wrap) {
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
+  opacity: 0 !important;
 }
 
 .vt-unified-item-card.vt-hover-price-title .item-title,
@@ -391,6 +314,7 @@ body:has(.vt-item-popout-backdrop[data-vt-centered-popup="true"]) :is(.item-moda
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
+  opacity: 0 !important;
 }
 
 .vt-item-popout-backdrop[data-vt-centered-popup="true"] {
@@ -401,25 +325,25 @@ body:has(.vt-item-popout-backdrop[data-vt-centered-popup="true"]) :is(.item-moda
   align-items: center !important;
   justify-content: center !important;
   padding: 24px !important;
-  background: rgba(4, 3, 10, 0.78) !important;
+  background: rgba(4, 3, 10, 0.76) !important;
   backdrop-filter: blur(6px) !important;
   pointer-events: auto !important;
   visibility: visible !important;
 }
 
 .vt-item-popout {
-  width: min(1040px, 88vw) !important;
-  max-width: 1040px !important;
-  max-height: 88vh !important;
+  width: fit-content !important;
+  max-width: min(920px, 88vw) !important;
+  max-height: min(760px, 86vh) !important;
   margin: 0 auto !important;
   display: grid !important;
-  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr) !important;
+  grid-template-columns: minmax(260px, 520px) minmax(280px, 340px) !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 24px !important;
-  padding: 20px !important;
+  gap: 22px !important;
+  padding: 18px !important;
   border-radius: 20px !important;
-  overflow: hidden !important;
+  overflow: auto !important;
   background: radial-gradient(circle at top left, rgba(141, 99, 255, 0.16), transparent 34%), rgba(12, 10, 20, 0.97) !important;
   border: 1px solid rgba(142, 113, 255, 0.38) !important;
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.72) !important;
@@ -432,15 +356,15 @@ body:has(.vt-item-popout-backdrop[data-vt-centered-popup="true"]) :is(.item-moda
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  padding: 4px 8px 4px 0 !important;
+  padding: 0 !important;
 }
 
 .vt-item-popout-image-wrap img {
   display: block !important;
   width: auto !important;
-  max-width: min(58vw, 660px) !important;
+  max-width: min(42vw, 520px) !important;
   height: auto !important;
-  max-height: 74vh !important;
+  max-height: min(72vh, 690px) !important;
   object-fit: contain !important;
   margin: 0 auto !important;
   border-radius: 16px !important;
@@ -450,7 +374,7 @@ body:has(.vt-item-popout-backdrop[data-vt-centered-popup="true"]) :is(.item-moda
 
 .vt-item-popout-menu {
   min-width: 0 !important;
-  max-width: 360px !important;
+  max-width: 340px !important;
   width: 100% !important;
   justify-self: start !important;
   align-self: center !important;
@@ -472,7 +396,7 @@ body:has(.vt-item-popout-backdrop[data-vt-centered-popup="true"]) :is(.item-moda
 
 .vt-item-popout-header h2 {
   margin: 0 !important;
-  font-size: 1.85rem !important;
+  font-size: 1.65rem !important;
   line-height: 1.1 !important;
   overflow-wrap: anywhere !important;
 }
@@ -490,83 +414,27 @@ body:has(.vt-item-popout-backdrop[data-vt-centered-popup="true"]) :is(.item-moda
   box-shadow: none !important;
 }
 
-.vt-price-editor {
-  display: grid !important;
-  gap: 7px !important;
-}
-
-.vt-price-editor input {
-  width: 100% !important;
-  min-height: 42px !important;
-}
-
-.vt-item-popout-actions {
-  display: grid !important;
-  gap: 10px !important;
-}
-
-.vt-item-popout-actions button {
-  width: 100% !important;
-  min-height: 38px !important;
-  border-radius: 11px !important;
-  font-size: 14px !important;
-  font-weight: 800 !important;
-  box-shadow: none !important;
-}
-
-.vt-primary-action {
-  background: linear-gradient(180deg, #8c5cff, #6737d2) !important;
-}
-
-.vt-secondary-action {
-  background: rgba(255,255,255,.045) !important;
-  border: 1px solid rgba(142, 113, 255, 0.34) !important;
-}
-
-.vt-danger-button {
-  background: linear-gradient(180deg, #9c3346, #6f1d2d) !important;
-}
-
-.vt-muted-note {
-  color: #ffd7a8 !important;
-  font-size: 13px !important;
-  line-height: 1.35 !important;
-}
-
-.vt-checkbox-row {
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-}
-
-.vt-interested-list {
-  max-height: 180px !important;
-  overflow: auto !important;
-  display: grid !important;
-  gap: 6px !important;
-  padding: 8px !important;
-  border-radius: 12px !important;
-  background: rgba(0,0,0,.24) !important;
-  border: 1px solid rgba(142, 113, 255, 0.24) !important;
-}
+.vt-price-editor { display: grid !important; gap: 7px !important; }
+.vt-price-editor input { width: 100% !important; min-height: 42px !important; }
+.vt-item-popout-actions { display: grid !important; gap: 10px !important; }
+.vt-item-popout-actions button { width: 100% !important; min-height: 38px !important; border-radius: 11px !important; font-size: 14px !important; font-weight: 800 !important; box-shadow: none !important; }
+.vt-primary-action { background: linear-gradient(180deg, #8c5cff, #6737d2) !important; }
+.vt-secondary-action { background: rgba(255,255,255,.045) !important; border: 1px solid rgba(142, 113, 255, 0.34) !important; }
+.vt-danger-button { background: linear-gradient(180deg, #9c3346, #6f1d2d) !important; }
+.vt-muted-note { color: #ffd7a8 !important; font-size: 13px !important; line-height: 1.35 !important; }
+.vt-checkbox-row { display: flex !important; align-items: center !important; gap: 8px !important; }
+.vt-interested-list { max-height: 180px !important; overflow: auto !important; display: grid !important; gap: 6px !important; padding: 8px !important; border-radius: 12px !important; background: rgba(0,0,0,.24) !important; border: 1px solid rgba(142, 113, 255, 0.24) !important; }
 
 @media (max-width: 860px) {
   .vt-item-popout {
     width: min(96vw, 760px) !important;
     grid-template-columns: 1fr !important;
     max-height: 92vh !important;
-    overflow: auto !important;
   }
-
-  .vt-item-popout-image-wrap {
-    padding-right: 0 !important;
-  }
-
   .vt-item-popout-image-wrap img {
     max-width: 100% !important;
     max-height: 54vh !important;
   }
-
   .vt-item-popout-menu {
     max-width: none !important;
     justify-self: stretch !important;
@@ -574,111 +442,10 @@ body:has(.vt-item-popout-backdrop[data-vt-centered-popup="true"]) :is(.item-moda
 }
 
 @media (max-width: 760px) {
-  .safe-online-dropdown,
-  .unified-player-menu,
-  .presence-hub,
-  .online-player-menu,
-  .online-players-menu,
-  .player-online-menu,
-  .player-presence-menu {
-    top: 12px !important;
-    right: 10px !important;
-    left: auto !important;
-  }
-
-  .safe-online-toggle,
-  .unified-player-trigger,
-  .presence-hub-trigger,
-  .online-player-toggle,
-  .online-players-toggle,
-  .player-online-toggle,
-  button[aria-label*="Online players" i],
-  button[title*="Online players" i] {
-    top: 12px !important;
-    right: 10px !important;
-  }
-
-  .safe-online-panel,
-  .unified-player-panel,
-  .presence-hub-panel,
-  .online-player-panel,
-  .online-players-panel,
-  .player-online-panel,
-  .player-presence-panel {
-    top: 62px !important;
-    right: 10px !important;
-    width: calc(100vw - 20px) !important;
-    max-width: calc(100vw - 20px) !important;
-    max-height: calc(100vh - 82px) !important;
-  }
-
-  section:has(> .vt-unified-item-card),
-  div:has(> .vt-unified-item-card),
-  ul:has(> .vt-unified-item-card),
-  .inventory-grid,
-  .inventory-items,
-  .items-grid,
-  .item-grid,
-  .profile-items,
-  .profile-inventory,
-  .bazaar-grid,
-  .bazaar-items,
-  .bazaar-list,
-  .trade-items-grid,
-  .trade-inventory-grid,
-  .trade-offer-grid,
-  .trade-menu-items,
-  .selected-items,
-  .offer-items,
-  .admin-trade-side ul,
-  .vt-unified-mosaic-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    justify-content: stretch !important;
-    gap: 8px !important;
-  }
-
-  .vt-unified-item-card,
-  .inventory-grid > *,
-  .inventory-items > *,
-  .items-grid > *,
-  .item-grid > *,
-  .profile-items > *,
-  .profile-inventory > *,
-  .bazaar-grid > *,
-  .bazaar-items > *,
-  .bazaar-list > *,
-  .trade-items-grid > *,
-  .trade-inventory-grid > *,
-  .trade-offer-grid > *,
-  .trade-menu-items > *,
-  .selected-items > *,
-  .offer-items > *,
-  .admin-trade-side li {
-    width: auto !important;
-    max-width: none !important;
-    min-width: 0 !important;
-    flex-basis: auto !important;
-  }
-
-  .vt-unified-item-card img,
-  .inventory-grid img,
-  .inventory-items img,
-  .items-grid img,
-  .item-grid img,
-  .profile-items img,
-  .profile-inventory img,
-  .bazaar-grid img,
-  .bazaar-items img,
-  .bazaar-list img,
-  .trade-items-grid img,
-  .trade-inventory-grid img,
-  .trade-offer-grid img,
-  .trade-menu-items img,
-  .selected-items img,
-  .offer-items img,
-  .admin-trade-side img,
-  .admin-trade-item-thumb {
-    height: clamp(135px, 42vw, 220px) !important;
-    max-height: 220px !important;
-  }
+  .safe-online-dropdown, .unified-player-menu, .presence-hub, .online-player-menu, .online-players-menu, .player-online-menu, .player-presence-menu { top: 12px !important; right: 10px !important; left: auto !important; }
+  .safe-online-toggle, .unified-player-trigger, .presence-hub-trigger, .online-player-toggle, .online-players-toggle, .player-online-toggle, button[aria-label*="Online players" i], button[title*="Online players" i] { top: 12px !important; right: 10px !important; }
+  .safe-online-panel, .unified-player-panel, .presence-hub-panel, .online-player-panel, .online-players-panel, .player-online-panel, .player-presence-panel { top: 62px !important; right: 10px !important; width: calc(100vw - 20px) !important; max-width: calc(100vw - 20px) !important; max-height: calc(100vh - 82px) !important; }
+  section:has(> .vt-unified-item-card), div:has(> .vt-unified-item-card), ul:has(> .vt-unified-item-card), .inventory-grid, .inventory-items, .items-grid, .item-grid, .profile-items, .profile-inventory, .bazaar-grid, .bazaar-items, .bazaar-list, .trade-items-grid, .trade-inventory-grid, .trade-offer-grid, .trade-menu-items, .selected-items, .offer-items, .admin-trade-side ul, .vt-unified-mosaic-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; justify-content: stretch !important; gap: 8px !important; }
+  .vt-unified-item-card, .inventory-grid > *, .inventory-items > *, .items-grid > *, .item-grid > *, .profile-items > *, .profile-inventory > *, .bazaar-grid > *, .bazaar-items > *, .bazaar-list > *, .trade-items-grid > *, .trade-inventory-grid > *, .trade-offer-grid > *, .trade-menu-items > *, .selected-items > *, .offer-items > *, .admin-trade-side li { width: auto !important; max-width: none !important; min-width: 0 !important; flex-basis: auto !important; }
+  .vt-unified-item-card img, .inventory-grid img, .inventory-items img, .items-grid img, .item-grid img, .profile-items img, .profile-inventory img, .bazaar-grid img, .bazaar-items img, .bazaar-list img, .trade-items-grid img, .trade-inventory-grid img, .trade-offer-grid img, .trade-menu-items img, .selected-items img, .offer-items img, .admin-trade-side img, .admin-trade-item-thumb { height: clamp(135px, 42vw, 220px) !important; max-height: 220px !important; }
 }
