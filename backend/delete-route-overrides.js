@@ -30,7 +30,8 @@ const routeInstallers = [
   ['item-folder-note-routes', optionalInstaller('./item-folder-note-routes', 'item-folder-note-routes')],
   ['inventory-bulk-cleanup-routes', optionalInstaller('./inventory-bulk-cleanup-routes', 'inventory-bulk-cleanup-routes')],
   ['developer-maintenance-routes', optionalInstaller('./developer-maintenance-routes', 'developer-maintenance-routes')],
-  ['notification-preference-routes', optionalInstaller('./notification-preference-routes', 'notification-preference-routes')]
+  ['notification-preference-routes', optionalInstaller('./notification-preference-routes', 'notification-preference-routes')],
+  ['notification-feed-routes', optionalInstaller('./notification-feed-routes', 'notification-feed-routes')]
 ].filter(([, installer]) => typeof installer === 'function');
 
 const DELETE_PATHS = new Set([
