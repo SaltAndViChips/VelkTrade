@@ -12,276 +12,37 @@ function txt(value, fallback = '') {
     if (typeof value.name === 'string') return value.name;
     if (typeof value.username === 'string') return value.username;
     if (typeof value.value === 'string' || typeof value.value === 'number') return String(value.value);
-    try {
-      const json = JSON.stringify(value);
-      return json && json !== '{}' ? json : fallback;
-    } catch {
-      return fallback;
-    }
+    try { const json = JSON.stringify(value); return json && json !== '{}' ? json : fallback; } catch { return fallback; }
   }
   return fallback;
 }
 
-function fmtPrice(value) {
-  const raw = txt(value).trim();
-  if (!raw) return '';
-  if (/IC$/i.test(raw)) return raw;
-  const number = Number(raw.replace(/[^\d.]/g, ''));
-  return Number.isFinite(number) && number > 0 ? `${number.toLocaleString()} IC` : raw;
-}
-
-function norm(value) {
-  return txt(value).replace(/^https?:\/\//i, '').replace(/\?.*$/, '').replace(/\s+/g, ' ').trim().toLowerCase();
-}
-
-function isPrivileged(user) {
-  const username = txt(user?.username).toLowerCase();
-  return Boolean(
-    user?.isAdmin || user?.is_admin || user?.admin ||
-    user?.isDeveloper || user?.is_developer || user?.developer ||
-    user?.role === 'admin' || user?.role === 'developer' ||
-    user?.rank === 'admin' || user?.rank === 'developer' ||
-    username === 'salt' || username === 'velkon'
-  );
-}
-
-function arraysFromPayload(value) {
-  const output = [];
-  if (Array.isArray(value)) output.push(value);
-  for (const key of ['items', 'data', 'listings', 'bazaarItems', 'inventory', 'fromItemDetails', 'toItemDetails', 'trades']) {
-    if (Array.isArray(value?.[key])) output.push(value[key]);
-  }
-  if (Array.isArray(value?.trades)) {
-    for (const trade of value.trades) {
-      if (Array.isArray(trade.fromItemDetails)) output.push(trade.fromItemDetails);
-      if (Array.isArray(trade.toItemDetails)) output.push(trade.toItemDetails);
-    }
-  }
-  return output.flat();
-}
-
+function fmtPrice(value) { const raw = txt(value).trim(); if (!raw) return ''; if (/IC$/i.test(raw)) return raw; const number = Number(raw.replace(/[^\d.]/g, '')); return Number.isFinite(number) && number > 0 ? `${number.toLocaleString()} IC` : raw; }
+function norm(value) { return txt(value).replace(/^https?:\/\//i, '').replace(/\?.*$/, '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+function isPrivileged(user) { const username = txt(user?.username).toLowerCase(); return Boolean(user?.isAdmin || user?.is_admin || user?.admin || user?.isDeveloper || user?.is_developer || user?.developer || user?.role === 'admin' || user?.role === 'developer' || user?.rank === 'admin' || user?.rank === 'developer' || username === 'salt' || username === 'velkon'); }
+function arraysFromPayload(value) { const output = []; if (Array.isArray(value)) output.push(value); for (const key of ['items', 'data', 'listings', 'bazaarItems', 'inventory', 'fromItemDetails', 'toItemDetails', 'trades']) if (Array.isArray(value?.[key])) output.push(value[key]); if (Array.isArray(value?.trades)) for (const trade of value.trades) { if (Array.isArray(trade.fromItemDetails)) output.push(trade.fromItemDetails); if (Array.isArray(trade.toItemDetails)) output.push(trade.toItemDetails); } return output.flat(); }
 function candidateId(value) { return txt(value?.id ?? value?.itemId ?? value?.item_id ?? value?.listingId ?? value?.listing_id); }
 function candidateTitle(value) { return txt(value?.title ?? value?.itemTitle ?? value?.item_title ?? value?.name ?? value?.itemName); }
 function candidateImage(value) { return txt(value?.image ?? value?.itemImage ?? value?.item_image ?? value?.img ?? value?.src ?? value?.url ?? value?.imageUrl ?? value?.image_url); }
 function candidateOwnerId(value) { return txt(value?.ownerId ?? value?.owner_id ?? value?.userId ?? value?.user_id ?? value?.userid ?? value?.sellerId ?? value?.seller_id); }
 function candidateOwnerUsername(value) { return txt(value?.ownerUsername ?? value?.owner_username ?? value?.username ?? value?.sellerUsername ?? value?.seller_username); }
-
-function normalizeCandidate(value) {
-  if (!value || typeof value !== 'object') return null;
-  const id = candidateId(value);
-  const title = candidateTitle(value);
-  const src = candidateImage(value);
-  const price = txt(value?.price ?? value?.itemPrice ?? value?.item_price ?? value?.priceAmount ?? value?.price_amount ?? value?.ic ?? value?.icPrice ?? value?.ic_price);
-  const ownerId = candidateOwnerId(value);
-  const ownerUsername = candidateOwnerUsername(value);
-  if (!id && !title && !src && !price) return null;
-  return { id, title, src, price, ownerId, ownerUsername };
-}
-
-function findReactItem(value, seen = new WeakSet(), depth = 0) {
-  if (!value || typeof value !== 'object' || depth > 5) return null;
-  if (seen.has(value)) return null;
-  seen.add(value);
-  if (value instanceof Element || value instanceof Window || value instanceof Document) return null;
-  const direct = normalizeCandidate(value);
-  if (direct && (direct.id || direct.title || direct.src)) return direct;
-  for (const key of ['item', 'listing', 'bazaarItem', 'inventoryItem', 'tradeItem', 'data', 'payload', 'props', 'children']) {
-    const found = findReactItem(value[key], seen, depth + 1);
-    if (found) return found;
-  }
-  for (const key of Object.keys(value).slice(0, 40)) {
-    if (['stateNode', 'return', 'alternate', '_owner'].includes(key)) continue;
-    const found = findReactItem(value[key], seen, depth + 1);
-    if (found) return found;
-  }
-  return null;
-}
-
-function reactItemData(element) {
-  let current = element;
-  let depth = 0;
-  while (current && current !== document.body && depth < 10) {
-    for (const key of Object.keys(current)) {
-      if (!key.startsWith('__reactProps$') && !key.startsWith('__reactFiber$')) continue;
-      const found = findReactItem(current[key]);
-      if (found) return found;
-    }
-    current = current.parentElement;
-    depth += 1;
-  }
-  return null;
-}
-
-function readData(element, keys) {
-  let current = element;
-  while (current && current !== document.body) {
-    for (const key of keys) if (current.dataset?.[key] !== undefined) return current.dataset[key];
-    for (const attr of Array.from(current.attributes || [])) {
-      const name = attr.name.toLowerCase().replace(/^data-/, '').replace(/-/g, '');
-      if (keys.some(key => name === key.toLowerCase())) return attr.value;
-      if ((name.includes('item') || name.includes('listing') || name.endsWith('id')) && /\d+/.test(attr.value)) return attr.value.match(/\d+/)?.[0] || attr.value;
-    }
-    current = current.parentElement;
-  }
-  return '';
-}
-
-function titleNode(card) {
-  for (const selector of ['.item-title', '.title', '.inventory-item-title', '.bazaar-item-title', '.trade-item-title', '.admin-trade-item-title', 'h3', 'h4', 'figcaption', 'strong']) {
-    const node = card.querySelector(selector);
-    const value = txt(node?.textContent).trim();
-    if (value && !/interested|remove|show interested|save price|no items/i.test(value)) return node;
-  }
-  const nodes = Array.from(card.querySelectorAll('p, span, small, div')).filter(node => {
-    const value = txt(node.textContent).trim();
-    return node.children.length === 0 && value && value.length < 80 && !/interested|remove|save price|verified users/i.test(value);
-  });
-  return nodes[nodes.length - 1] || null;
-}
-
-function bindHoverPrice(card) {
-  if (!card || card.dataset.vtHoverSwapBound === 'true') return;
-  card.dataset.vtHoverSwapBound = 'true';
-  const node = titleNode(card);
-  if (!node) return;
-  const original = txt(node.textContent).trim();
-  if (original) card.dataset.vtOriginalTitle = original;
-  const show = () => {
-    const price = fmtPrice(card.dataset.vtPrice || card.dataset.price || card.dataset.itemPrice || '');
-    if (!price) return;
-    card.dataset.vtHoveringPrice = 'true';
-    if (!card.dataset.vtOriginalTitle) card.dataset.vtOriginalTitle = txt(node.textContent).trim();
-    node.textContent = price;
-    card.classList.add('vt-hover-price-title');
-  };
-  const hide = () => {
-    card.dataset.vtHoveringPrice = 'false';
-    card.classList.remove('vt-hover-price-title');
-    if (card.dataset.vtOriginalTitle) node.textContent = card.dataset.vtOriginalTitle;
-  };
-  card.addEventListener('mouseenter', show);
-  card.addEventListener('mouseleave', hide);
-  card.addEventListener('focusin', show);
-  card.addEventListener('focusout', hide);
-}
-
+function normalizeCandidate(value) { if (!value || typeof value !== 'object') return null; const id = candidateId(value); const title = candidateTitle(value); const src = candidateImage(value); const price = txt(value?.price ?? value?.itemPrice ?? value?.item_price ?? value?.priceAmount ?? value?.price_amount ?? value?.ic ?? value?.icPrice ?? value?.ic_price); const ownerId = candidateOwnerId(value); const ownerUsername = candidateOwnerUsername(value); if (!id && !title && !src && !price) return null; return { id, title, src, price, ownerId, ownerUsername }; }
+function findReactItem(value, seen = new WeakSet(), depth = 0) { if (!value || typeof value !== 'object' || depth > 5) return null; if (seen.has(value)) return null; seen.add(value); if (value instanceof Element || value instanceof Window || value instanceof Document) return null; const direct = normalizeCandidate(value); if (direct && (direct.id || direct.title || direct.src)) return direct; for (const key of ['item', 'listing', 'bazaarItem', 'inventoryItem', 'tradeItem', 'data', 'payload', 'props', 'children']) { const found = findReactItem(value[key], seen, depth + 1); if (found) return found; } for (const key of Object.keys(value).slice(0, 40)) { if (['stateNode', 'return', 'alternate', '_owner'].includes(key)) continue; const found = findReactItem(value[key], seen, depth + 1); if (found) return found; } return null; }
+function reactItemData(element) { let current = element; let depth = 0; while (current && current !== document.body && depth < 10) { for (const key of Object.keys(current)) { if (!key.startsWith('__reactProps$') && !key.startsWith('__reactFiber$')) continue; const found = findReactItem(current[key]); if (found) return found; } current = current.parentElement; depth += 1; } return null; }
+function readData(element, keys) { let current = element; while (current && current !== document.body) { for (const key of keys) if (current.dataset?.[key] !== undefined) return current.dataset[key]; for (const attr of Array.from(current.attributes || [])) { const name = attr.name.toLowerCase().replace(/^data-/, '').replace(/-/g, ''); if (keys.some(key => name === key.toLowerCase())) return attr.value; if ((name.includes('item') || name.includes('listing') || name.endsWith('id')) && /\d+/.test(attr.value)) return attr.value.match(/\d+/)?.[0] || attr.value; } current = current.parentElement; } return ''; }
+function titleNode(card) { for (const selector of ['.item-title', '.title', '.inventory-item-title', '.bazaar-item-title', '.trade-item-title', '.admin-trade-item-title', 'h3', 'h4', 'figcaption', 'strong']) { const node = card.querySelector(selector); const value = txt(node?.textContent).trim(); if (value && !/interested|remove|show interested|save price|no items/i.test(value)) return node; } const nodes = Array.from(card.querySelectorAll('p, span, small, div')).filter(node => { const value = txt(node.textContent).trim(); return node.children.length === 0 && value && value.length < 80 && !/interested|remove|save price|verified users/i.test(value); }); return nodes[nodes.length - 1] || null; }
+function bindHoverPrice(card) { if (!card || card.dataset.vtHoverSwapBound === 'true' || card.classList.contains('vt-folder-card') || card.closest('.vt-folder-card')) return; card.dataset.vtHoverSwapBound = 'true'; const node = titleNode(card); if (!node) return; const original = txt(node.textContent).trim(); if (original) card.dataset.vtOriginalTitle = original; const show = () => { const price = fmtPrice(card.dataset.vtPrice || card.dataset.price || card.dataset.itemPrice || ''); if (!price) return; card.dataset.vtHoveringPrice = 'true'; if (!card.dataset.vtOriginalTitle) card.dataset.vtOriginalTitle = txt(node.textContent).trim(); node.textContent = price; card.classList.add('vt-hover-price-title'); }; const hide = () => { card.dataset.vtHoveringPrice = 'false'; card.classList.remove('vt-hover-price-title'); if (card.dataset.vtOriginalTitle) node.textContent = card.dataset.vtOriginalTitle; }; card.addEventListener('mouseenter', show); card.addEventListener('mouseleave', hide); card.addEventListener('focusin', show); card.addEventListener('focusout', hide); }
 function itemImage(target) { return target?.closest?.('img') || target?.querySelector?.('img') || null; }
-function validItemImage(image) {
-  if (!image) return false;
-  if (image.closest('.vt-item-popout,.avatar,.profile-avatar,.user-avatar,.badge,.icon,.status-dot,.emoji,.logo,.favicon')) return false;
-  if (!txt(image.currentSrc || image.src)) return false;
-  const rect = image.getBoundingClientRect?.();
-  if (rect && (rect.width < 32 || rect.height < 32)) return false;
-  return Boolean(image.closest('.inventory,.inventory-page,.profile,.profile-page,.bazaar,.bazaar-page,.trade-room,.trade-menu,.trade-panel,.admin-panel,.admin-trade-side,.admin-trade-log,.trade-log,main,section'));
-}
-
-function nearestCard(target) {
-  const image = itemImage(target);
-  if (!validItemImage(image)) return null;
-  const explicit = image.closest('.vt-unified-item-card,article,li,.item-card,.inventory-item,.bazaar-item-card,.bazaar-item,.trade-item,.admin-trade-item,.admin-trade-side li,.admin-trade-image-frame,.admin-trade-image-button');
-  if (explicit?.querySelector?.('img')) return explicit;
-  let current = image.parentElement;
-  let depth = 0;
-  while (current && current !== document.body && depth < 12) {
-    const imageCount = current.querySelectorAll?.('img')?.length || 0;
-    const className = txt(current.className);
-    const body = txt(current.textContent);
-    if (imageCount >= 1 && imageCount <= 6 && (/item|card|tile|listing|entry|slot|bazaar|inventory|trade|offer|log/i.test(className) || /IC|price|LVL|DMG|RPM|MAG|offers/i.test(body))) return current;
-    current = current.parentElement;
-    depth += 1;
-  }
-  return image.parentElement;
-}
-
-function cardPrice(card) {
-  const direct = readData(card, ['price', 'itemPrice', 'vtPrice']) || txt(card.querySelector('.price,.item-price,.bazaar-price')?.textContent);
-  if (direct) return direct;
-  return txt(card.textContent).match(/[\d,]+(?:\.\d+)?\s*IC/i)?.[0] || '';
-}
-
-function parseItem(card) {
-  const react = reactItemData(card) || {};
-  const img = card.querySelector('img');
-  const src = txt(react.src || img?.currentSrc || img?.src);
-  const rawTitle = txt(react.title || readData(card, ['title', 'itemTitle']) || txt(titleNode(card)?.textContent) || img?.alt, 'Item');
-  const title = rawTitle.replace(/\bI'?m interested\b/gi, '').replace(/\bInterested\b/gi, '').replace(/\bRemove interest\b/gi, '').replace(/\bRemove\b/gi, '').replace(/[\d,]+(?:\.\d+)?\s*IC/gi, '').replace(/\d+\s+verified users interested/gi, '').trim() || 'Item';
-  return {
-    id: txt(react.id || readData(card, ['itemId', 'id', 'listingId'])),
-    title,
-    price: txt(react.price || cardPrice(card)),
-    src,
-    ownerId: txt(react.ownerId || readData(card, ['ownerId', 'userId', 'userid', 'sellerId'])),
-    ownerUsername: txt(react.ownerUsername || readData(card, ['ownerUsername', 'username', 'sellerUsername'])),
-    rawElement: card,
-    locked: card.dataset?.vtLocked === 'true' || card.classList.contains('vt-item-locked')
-  };
-}
-
-function isOwner(user, item) {
-  if (!user || !item) return false;
-  if (item.ownerId && user.id && String(item.ownerId) === String(user.id)) return true;
-  return Boolean(item.ownerUsername && user.username && item.ownerUsername.toLowerCase() === user.username.toLowerCase());
-}
-
-function suppressLegacyPopups() {
-  document.querySelectorAll('.item-modal,.item-popup,.item-detail-modal,.item-preview-modal,.legacy-item-popout,.legacy-item-modal,.bazaar-full-preview,[class*="hover-preview" i],[class*="full-preview" i]').forEach(node => {
-    if (!node.closest('.vt-item-popout-backdrop[data-vt-centered-popup="true"]')) {
-      node.setAttribute('aria-hidden', 'true');
-      node.classList.add('vt-kill-legacy-item-popup');
-    }
-  });
-}
-
-function applyPrice(card, nextPrice) {
-  if (!card) return;
-  const formatted = fmtPrice(nextPrice);
-  card.dataset.vtPrice = formatted;
-  card.dataset.price = formatted;
-  card.dataset.itemPrice = formatted;
-  const visible = card.querySelector('.price,.item-price,.bazaar-price');
-  if (visible) visible.textContent = formatted;
-  const node = titleNode(card);
-  if (node && card.dataset.vtHoveringPrice === 'true') node.textContent = formatted || card.dataset.vtOriginalTitle || node.textContent;
-}
-
-async function toggleOnline(nextValue) {
-  const body = JSON.stringify({ showOnline: nextValue, show_online: nextValue, online: nextValue, enabled: nextValue });
-  for (const method of ['PUT', 'PATCH', 'POST']) {
-    for (const path of ['/api/me/online', '/api/profile/online', '/api/users/me/online', '/api/inventory/online']) {
-      try { return await api(path, { method, body }); } catch {}
-    }
-  }
-  return { ok: false, localOnly: true, online: nextValue };
-}
-
-async function updatePriceWithFallbacks(itemId, formatted, item) {
-  const body = JSON.stringify({ price: formatted, title: txt(item?.title), image: txt(item?.src) });
-  const attempts = [
-    [`/api/items/${encodeURIComponent(itemId)}/price`, 'PUT'],
-    [`/api/items/${encodeURIComponent(itemId)}/price`, 'PATCH'],
-    [`/api/items/${encodeURIComponent(itemId)}/price`, 'POST'],
-    [`/api/items/${encodeURIComponent(itemId)}`, 'PATCH']
-  ];
-  let lastError;
-  for (const [path, method] of attempts) {
-    try {
-      const data = await api(path, { method, body });
-      return data;
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError || new Error('Price update failed.');
-}
-
-function syncOnlinePills(nextValue) {
-  document.querySelectorAll('button,.profile-toggle-pill,.inventory-status-pill,[class*="online" i]').forEach(element => {
-    const value = txt(element.textContent).trim().toLowerCase();
-    if (value !== 'online' && value !== 'offline') return;
-    element.classList.toggle('is-online', nextValue);
-    element.classList.toggle('is-offline', !nextValue);
-  });
-}
+function validItemImage(image) { if (!image) return false; if (image.closest('.vt-item-popout,.avatar,.profile-avatar,.user-avatar,.badge,.icon,.status-dot,.emoji,.logo,.favicon,.vt-folder-card')) return false; if (!txt(image.currentSrc || image.src)) return false; const rect = image.getBoundingClientRect?.(); if (rect && (rect.width < 32 || rect.height < 32)) return false; return Boolean(image.closest('.inventory,.inventory-page,.profile,.profile-page,.bazaar,.bazaar-page,.trade-room,.trade-menu,.trade-panel,.admin-panel,.admin-trade-side,.admin-trade-log,.trade-log,main,section')); }
+function nearestCard(target) { const image = itemImage(target); if (!validItemImage(image)) return null; const explicit = image.closest('.vt-unified-item-card,article,li,.item-card,.inventory-item,.bazaar-item-card,.bazaar-item,.trade-item,.admin-trade-item,.admin-trade-side li,.admin-trade-image-frame,.admin-trade-image-button'); if (explicit?.querySelector?.('img') && !explicit.classList.contains('vt-folder-card')) return explicit; let current = image.parentElement; let depth = 0; while (current && current !== document.body && depth < 12) { if (current.classList?.contains('vt-folder-card')) return null; const imageCount = current.querySelectorAll?.('img')?.length || 0; const className = txt(current.className); const body = txt(current.textContent); if (imageCount >= 1 && imageCount <= 6 && (/item|card|tile|listing|entry|slot|bazaar|inventory|trade|offer|log/i.test(className) || /IC|price|LVL|DMG|RPM|MAG|offers/i.test(body))) return current; current = current.parentElement; depth += 1; } return image.parentElement; }
+function cardPrice(card) { const direct = readData(card, ['price', 'itemPrice', 'vtPrice']) || txt(card.querySelector('.price,.item-price,.bazaar-price')?.textContent); if (direct) return direct; return txt(card.textContent).match(/[\d,]+(?:\.\d+)?\s*IC/i)?.[0] || ''; }
+function parseItem(card) { const react = reactItemData(card) || {}; const img = card.querySelector('img'); const src = txt(react.src || img?.currentSrc || img?.src); const rawTitle = txt(react.title || readData(card, ['title', 'itemTitle']) || txt(titleNode(card)?.textContent) || img?.alt, 'Item'); const title = rawTitle.replace(/\bI'?m interested\b/gi, '').replace(/\bInterested\b/gi, '').replace(/\bRemove interest\b/gi, '').replace(/\bRemove\b/gi, '').replace(/[\d,]+(?:\.\d+)?\s*IC/gi, '').replace(/\d+\s+verified users interested/gi, '').trim() || 'Item'; return { id: txt(react.id || readData(card, ['itemId', 'id', 'listingId'])), title, price: txt(react.price || cardPrice(card)), src, ownerId: txt(react.ownerId || readData(card, ['ownerId', 'userId', 'userid', 'sellerId'])), ownerUsername: txt(react.ownerUsername || readData(card, ['ownerUsername', 'username', 'sellerUsername'])), rawElement: card, locked: card.dataset?.vtLocked === 'true' || card.classList.contains('vt-item-locked') }; }
+function isOwner(user, item) { if (!user || !item) return false; if (item.ownerId && user.id && String(item.ownerId) === String(user.id)) return true; return Boolean(item.ownerUsername && user.username && item.ownerUsername.toLowerCase() === user.username.toLowerCase()); }
+function suppressLegacyPopups() { document.querySelectorAll('.item-modal,.item-popup,.item-detail-modal,.item-preview-modal,.legacy-item-popout,.legacy-item-modal,.bazaar-full-preview,[class*="hover-preview" i],[class*="full-preview" i]').forEach(node => { if (!node.closest('.vt-item-popout-backdrop[data-vt-centered-popup="true"]')) { node.setAttribute('aria-hidden', 'true'); node.classList.add('vt-kill-legacy-item-popup'); } }); }
+function applyPrice(card, nextPrice) { if (!card) return; const formatted = fmtPrice(nextPrice); card.dataset.vtPrice = formatted; card.dataset.price = formatted; card.dataset.itemPrice = formatted; const visible = card.querySelector('.price,.item-price,.bazaar-price'); if (visible) visible.textContent = formatted; const node = titleNode(card); if (node && card.dataset.vtHoveringPrice === 'true') node.textContent = formatted || card.dataset.vtOriginalTitle || node.textContent; }
+async function toggleOnline(nextValue) { const body = JSON.stringify({ showOnline: nextValue, show_online: nextValue, online: nextValue, enabled: nextValue }); for (const method of ['PUT', 'PATCH', 'POST']) for (const path of ['/api/me/online', '/api/profile/online', '/api/users/me/online', '/api/inventory/online']) { try { return await api(path, { method, body }); } catch {} } return { ok: false, localOnly: true, online: nextValue }; }
+async function updatePriceWithFallbacks(itemId, formatted, item) { const body = JSON.stringify({ price: formatted, title: txt(item?.title), image: txt(item?.src) }); const attempts = [[`/api/items/${encodeURIComponent(itemId)}/price`, 'PUT'], [`/api/items/${encodeURIComponent(itemId)}/price`, 'PATCH'], [`/api/items/${encodeURIComponent(itemId)}/price`, 'POST'], [`/api/items/${encodeURIComponent(itemId)}`, 'PATCH']]; let lastError; for (const [path, method] of attempts) { try { return await api(path, { method, body }); } catch (error) { lastError = error; } } throw lastError || new Error('Price update failed.'); }
+function syncOnlinePills(nextValue) { document.querySelectorAll('button,.profile-toggle-pill,.inventory-status-pill,[class*="online" i]').forEach(element => { const value = txt(element.textContent).trim().toLowerCase(); if (value !== 'online' && value !== 'offline') return; element.classList.toggle('is-online', nextValue); element.classList.toggle('is-offline', !nextValue); }); }
 
 export default function UnifiedItemExperience({ currentUser }) {
   const [item, setItem] = useState(null);
@@ -298,46 +59,18 @@ export default function UnifiedItemExperience({ currentUser }) {
     const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     let tagQueued = false;
     window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ = token;
-    window.__VELKTRADE_OPEN_ITEM_POPUP__ = nextItem => {
-      suppressLegacyPopups();
-      setItem(nextItem);
-      setPrice(fmtPrice(nextItem.price || ''));
-      setBuyOfferIc(fmtPrice(nextItem.price || ''));
-      setBuyOfferMessage('');
-      setMessage('');
-      setInterestedUsers([]);
-      setPriceHistory([]);
-      setPriceHistoryLoaded(false);
-    };
-    function tagItemsNow() {
-      tagQueued = false;
-      document.querySelectorAll('.inventory-grid,.inventory-items,.items-grid,.item-grid,.profile-items,.profile-inventory,.bazaar-grid,.bazaar-items,.bazaar-list,.trade-items-grid,.trade-inventory-grid,.trade-offer-grid,.trade-menu-items,.selected-items,.offer-items,.admin-trade-side ul,.admin-trade-items,.admin-trade-log,.trade-log').forEach(grid => grid.classList.add('vt-unified-mosaic-grid'));
-      const cards = new Set();
-      document.querySelectorAll('main img,section img,article img,.card img,.panel img,.admin-panel img,.trade-room img,.trade-log img').forEach(image => {
-        if (!validItemImage(image)) return;
-        const card = nearestCard(image);
-        if (card?.querySelector?.('img')) cards.add(card);
-      });
-      cards.forEach(card => {
-        card.classList.add('vt-unified-item-card');
-        const parsed = parseItem(card);
-        if (parsed.id) { card.dataset.itemId = parsed.id; card.dataset.id = parsed.id; }
-        if (parsed.title) { card.dataset.title = parsed.title; card.dataset.vtOriginalTitle = parsed.title; }
-        if (parsed.price) { card.dataset.vtPrice = parsed.price; card.dataset.price = parsed.price; }
-        bindHoverPrice(card);
-      });
-      suppressLegacyPopups();
-    }
-    function tagItems() {
-      if (tagQueued) return;
-      tagQueued = true;
-      window.requestAnimationFrame(tagItemsNow);
-    }
+    window.__VELKTRADE_OPEN_ITEM_POPUP__ = nextItem => { suppressLegacyPopups(); setItem(nextItem); setPrice(fmtPrice(nextItem.price || '')); setBuyOfferIc(fmtPrice(nextItem.price || '')); setBuyOfferMessage(''); setMessage(''); setInterestedUsers([]); setPriceHistory([]); setPriceHistoryLoaded(false); };
+    function tagItemsNow() { tagQueued = false; document.querySelectorAll('.inventory-grid,.inventory-items,.items-grid,.item-grid,.profile-items,.profile-inventory,.bazaar-grid,.bazaar-items,.bazaar-list,.trade-items-grid,.trade-inventory-grid,.trade-offer-grid,.trade-menu-items,.selected-items,.offer-items,.admin-trade-side ul,.admin-trade-items,.admin-trade-log,.trade-log').forEach(grid => grid.classList.add('vt-unified-mosaic-grid')); const cards = new Set(); document.querySelectorAll('main img,section img,article img,.card img,.panel img,.admin-panel img,.trade-room img,.trade-log img').forEach(image => { if (!validItemImage(image)) return; const card = nearestCard(image); if (card?.querySelector?.('img')) cards.add(card); }); cards.forEach(card => { card.classList.add('vt-unified-item-card'); const parsed = parseItem(card); if (parsed.id) { card.dataset.itemId = parsed.id; card.dataset.id = parsed.id; } if (parsed.title) { card.dataset.title = parsed.title; card.dataset.vtOriginalTitle = parsed.title; } if (parsed.price) { card.dataset.vtPrice = parsed.price; card.dataset.price = parsed.price; } bindHoverPrice(card); }); suppressLegacyPopups(); }
+    function tagItems() { if (tagQueued) return; tagQueued = true; window.requestAnimationFrame(tagItemsNow); }
     tagItems();
     const observer = new MutationObserver(tagItems);
     observer.observe(document.body, { childList: true, subtree: true });
     function handleItemClick(event) {
       if (window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ !== token) return;
+      if (event.target?.closest?.('.vt-item-popout,.vt-folder-card')) return;
+      const tradeContext = event.target?.closest?.('.trade-room,.trade-menu,.trade-panel,.offline-trade,.offline-trade-room,[data-trade-context="true"]');
+      const tradeCard = tradeContext ? event.target?.closest?.('.vt-unified-item-card,.item-card,.inventory-item') : null;
+      if (tradeCard && !tradeCard.closest('.offer-items,.selected-items,.trade-offer-grid')) return;
       if (event.target?.closest?.('.vt-item-popout')) return;
       const interactive = event.target?.closest?.('button,a,input,textarea,select,label,summary,details,[role="button"]');
       if (interactive && !interactive.closest('.vt-unified-item-card')) return;
@@ -345,35 +78,13 @@ export default function UnifiedItemExperience({ currentUser }) {
       if (!card) return;
       const parsed = parseItem(card);
       if (!parsed.src) return;
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation?.();
+      event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation?.();
       window.__VELKTRADE_OPEN_ITEM_POPUP__?.(parsed);
     }
-    async function handleOnlineClick(event) {
-      const pill = event.target?.closest?.('button,.profile-toggle-pill,.inventory-status-pill,[class*="online" i]');
-      if (!pill) return;
-      const value = txt(pill.textContent).trim().toLowerCase();
-      if (value !== 'online' && value !== 'offline') return;
-      if (pill.closest('.vt-unified-item-card,.vt-item-popout,.unified-player-panel,.presence-hub-panel,.safe-online-panel')) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const next = value !== 'online';
-      window.localStorage.setItem('velktrade-show-online', String(next));
-      syncOnlinePills(next);
-      await toggleOnline(next);
-    }
+    async function handleOnlineClick(event) { const pill = event.target?.closest?.('button,.profile-toggle-pill,.inventory-status-pill,[class*="online" i]'); if (!pill) return; const value = txt(pill.textContent).trim().toLowerCase(); if (value !== 'online' && value !== 'offline') return; if (pill.closest('.vt-unified-item-card,.vt-item-popout,.unified-player-panel,.presence-hub-panel,.safe-online-panel')) return; event.preventDefault(); event.stopPropagation(); const next = value !== 'online'; window.localStorage.setItem('velktrade-show-online', String(next)); syncOnlinePills(next); await toggleOnline(next); }
     window.addEventListener('click', handleItemClick, true);
     document.addEventListener('click', handleOnlineClick, true);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('click', handleItemClick, true);
-      document.removeEventListener('click', handleOnlineClick, true);
-      if (window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ === token) {
-        delete window.__VELKTRADE_OPEN_ITEM_POPUP__;
-        delete window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__;
-      }
-    };
+    return () => { observer.disconnect(); window.removeEventListener('click', handleItemClick, true); document.removeEventListener('click', handleOnlineClick, true); if (window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__ === token) { delete window.__VELKTRADE_OPEN_ITEM_POPUP__; delete window.__VELKTRADE_ITEM_POPUP_HANDLER_TOKEN__; } };
   }, []);
 
   const hasItemId = Boolean(txt(item?.id));
@@ -386,160 +97,17 @@ export default function UnifiedItemExperience({ currentUser }) {
   const canInterest = useMemo(() => Boolean(item && hasItemId && !isLocked && !owner), [item, hasItemId, isLocked, owner]);
   const canViewPriceHistory = useMemo(() => Boolean(item && hasItemId && (owner || privileged)), [item, hasItemId, owner, privileged]);
 
-  async function resolveItemIdFromApis() {
-    const targetImage = norm(item?.src);
-    const targetTitle = norm(item?.title);
-    for (const endpoint of ['/api/bazaar/items', '/api/items', '/api/inventory', '/api/me/inventory', '/api/users/me/inventory', '/api/profile/inventory', '/api/admin/trades', '/api/trades']) {
-      try {
-        const data = await api(endpoint);
-        for (const candidate of arraysFromPayload(data)) {
-          const id = candidateId(candidate);
-          if (!id) continue;
-          const candidateImg = norm(candidateImage(candidate));
-          const candidateName = norm(candidateTitle(candidate));
-          if (targetImage && candidateImg && (candidateImg === targetImage || candidateImg.includes(targetImage) || targetImage.includes(candidateImg))) return id;
-          if (targetTitle && candidateName && candidateName === targetTitle) return id;
-        }
-      } catch {}
-    }
-    return '';
-  }
-
-  async function ensureItemId() {
-    if (item?.id) return item.id;
-    const parsed = item?.rawElement ? parseItem(item.rawElement) : null;
-    if (parsed?.id) { setItem(previous => ({ ...previous, ...parsed })); return parsed.id; }
-    const apiId = await resolveItemIdFromApis();
-    if (apiId) { setItem(previous => ({ ...previous, id: apiId })); return apiId; }
-    try {
-      const data = await api('/api/items/resolve', { method: 'POST', body: JSON.stringify({ title: txt(item?.title), image: txt(item?.src), price: txt(item?.price || price) }) });
-      const resolved = txt(data?.id || data?.itemId || data?.item?.id);
-      if (resolved) { setItem(previous => ({ ...previous, id: resolved })); return resolved; }
-    } catch {}
-    return '';
-  }
-
-  async function savePrice() {
-    try {
-      const itemId = await ensureItemId();
-      if (!itemId || !ownerCanEditPrice) return;
-      const formatted = fmtPrice(price);
-      await updatePriceWithFallbacks(itemId, formatted, item);
-      applyPrice(item?.rawElement, formatted);
-      auditClientEvent('item.price_updated', { itemId, price: formatted });
-      velkToast('Price updated.', 'success');
-      setPrice(formatted);
-      setItem(previous => ({ ...previous, id: itemId, price: formatted }));
-      setPriceHistoryLoaded(false);
-    } catch (error) {
-      console.error('savePrice failed:', error);
-      const message = txt(error?.message, 'Price update failed.');
-      velkToast(message, 'error', 7000);
-      setMessage(message);
-    }
-  }
-
-  async function createBuyOffer() {
-    try {
-      const itemId = await ensureItemId();
-      if (!itemId || !canInterest) return;
-      const offeredIc = fmtPrice(buyOfferIc || item?.price || '');
-      if (!offeredIc) { setMessage('Enter an IC offer amount first.'); velkToast('Enter an IC offer amount first.', 'warning'); return; }
-      await api(`/api/items/${encodeURIComponent(itemId)}/buy-offer`, { method: 'POST', body: JSON.stringify({ offeredIc, message: buyOfferMessage, title: txt(item?.title), image: txt(item?.src) }) });
-      auditClientEvent('buy_offer.created', { itemId, offeredIc });
-      velkToast('Buy offer sent to seller.', 'success');
-      setMessage('Buy offer sent. The seller can accept, counter, or decline it in their Trade tab.');
-      setItem(previous => ({ ...previous, id: itemId }));
-    } catch (error) { console.error('createBuyOffer failed:', error); velkToast('Could not send buy offer.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); }
-  }
-
-  async function addInterest() {
-    try {
-      const itemId = await ensureItemId();
-      if (!itemId || !canInterest) return;
-      await api(`/api/items/${encodeURIComponent(itemId)}/interest`, { method: 'POST', body: JSON.stringify({ title: txt(item?.title), image: txt(item?.src), price: txt(item?.price) }) });
-      auditClientEvent('item.interest_added', { itemId });
-      velkToast('Interest added.', 'success');
-      setItem(previous => ({ ...previous, id: itemId }));
-    } catch (error) { console.error('addInterest failed:', error); velkToast('Could not add interest.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); }
-  }
-
-  async function removeInterest() {
-    try {
-      const itemId = await ensureItemId();
-      if (!itemId || !canInterest) return;
-      await api(`/api/items/${encodeURIComponent(itemId)}/interest`, { method: 'DELETE' });
-      auditClientEvent('item.interest_removed', { itemId });
-      velkToast('Interest removed.', 'success');
-      setItem(previous => ({ ...previous, id: itemId }));
-    } catch (error) { console.error('removeInterest failed:', error); velkToast('Could not remove interest.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); }
-  }
-
-  async function removeItem() {
-    try {
-      const itemId = await ensureItemId();
-      if (!itemId || !canRemoveListing) return;
-      if (!window.confirm('Remove this item/listing?')) return;
-      await api(`/api/items/${encodeURIComponent(itemId)}`, { method: 'DELETE' });
-      auditClientEvent('item.removed', { itemId });
-      velkToast('Item removed.', 'success');
-      item.rawElement?.remove?.();
-      setItem(null);
-      window.dispatchEvent(new CustomEvent('velktrade:item-removed', { detail: { itemId } }));
-    } catch (error) { console.error('removeItem failed:', error); velkToast('Item removal failed.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); }
-  }
-
-  async function loadInterestedUsers() {
-    try {
-      const itemId = await ensureItemId();
-      if (!itemId || !canShowInterested) return;
-      const data = await api(`/api/items/${encodeURIComponent(itemId)}/interest`);
-      const users = Array.isArray(data?.users) ? data.users : Array.isArray(data?.interestedUsers) ? data.interestedUsers : [];
-      setItem(previous => ({ ...previous, id: itemId }));
-      setInterestedUsers(users);
-    } catch (error) { console.error('loadInterestedUsers failed:', error); velkToast('Could not load interested users.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); }
-  }
-
-  async function loadPriceHistory() {
-    try {
-      const itemId = await ensureItemId();
-      if (!itemId || !canViewPriceHistory) return;
-      const data = await api(`/api/items/${encodeURIComponent(itemId)}/price-history`);
-      const history = Array.isArray(data?.history) ? data.history : Array.isArray(data?.priceHistory) ? data.priceHistory : [];
-      setPriceHistory(history);
-      setPriceHistoryLoaded(true);
-    } catch (error) { console.error('loadPriceHistory failed:', error); velkToast('Could not load price history.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); }
-  }
+  async function resolveItemIdFromApis() { const targetImage = norm(item?.src); const targetTitle = norm(item?.title); for (const endpoint of ['/api/bazaar/items', '/api/items', '/api/inventory', '/api/me/inventory', '/api/users/me/inventory', '/api/profile/inventory', '/api/admin/trades', '/api/trades']) { try { const data = await api(endpoint); for (const candidate of arraysFromPayload(data)) { const id = candidateId(candidate); if (!id) continue; const candidateImg = norm(candidateImage(candidate)); const candidateName = norm(candidateTitle(candidate)); if (targetImage && candidateImg && (candidateImg === targetImage || candidateImg.includes(targetImage) || targetImage.includes(candidateImg))) return id; if (targetTitle && candidateName && candidateName === targetTitle) return id; } } catch {} } return ''; }
+  async function ensureItemId() { if (item?.id) return item.id; const parsed = item?.rawElement ? parseItem(item.rawElement) : null; if (parsed?.id) { setItem(previous => ({ ...previous, ...parsed })); return parsed.id; } const apiId = await resolveItemIdFromApis(); if (apiId) { setItem(previous => ({ ...previous, id: apiId })); return apiId; } try { const data = await api('/api/items/resolve', { method: 'POST', body: JSON.stringify({ title: txt(item?.title), image: txt(item?.src), price: txt(item?.price || price) }) }); const resolved = txt(data?.id || data?.itemId || data?.item?.id); if (resolved) { setItem(previous => ({ ...previous, id: resolved })); return resolved; } } catch {} return ''; }
+  async function savePrice() { try { const itemId = await ensureItemId(); if (!itemId || !ownerCanEditPrice) return; const formatted = fmtPrice(price); await updatePriceWithFallbacks(itemId, formatted, item); applyPrice(item?.rawElement, formatted); auditClientEvent('item.price_updated', { itemId, price: formatted }); velkToast('Price updated.', 'success'); setPrice(formatted); setItem(previous => ({ ...previous, id: itemId, price: formatted })); setPriceHistoryLoaded(false); } catch (error) { console.error('savePrice failed:', error); const message = txt(error?.message, 'Price update failed.'); velkToast(message, 'error', 7000); setMessage(message); } }
+  async function createBuyOffer() { try { const itemId = await ensureItemId(); if (!itemId || !canInterest) return; const offeredIc = fmtPrice(buyOfferIc || item?.price || ''); if (!offeredIc) { setMessage('Enter an IC offer amount first.'); velkToast('Enter an IC offer amount first.', 'warning'); return; } await api(`/api/items/${encodeURIComponent(itemId)}/buy-offer`, { method: 'POST', body: JSON.stringify({ offeredIc, message: buyOfferMessage, title: txt(item?.title), image: txt(item?.src) }) }); auditClientEvent('buy_offer.created', { itemId, offeredIc }); velkToast('Buy offer sent to seller.', 'success'); setMessage('Buy offer sent. The seller can accept, counter, or decline it in their Trade tab.'); setItem(previous => ({ ...previous, id: itemId })); } catch (error) { console.error('createBuyOffer failed:', error); velkToast('Could not send buy offer.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); } }
+  async function addInterest() { try { const itemId = await ensureItemId(); if (!itemId || !canInterest) return; await api(`/api/items/${encodeURIComponent(itemId)}/interest`, { method: 'POST', body: JSON.stringify({ title: txt(item?.title), image: txt(item?.src), price: txt(item?.price) }) }); auditClientEvent('item.interest_added', { itemId }); velkToast('Interest added.', 'success'); setItem(previous => ({ ...previous, id: itemId })); } catch (error) { console.error('addInterest failed:', error); velkToast('Could not add interest.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); } }
+  async function removeInterest() { try { const itemId = await ensureItemId(); if (!itemId || !canInterest) return; await api(`/api/items/${encodeURIComponent(itemId)}/interest`, { method: 'DELETE' }); auditClientEvent('item.interest_removed', { itemId }); velkToast('Interest removed.', 'success'); setItem(previous => ({ ...previous, id: itemId })); } catch (error) { console.error('removeInterest failed:', error); velkToast('Could not remove interest.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); } }
+  async function removeItem() { try { const itemId = await ensureItemId(); if (!itemId || !canRemoveListing) return; if (!window.confirm('Remove this item/listing?')) return; await api(`/api/items/${encodeURIComponent(itemId)}`, { method: 'DELETE' }); auditClientEvent('item.removed', { itemId }); velkToast('Item removed.', 'success'); item.rawElement?.remove?.(); setItem(null); window.dispatchEvent(new CustomEvent('velktrade:item-removed', { detail: { itemId } })); } catch (error) { console.error('removeItem failed:', error); velkToast('Item removal failed.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); } }
+  async function loadInterestedUsers() { try { const itemId = await ensureItemId(); if (!itemId || !canShowInterested) return; const data = await api(`/api/items/${encodeURIComponent(itemId)}/interest`); const users = Array.isArray(data?.users) ? data.users : Array.isArray(data?.interestedUsers) ? data.interestedUsers : []; setItem(previous => ({ ...previous, id: itemId })); setInterestedUsers(users); } catch (error) { console.error('loadInterestedUsers failed:', error); velkToast('Could not load interested users.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); } }
+  async function loadPriceHistory() { try { const itemId = await ensureItemId(); if (!itemId || !canViewPriceHistory) return; const data = await api(`/api/items/${encodeURIComponent(itemId)}/price-history`); const history = Array.isArray(data?.history) ? data.history : Array.isArray(data?.priceHistory) ? data.priceHistory : []; setPriceHistory(history); setPriceHistoryLoaded(true); } catch (error) { console.error('loadPriceHistory failed:', error); velkToast('Could not load price history.', 'error'); setMessage('Request failed. The backend route may need redeploying.'); } }
 
   if (!item) return null;
   const visibleInterested = verifiedOnly ? interestedUsers.filter(user => user?.isVerified || user?.is_verified || user?.isTrusted) : interestedUsers;
-
-  return (
-    <div className="vt-item-popout-backdrop" data-vt-centered-popup="true" onMouseDown={event => { if (event.target === event.currentTarget) setItem(null); }} onClick={event => { if (event.target === event.currentTarget) setItem(null); }}>
-      <section className="vt-item-popout" onMouseDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
-        <div className="vt-item-popout-image-wrap"><img src={txt(item.src)} alt={txt(item.title, 'Item')} /></div>
-        <aside className="vt-item-popout-menu">
-          <div className="vt-item-popout-header"><h2>{txt(item.title, 'Item')}</h2><button type="button" className="vt-icon-button" onClick={() => setItem(null)} aria-label="Close item menu">×</button></div>
-          {txt(item.price) && <p className="admin-ic-line">{txt(item.price)}</p>}
-          {isLocked && <p className="vt-muted-note">🔒 This item is locked because it is pending or already in a trade.</p>}
-          {txt(message) && <p className="vt-muted-note">{txt(message)}</p>}
-          {ownerCanEditPrice && <label className="vt-price-editor"><span>Edit price</span><input value={txt(price)} onChange={event => setPrice(event.target.value)} placeholder="Example: 500000 IC" /></label>}
-          {canInterest && <section className="vt-buy-offer-box"><strong>Make buy offer</strong><label className="vt-price-editor"><span>IC offer</span><input value={txt(buyOfferIc)} onChange={event => setBuyOfferIc(event.target.value)} placeholder="Example: 500000 IC" /></label><textarea value={txt(buyOfferMessage)} onChange={event => setBuyOfferMessage(event.target.value)} placeholder="Optional message to seller" rows={3} /></section>}
-          <div className="vt-item-popout-actions">
-            {ownerCanEditPrice && <button type="button" className="vt-primary-action" onClick={savePrice}>Save price</button>}
-            {canInterest && <button type="button" className="vt-primary-action" onClick={createBuyOffer}>Send buy offer</button>}
-            {canInterest && <button type="button" className="vt-secondary-action" onClick={addInterest}>Mark interested only</button>}
-            {canInterest && <button type="button" className="vt-secondary-action" onClick={removeInterest}>Remove interest</button>}
-            {canShowInterested && <button type="button" className="vt-secondary-action" onClick={loadInterestedUsers}>Show interested users</button>}
-            {canViewPriceHistory && <button type="button" className="vt-secondary-action" onClick={loadPriceHistory}>Show price history</button>}
-            {canRemoveListing && <button type="button" className="vt-danger-button" onClick={removeItem}>Remove item/listing</button>}
-          </div>
-          {canShowInterested && interestedUsers.length > 0 && <label className="vt-checkbox-row"><input type="checkbox" checked={verifiedOnly} onChange={event => setVerifiedOnly(event.target.checked)} /><span>Verified users only</span></label>}
-          {canShowInterested && interestedUsers.length > 0 && <div className="vt-interested-list">{visibleInterested.length === 0 ? <p className="vt-muted-note">No matching interested users.</p> : visibleInterested.map((user, index) => <p key={txt(user?.id || user?.username || index, String(index))}>{txt(user?.username || user?.name || user?.displayName || user?.id, 'User')}{(user?.isVerified || user?.is_verified || user?.isTrusted) ? ' ✓' : ''}</p>)}</div>}
-          {priceHistoryLoaded && <div className="vt-price-history-list"><strong>Price history</strong>{priceHistory.length === 0 ? <p className="vt-muted-note">No recorded price changes yet.</p> : priceHistory.map((entry, index) => <p key={entry.id || index}><span>{txt(entry.old_price ?? entry.oldPrice, '—')} → {txt(entry.new_price ?? entry.newPrice, '—')}</span><small>{txt(entry.changedByUsername || entry.changed_by_username || 'Unknown')} · {entry.created_at || entry.createdAt ? new Date(entry.created_at || entry.createdAt).toLocaleString() : ''}</small></p>)}</div>}
-          {!ownerCanEditPrice && !canInterest && !canShowInterested && !canRemoveListing && <p className="vt-muted-note">No actions available for this item.</p>}
-        </aside>
-      </section>
-    </div>
-  );
+  return <div className="vt-item-popout-backdrop" data-vt-centered-popup="true" onMouseDown={event => { if (event.target === event.currentTarget) setItem(null); }} onClick={event => { if (event.target === event.currentTarget) setItem(null); }}><section className="vt-item-popout" onMouseDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}><div className="vt-item-popout-image-wrap"><img src={txt(item.src)} alt={txt(item.title, 'Item')} /></div><aside className="vt-item-popout-menu"><div className="vt-item-popout-header"><h2>{txt(item.title, 'Item')}</h2><button type="button" className="vt-icon-button" onClick={() => setItem(null)} aria-label="Close item menu">×</button></div>{txt(item.price) && <p className="admin-ic-line">{txt(item.price)}</p>}{isLocked && <p className="vt-muted-note">🔒 This item is locked because it is pending or already in a trade.</p>}{txt(message) && <p className="vt-muted-note">{txt(message)}</p>}{ownerCanEditPrice && <label className="vt-price-editor"><span>Edit price</span><input value={txt(price)} onChange={event => setPrice(event.target.value)} placeholder="Example: 500000 IC" /></label>}{canInterest && <section className="vt-buy-offer-box"><strong>Make buy offer</strong><label className="vt-price-editor"><span>IC offer</span><input value={txt(buyOfferIc)} onChange={event => setBuyOfferIc(event.target.value)} placeholder="Example: 500000 IC" /></label><textarea value={txt(buyOfferMessage)} onChange={event => setBuyOfferMessage(event.target.value)} placeholder="Optional message to seller" rows={3} /></section>}<div className="vt-item-popout-actions">{ownerCanEditPrice && <button type="button" className="vt-primary-action" onClick={savePrice}>Save price</button>}{canInterest && <button type="button" className="vt-primary-action" onClick={createBuyOffer}>Send buy offer</button>}{canInterest && <button type="button" className="vt-secondary-action" onClick={addInterest}>Mark interested only</button>}{canInterest && <button type="button" className="vt-secondary-action" onClick={removeInterest}>Remove interest</button>}{canShowInterested && <button type="button" className="vt-secondary-action" onClick={loadInterestedUsers}>Show interested users</button>}{canViewPriceHistory && <button type="button" className="vt-secondary-action" onClick={loadPriceHistory}>Show price history</button>}{canRemoveListing && <button type="button" className="vt-danger-button" onClick={removeItem}>Remove item/listing</button>}</div>{canShowInterested && interestedUsers.length > 0 && <label className="vt-checkbox-row"><input type="checkbox" checked={verifiedOnly} onChange={event => setVerifiedOnly(event.target.checked)} /><span>Verified users only</span></label>}{canShowInterested && interestedUsers.length > 0 && <div className="vt-interested-list">{visibleInterested.length === 0 ? <p className="vt-muted-note">No matching interested users.</p> : visibleInterested.map((user, index) => <p key={txt(user?.id || user?.username || index, String(index))}>{txt(user?.username || user?.name || user?.displayName || user?.id, 'User')}{(user?.isVerified || user?.is_verified || user?.isTrusted) ? ' ✓' : ''}</p>)}</div>}{priceHistoryLoaded && <div className="vt-price-history-list"><strong>Price history</strong>{priceHistory.length === 0 ? <p className="vt-muted-note">No recorded price changes yet.</p> : priceHistory.map((entry, index) => <p key={entry.id || index}><span>{txt(entry.old_price ?? entry.oldPrice, '—')} → {txt(entry.new_price ?? entry.newPrice, '—')}</span><small>{txt(entry.changedByUsername || entry.changed_by_username || 'Unknown')} · {entry.created_at || entry.createdAt ? new Date(entry.created_at || entry.createdAt).toLocaleString() : ''}</small></p>)}</div>}{!ownerCanEditPrice && !canInterest && !canShowInterested && !canRemoveListing && <p className="vt-muted-note">No actions available for this item.</p>}</aside></section></div>;
 }
