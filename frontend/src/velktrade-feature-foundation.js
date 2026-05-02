@@ -164,18 +164,36 @@ function cardLooksLocked(card) {
   return body.includes('trade pending') || body.includes('locked') || body.includes('in trade');
 }
 
-export function scanItemLocks() {
-  if (typeof document === 'undefined') return;
+let lockScanQueued = false;
+let lockScannerObserver = null;
+
+function runItemLockScan() {
+  lockScanQueued = false;
+
+  if (lockScannerObserver) lockScannerObserver.disconnect();
 
   document.querySelectorAll('.vt-lock-badge').forEach(badge => {
     badge.parentNode?.removeChild(badge);
   });
 
   document.querySelectorAll('.vt-unified-item-card, .inventory-item, .bazaar-item-card, .bazaar-item, .trade-item, [data-item-id]').forEach(card => {
-    if (!cardLooksLocked(card)) return;
-    card.classList.add('vt-item-locked');
-    card.dataset.vtLocked = 'true';
+    const shouldLock = cardLooksLocked(card);
+    const alreadyLocked = card.classList.contains('vt-item-locked') && card.dataset.vtLocked === 'true';
+
+    if (shouldLock && !alreadyLocked) {
+      card.classList.add('vt-item-locked');
+      card.dataset.vtLocked = 'true';
+    }
   });
+
+  if (lockScannerObserver) lockScannerObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+export function scanItemLocks() {
+  if (typeof document === 'undefined') return;
+  if (lockScanQueued) return;
+  lockScanQueued = true;
+  window.requestAnimationFrame(runItemLockScan);
 }
 
 export function auditClientEvent(type, payload = {}) {
@@ -208,10 +226,10 @@ function installFoundation() {
   });
 
   window.addEventListener('velktrade:scan-locks', scanItemLocks);
-  scanItemLocks();
 
-  const observer = new MutationObserver(scanItemLocks);
-  observer.observe(document.body, { childList: true, subtree: true });
+  lockScannerObserver = new MutationObserver(scanItemLocks);
+  lockScannerObserver.observe(document.body, { childList: true, subtree: true });
+  scanItemLocks();
 }
 
 installFoundation();
