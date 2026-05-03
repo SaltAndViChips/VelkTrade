@@ -195,6 +195,60 @@ body .unified-player-panel,
   color: var(--folder-color, #00fa9a) !important;
 }
 
+/* Bulk selection should only exist while Inventory Tools are expanded. */
+.inventory-card-section:not(.bulk-selection-active) .bulk-select-pill {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.inventory-card-section.bulk-selection-active .bulk-select-pill {
+  display: inline-flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+/* Kill old oval price popups everywhere, especially inside opened folders. */
+.inventory-folder-items .vt-hover-price,
+.inventory-folder-items .vt-price-badge,
+.inventory-folder-items .item-price-badge,
+.inventory-folder-items .price-badge,
+.inventory-folder-items .hover-price,
+.inventory-folder-items .item-hover-price,
+.inventory-folder-items [class*="price-badge" i],
+.inventory-folder-items [class*="hover-price" i],
+.inventory-folder-items [class*="price-pill" i],
+.inventory-folder-items [class*="hover-preview" i],
+.inventory-folder-items [class*="full-preview" i],
+.vt-hover-price,
+.vt-price-badge,
+.item-price-badge,
+.price-badge,
+.hover-price,
+.item-hover-price,
+[class*="price-badge" i],
+[class*="hover-price" i],
+[class*="price-pill" i] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Hover price swap should only color the exact hovered item, never the entire folder row. */
+.inventory-folder-items.vt-hover-price-title .item-title,
+.inventory-folder-item-grid.vt-hover-price-title .item-title,
+.inventory-folder-items:hover .vt-unified-item-card:not(:hover) .item-title,
+.inventory-folder-item-grid:hover .vt-unified-item-card:not(:hover) .item-title {
+  color: inherit !important;
+}
+
+.inventory-folder-items .vt-unified-item-card:hover .item-title,
+.inventory-folder-item-grid .vt-unified-item-card:hover .item-title {
+  color: #ffdc93 !important;
+  text-align: center !important;
+}
+
 .folder-color-select {
   min-width: 150px !important;
   max-width: 190px !important;
