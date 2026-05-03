@@ -19,6 +19,15 @@ function text(value, fallback = '') {
   }
 }
 
+function num(value, fallback = 0) {
+  const parsed = Number(String(value ?? '').replace(/[^\d.-]/g, ''));
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function formatIc(value) {
+  return `${Math.round(num(value)).toLocaleString()} IC`;
+}
+
 function isDeveloperUser(user) {
   return Boolean(
     user?.isDeveloper ||
@@ -200,6 +209,104 @@ function AuditLogTab({ auditLogs, query, setQuery, actionFilter, setActionFilter
   );
 }
 
+function EconomyDashboardTab({ users, trades, economyData, loading, onRefresh }) {
+  const items = economyData.items || [];
+  const activeAuctions = economyData.activeAuctions || [];
+  const recentAuctions = economyData.recentAuctions || [];
+  const itemPrice = item => num(item.priceAmount ?? item.price_amount ?? item.price ?? item.icPrice ?? item.ic_price);
+  const itemOwner = item => text(item.ownerUsername ?? item.owner_username ?? item.sellerUsername ?? item.seller_username ?? item.username, 'Unknown');
+  const itemTitle = item => text(item.title ?? item.itemTitle ?? item.item_title ?? item.name, 'Untitled item');
+  const listedValue = items.reduce((sum, item) => sum + itemPrice(item), 0);
+  const pricedItems = items.filter(item => itemPrice(item) > 0);
+  const avgPrice = pricedItems.length ? listedValue / pricedItems.length : 0;
+  const verifiedListings = items.filter(item => item.ownerVerified || item.owner_verified || item.sellerVerified || item.seller_verified).length;
+  const completedTrades = trades.filter(trade => String(trade.status || '').toLowerCase() === 'completed').length;
+  const activeAuctionValue = activeAuctions.reduce((sum, auction) => sum + num(auction.currentBid ?? auction.current_bid ?? auction.startingBid ?? auction.starting_bid), 0);
+  const topListings = [...items].sort((a, b) => itemPrice(b) - itemPrice(a)).slice(0, 8);
+  const sellers = Array.from(items.reduce((map, item) => {
+    const seller = itemOwner(item);
+    const row = map.get(seller) || { seller, count: 0, value: 0 };
+    row.count += 1;
+    row.value += itemPrice(item);
+    map.set(seller, row);
+    return map;
+  }, new Map()).values()).sort((a, b) => b.value - a.value).slice(0, 8);
+
+  return (
+    <section className="card admin-tab-card velktrade-admin-economy-panel">
+      <div className="panel-title-row"><div><h2>Economy Dashboard</h2><p className="muted">Admin market overview from Bazaar listings, auctions, users, and trades.</p></div><button type="button" className="ghost" onClick={onRefresh}>Refresh Economy</button></div>
+      {loading && <p className="muted">Loading economy data...</p>}
+      <div className="economy-stat-grid">
+        <span><strong>{users.length.toLocaleString()}</strong><em>Users</em></span>
+        <span><strong>{items.length.toLocaleString()}</strong><em>Bazaar Listings</em></span>
+        <span><strong>{formatIc(listedValue)}</strong><em>Listed Value</em></span>
+        <span><strong>{formatIc(avgPrice)}</strong><em>Average Price</em></span>
+        <span><strong>{verifiedListings.toLocaleString()}</strong><em>Verified Listings</em></span>
+        <span><strong>{activeAuctions.length.toLocaleString()}</strong><em>Active Auctions</em></span>
+        <span><strong>{formatIc(activeAuctionValue)}</strong><em>Active Auction Value</em></span>
+        <span><strong>{completedTrades.toLocaleString()}</strong><em>Completed Trades</em></span>
+      </div>
+      <div className="economy-columns">
+        <section><h3>Top Listings</h3>{topListings.length ? topListings.map((item, index) => <article key={item.id || index}><strong>{itemTitle(item)}</strong><span>{itemOwner(item)}</span><em>{formatIc(itemPrice(item))}</em></article>) : <p className="muted">No priced listings.</p>}</section>
+        <section><h3>Top Sellers By Listed Value</h3>{sellers.length ? sellers.map(row => <article key={row.seller}><strong>{row.seller}</strong><span>{row.count} listing{row.count === 1 ? '' : 's'}</span><em>{formatIc(row.value)}</em></article>) : <p className="muted">No sellers found.</p>}</section>
+        <section><h3>Recent Auction Results</h3>{recentAuctions.length ? recentAuctions.slice(0, 8).map(auction => <article key={auction.id}><strong>{text(auction.title, 'Auction')}</strong><span>{text(auction.status, 'updated').replace(/_/g, ' ')}</span><em>{formatIc(auction.currentBid ?? auction.current_bid ?? auction.winningBid)}</em></article>) : <p className="muted">No recent auction results.</p>}</section>
+      </div>
+    </section>
+  );
+}
+
+function TestViewTab({ users }) {
+  const [testUsername, setTestUsername] = useState(() => window.localStorage.getItem('velktrade:admin-test-view-user') || '');
+  const normalUsers = users.filter(candidate => !isAdminUser(candidate) && !isDeveloperUser(candidate));
+  const availableUsers = normalUsers.length ? normalUsers : users;
+
+  useEffect(() => {
+    if (!testUsername && availableUsers[0]?.username) setTestUsername(availableUsers[0].username);
+  }, [availableUsers, testUsername]);
+
+  function profileUrl(username) {
+    const base = import.meta.env.BASE_URL || '/';
+    const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
+    return `${cleanBase}/user/${encodeURIComponent(username)}`;
+  }
+
+  function openProfile() {
+    if (!testUsername) return;
+    window.localStorage.setItem('velktrade:admin-test-view-user', testUsername);
+    window.history.pushState({}, '', profileUrl(testUsername));
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    velkToast(`Viewing ${testUsername}'s public profile as test view.`, 'success');
+  }
+
+  function setTarget() {
+    if (!testUsername) return;
+    window.localStorage.setItem('velktrade:admin-test-view-user', testUsername);
+    window.dispatchEvent(new CustomEvent('velktrade:admin-test-view-changed', { detail: { username: testUsername } }));
+    velkToast(`Test view target set to ${testUsername}.`, 'success');
+  }
+
+  function clearTarget() {
+    window.localStorage.removeItem('velktrade:admin-test-view-user');
+    setTestUsername('');
+    window.dispatchEvent(new CustomEvent('velktrade:admin-test-view-changed', { detail: { username: '' } }));
+    velkToast('Test view cleared.', 'success');
+  }
+
+  return (
+    <section className="card admin-tab-card velktrade-admin-economy-panel">
+      <div className="panel-title-row"><div><h2>Test Account View</h2><p className="muted">Preview player-facing profile screens as a selected account. Full private impersonation still needs a backend impersonation token route.</p></div></div>
+      <div className="test-view-controls">
+        <label><span>Test account</span><select value={testUsername} onChange={event => setTestUsername(event.target.value)}><option value="">Choose a player...</option>{availableUsers.map(candidate => <option key={candidate.id || candidate.username} value={candidate.username}>#{candidate.id ?? '?'} {candidate.username}</option>)}</select></label>
+        <button type="button" disabled={!testUsername} onClick={openProfile}>Open Profile</button>
+        <button type="button" disabled={!testUsername} onClick={setTarget}>Set Test Target</button>
+        <button type="button" className="ghost" onClick={clearTarget}>Clear</button>
+      </div>
+      <p className="muted">Current test target: <strong>{window.localStorage.getItem('velktrade:admin-test-view-user') || 'None'}</strong></p>
+      <p className="muted">Use this for public inventory/profile validation. Next backend step: add an admin-only impersonation/session preview endpoint so Dashboard and other authenticated screens can be rendered as that user without changing the admin account.</p>
+    </section>
+  );
+}
+
 async function tryApi(calls) {
   let lastError;
   for (const call of calls) {
@@ -215,6 +322,8 @@ export default function AdminPanel({ currentUser, user }) {
   const [rooms, setRooms] = useState([]);
   const [trades, setTrades] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [economyData, setEconomyData] = useState({ items: [], activeAuctions: [], recentAuctions: [] });
+  const [economyLoading, setEconomyLoading] = useState(false);
   const [query, setQuery] = useState('');
   const [auditQuery, setAuditQuery] = useState('');
   const [filter, setFilter] = useState('all');
@@ -224,6 +333,26 @@ export default function AdminPanel({ currentUser, user }) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [previewTradeImage, setPreviewTradeImage] = useState(null);
+
+  async function loadEconomyData() {
+    setEconomyLoading(true);
+    try {
+      const [bazaarData, activeAuctionsData, recentAuctionsData] = await Promise.allSettled([
+        tryApi([() => api('/api/bazaar?sort=newest'), () => api('/api/bazaar')]),
+        tryApi([() => api('/api/bazaar/auctions?status=active')]),
+        tryApi([() => api('/api/bazaar/auctions?status=recent')])
+      ]);
+      setEconomyData({
+        items: bazaarData.status === 'fulfilled' ? (bazaarData.value.items || bazaarData.value.listings || bazaarData.value.bazaarItems || []) : [],
+        activeAuctions: activeAuctionsData.status === 'fulfilled' ? (activeAuctionsData.value.auctions || []) : [],
+        recentAuctions: recentAuctionsData.status === 'fulfilled' ? (recentAuctionsData.value.auctions || []) : []
+      });
+    } catch (economyError) {
+      velkToast(economyError.message || 'Could not load economy dashboard.', 'error');
+    } finally {
+      setEconomyLoading(false);
+    }
+  }
 
   async function loadAdminData() {
     setLoading(true);
@@ -260,6 +389,7 @@ export default function AdminPanel({ currentUser, user }) {
   }
 
   useEffect(() => { loadAdminData(); }, []);
+  useEffect(() => { if (activeTab === 'economy') loadEconomyData(); }, [activeTab]);
 
   const filteredUsers = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -314,9 +444,9 @@ export default function AdminPanel({ currentUser, user }) {
 
   return (
     <section className="admin-panel rewritten-admin-panel">
-      <div className="panel-title-row"><div><h1>Admin Panel</h1><p className="muted">Manage users, active rooms, trade records, and audit logs.</p></div><button type="button" className="ghost" onClick={loadAdminData}>Refresh</button></div>
+      <div className="panel-title-row"><div><h1>Admin Panel</h1><p className="muted">Manage users, active rooms, trade records, audit logs, economy, and test views.</p></div><button type="button" className="ghost" onClick={loadAdminData}>Refresh</button></div>
       {message && <p className="success-message">{message}</p>}{error && <p className="error-message">{error}</p>}{loading && <p className="muted">Loading admin data...</p>}
-      <div className="admin-themed-tabs"><button type="button" className={activeTab === 'users' ? 'active' : ''} onClick={() => setActiveTab('users')}>Users</button><button type="button" className={activeTab === 'rooms' ? 'active' : ''} onClick={() => setActiveTab('rooms')}>Rooms</button><button type="button" className={activeTab === 'trades' ? 'active' : ''} onClick={() => setActiveTab('trades')}>Trades</button><button type="button" className={activeTab === 'audit' ? 'active' : ''} onClick={() => setActiveTab('audit')}>Audit Logs</button></div>
+      <div className="admin-themed-tabs"><button type="button" className={activeTab === 'users' ? 'active' : ''} onClick={() => setActiveTab('users')}>Users</button><button type="button" className={activeTab === 'rooms' ? 'active' : ''} onClick={() => setActiveTab('rooms')}>Rooms</button><button type="button" className={activeTab === 'trades' ? 'active' : ''} onClick={() => setActiveTab('trades')}>Trades</button><button type="button" className={activeTab === 'audit' ? 'active' : ''} onClick={() => setActiveTab('audit')}>Audit Logs</button><button type="button" className={activeTab === 'economy' ? 'active' : ''} onClick={() => setActiveTab('economy')}>Economy</button><button type="button" className={activeTab === 'testview' ? 'active' : ''} onClick={() => setActiveTab('testview')}>Test View</button></div>
 
       {activeTab === 'users' && <section className="card admin-tab-card admin-users-card"><div className="panel-title-row"><div><h2>Users</h2><p className="muted">Search, filter, and manage player roles. Sorted by ID by default.</p></div></div><div className="admin-filter-grid"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search users by ID, name, or role..." /><select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">All users</option><option value="developers">Developers</option><option value="admins">Admins</option><option value="verified">Verified</option><option value="online">Online</option></select></div><div className="admin-user-list">{filteredUsers.map(candidate => { const modifiable = canModifyUser(viewer, candidate); const developer = isDeveloperUser(candidate); const adminRole = isAdminUser(candidate); const verified = isVerifiedUser(candidate); return <article className="admin-user-card" key={candidate.id || candidate.username}><div className="admin-user-main"><span className="admin-user-id">#{candidate.id ?? '?'}</span><strong>{candidate.username}</strong><UserBadge user={candidate} />{candidate.online && <span className="online-mini-pill">Online</span>}</div>{developer && !isDeveloperUser(viewer) && <p className="muted admin-protected-note">Developer account. Only developers can modify this user.</p>}<div className="admin-user-actions">{!developer && (adminRole ? <button type="button" className="danger" disabled={!modifiable} onClick={() => setAdminFlag(candidate, false)}>Remove Admin</button> : <button type="button" disabled={!modifiable} onClick={() => setAdminFlag(candidate, true)}>Make Admin</button>)}{!developer && (verified ? <button type="button" className="ghost" disabled={!modifiable} onClick={() => setVerifiedFlag(candidate, false)}>Remove Verified</button> : <button type="button" className="ghost" disabled={!modifiable} onClick={() => setVerifiedFlag(candidate, true)}>Mark Verified</button>)}{modifiable && <button type="button" className="ghost" onClick={() => resetPassword(candidate)}>Reset Password</button>}</div></article>; })}{filteredUsers.length === 0 && <p className="muted tidy-empty">No matching users.</p>}</div></section>}
 
@@ -325,6 +455,8 @@ export default function AdminPanel({ currentUser, user }) {
       {activeTab === 'trades' && <section className="card admin-tab-card admin-trades-card"><div className="panel-title-row"><div><h2>Trades</h2><p className="muted">Expandable trade summaries with items, IC, and chat history.</p></div></div><div className="admin-trade-list">{trades.length === 0 && <p className="muted tidy-empty">No trades found.</p>}{trades.map((trade, index) => { const tradeId = trade.id || trade.tradeId || index; const expanded = expandedTradeIds.has(tradeId); const fromItems = normalizeTradeItems(trade, 'from'); const toItems = normalizeTradeItems(trade, 'to'); const chat = normalizeTradeChat(trade); const fromIc = getIcValue(trade, ['fromIc', 'fromIC', 'fromIcAmount', 'fromICAmount', 'offerIc', 'offeredIc', 'offerIC', 'offeredIC']); const toIc = getIcValue(trade, ['toIc', 'toIC', 'toIcAmount', 'toICAmount', 'requestIc', 'requestedIc', 'requestIC', 'requestedIC']); return <article className="admin-trade-card" key={tradeId}><button type="button" className="admin-trade-summary" onClick={() => toggleTrade(tradeId)}><span>{expanded ? '▾' : '▸'}</span><strong>Trade #{tradeId}</strong><em>{getTradeSummary(trade)}</em></button>{expanded && <div className="admin-trade-details"><div className="admin-trade-meta"><p><strong>Room:</strong> {trade.roomId || trade.room_id || 'Unknown'}</p><p><strong>From:</strong> {trade.fromUsername || trade.from_user || trade.fromUser || 'Unknown'}</p><p><strong>To:</strong> {trade.toUsername || trade.to_user || trade.toUser || 'Unknown'}</p><p><strong>Status:</strong> {trade.status || 'Unknown'}</p></div><TradeItemList title={`${trade.fromUsername || 'From'} offers`} items={fromItems} ic={fromIc} onPreview={setPreviewTradeImage} /><TradeItemList title={`${trade.toUsername || 'To'} offers`} items={toItems} ic={toIc} onPreview={setPreviewTradeImage} /><div className="admin-trade-chat"><h3>Chat History</h3><ChatLog messages={chat} /></div><RawTradeDebug trade={trade} /></div>}</article>; })}</div></section>}
 
       {activeTab === 'audit' && <AuditLogTab auditLogs={auditLogs} query={auditQuery} setQuery={setAuditQuery} actionFilter={auditActionFilter} setActionFilter={setAuditActionFilter} />}
+      {activeTab === 'economy' && <EconomyDashboardTab users={users} trades={trades} economyData={economyData} loading={economyLoading} onRefresh={loadEconomyData} />}
+      {activeTab === 'testview' && <TestViewTab users={users} />}
 
       {previewTradeImage && <div className="admin-image-preview-backdrop" role="dialog" aria-modal="true" onClick={() => setPreviewTradeImage(null)}><div className="admin-image-preview-modal" onClick={event => event.stopPropagation()}><div className="admin-image-preview-header"><strong>{previewTradeImage.title}</strong><button type="button" className="ghost" onClick={() => setPreviewTradeImage(null)}>Close</button></div><img src={previewTradeImage.src} alt={previewTradeImage.title || 'Trade item preview'} /></div></div>}
     </section>
