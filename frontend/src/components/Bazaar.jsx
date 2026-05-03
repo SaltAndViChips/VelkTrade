@@ -52,17 +52,6 @@ function filterSummary(filters = {}) {
   if (filters.minInterest) parts.push(`${filters.minInterest}+ interested`);
   return parts.length ? parts.join(' · ') : 'No extra filters';
 }
-function timeLeft(value) {
-  const end = new Date(value).getTime();
-  if (!Number.isFinite(end)) return 'Unknown end';
-  const ms = end - Date.now();
-  if (ms <= 0) return 'Ended';
-  const hours = Math.floor(ms / 36e5);
-  const minutes = Math.floor((ms % 36e5) / 6e4);
-  if (hours >= 24) return `${Math.floor(hours / 24)}d ${hours % 24}h left`;
-  if (hours > 0) return `${hours}h ${minutes}m left`;
-  return `${minutes}m left`;
-}
 
 function BazaarMosaicItem({ item, currentUser }) {
   const [hovered, setHovered] = useState(false);
@@ -99,7 +88,7 @@ function AuctionMosaicItem({ auction, currentUser, onBid, onBuyout }) {
     <div className="bazaar-mosaic-meta auction-meta">
       <span><strong>Current:</strong> {formatNumber(currentBid)} IC</span>
       <span><strong>Buyout:</strong> {buyout ? `${formatNumber(buyout)} IC` : 'None'}</span>
-      <span><strong>Bids:</strong> {auction.bidCount || 0} · {timeLeft(auction.endsAt)}</span>
+      <span><strong>Bids:</strong> {auction.bidCount || 0}</span>
       {auction.sellerUsername && <span>Seller: <strong>{auction.sellerUsername}</strong>{auction.sellerVerified && <span className="verified-badge mini">✓</span>}</span>}
       {auction.viewerIsWinner && <span className="status-pill bazaar-watch-pill">you are winning</span>}
     </div>
@@ -118,7 +107,7 @@ export default function Bazaar({ currentUser }) {
   const [auctions, setAuctions] = useState([]);
   const [auctionStatus, setAuctionStatus] = useState('active');
   const [createOpen, setCreateOpen] = useState(false);
-  const [auctionForm, setAuctionForm] = useState({ itemId: '', startingBid: '', buyoutPrice: '', durationHours: '24' });
+  const [auctionForm, setAuctionForm] = useState({ itemId: '', startingBid: '', buyoutPrice: '' });
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('newest');
   const [verified, setVerified] = useState('all');
@@ -145,25 +134,9 @@ export default function Bazaar({ currentUser }) {
     return params.toString();
   }, [search, sort, verified, min, max, minInterest]);
 
-  async function loadBazaar() {
-    setLoading(true); setError('');
-    try { const data = await api(`/api/bazaar${queryString ? `?${queryString}` : ''}`); setItems(data.items || []); }
-    catch (err) { setError(err.message || 'Could not load Bazaar.'); }
-    finally { setLoading(false); }
-  }
-  async function loadAuctions() {
-    setAuctionLoading(true);
-    try { const data = await api(`/api/bazaar/auctions?status=${encodeURIComponent(auctionStatus)}`); setAuctions(data.auctions || []); }
-    catch (err) { velkToast(err.message || 'Could not load auctions.', 'error'); }
-    finally { setAuctionLoading(false); }
-  }
-  async function loadFilterTools() {
-    try {
-      const [filtersData, watchData] = await Promise.allSettled([api('/api/bazaar/saved-filters'), api('/api/bazaar/watchlist')]);
-      if (filtersData.status === 'fulfilled') setSavedFilters(safeArray(filtersData.value.filters || filtersData.value.savedFilters));
-      if (watchData.status === 'fulfilled') setWatchlist(safeArray(watchData.value.watchlist || watchData.value.watches));
-    } catch {}
-  }
+  async function loadBazaar() { setLoading(true); setError(''); try { const data = await api(`/api/bazaar${queryString ? `?${queryString}` : ''}`); setItems(data.items || []); } catch (err) { setError(err.message || 'Could not load Bazaar.'); } finally { setLoading(false); } }
+  async function loadAuctions() { setAuctionLoading(true); try { const data = await api(`/api/bazaar/auctions?status=${encodeURIComponent(auctionStatus)}`); setAuctions(data.auctions || []); } catch (err) { velkToast(err.message || 'Could not load auctions.', 'error'); } finally { setAuctionLoading(false); } }
+  async function loadFilterTools() { try { const [filtersData, watchData] = await Promise.allSettled([api('/api/bazaar/saved-filters'), api('/api/bazaar/watchlist')]); if (filtersData.status === 'fulfilled') setSavedFilters(safeArray(filtersData.value.filters || filtersData.value.savedFilters)); if (watchData.status === 'fulfilled') setWatchlist(safeArray(watchData.value.watchlist || watchData.value.watches)); } catch {} }
   useEffect(() => { loadFilterTools(); }, []);
   useEffect(() => { const timer = window.setTimeout(loadBazaar, 180); return () => window.clearTimeout(timer); }, [queryString]);
   useEffect(() => { if (activeTab === 'auctions') loadAuctions(); }, [activeTab, auctionStatus]);
@@ -174,7 +147,7 @@ export default function Bazaar({ currentUser }) {
   async function deleteSavedFilter(id) { try { await api(`/api/bazaar/saved-filters/${encodeURIComponent(id)}`, { method: 'DELETE' }); await loadFilterTools(); velkToast('Saved filter deleted.', 'success'); } catch (err) { velkToast(err.message || 'Could not delete saved filter.', 'error'); } }
   async function addWatch() { const keyword = watchKeyword.trim() || search.trim(); if (!keyword) return velkToast('Enter a keyword or search first.', 'warning'); try { await api('/api/bazaar/watchlist', { method: 'POST', body: JSON.stringify({ keyword, minPrice: min, maxPrice: max, verifiedOnly: verified === 'verified' }) }); setWatchKeyword(''); await loadFilterTools(); velkToast('Watchlist entry added.', 'success'); } catch (err) { velkToast(err.message || 'Could not add watchlist entry.', 'error'); } }
   async function deleteWatch(id) { try { await api(`/api/bazaar/watchlist/${encodeURIComponent(id)}`, { method: 'DELETE' }); await loadFilterTools(); velkToast('Watchlist entry removed.', 'success'); } catch (err) { velkToast(err.message || 'Could not remove watchlist entry.', 'error'); } }
-  async function createAuction(event) { event.preventDefault(); if (!isVerifiedUser(currentUser)) return velkToast('Verified users only.', 'warning'); try { await api('/api/bazaar/auctions', { method: 'POST', body: JSON.stringify(auctionForm) }); setAuctionForm({ itemId: '', startingBid: '', buyoutPrice: '', durationHours: '24' }); setCreateOpen(false); await loadAuctions(); velkToast('Auction created.', 'success'); } catch (err) { velkToast(err.message || 'Could not create auction.', 'error'); } }
+  async function createAuction(event) { event.preventDefault(); if (!isVerifiedUser(currentUser)) return velkToast('Verified users only.', 'warning'); try { await api('/api/bazaar/auctions', { method: 'POST', body: JSON.stringify(auctionForm) }); setAuctionForm({ itemId: '', startingBid: '', buyoutPrice: '' }); setCreateOpen(false); await loadAuctions(); velkToast('Auction created.', 'success'); } catch (err) { velkToast(err.message || 'Could not create auction.', 'error'); } }
   async function placeBid(auction, amount) { try { await api(`/api/bazaar/auctions/${auction.id}/bid`, { method: 'POST', body: JSON.stringify({ amount }) }); await loadAuctions(); velkToast('Bid placed.', 'success'); } catch (err) { velkToast(err.message || 'Could not place bid.', 'error'); } }
   async function buyoutAuction(auction) { if (!window.confirm(`Buy out ${auction.title} for ${formatNumber(auction.buyoutPrice)} IC?`)) return; try { await api(`/api/bazaar/auctions/${auction.id}/buyout`, { method: 'POST' }); await loadAuctions(); velkToast('Auction bought out.', 'success'); } catch (err) { velkToast(err.message || 'Could not buy out auction.', 'error'); } }
 
@@ -190,7 +163,7 @@ export default function Bazaar({ currentUser }) {
     </>}
 
     {activeTab === 'auctions' && <>
-      <section className="tidy-tab-panel bazaar-clean-tools"><div className="panel-title-row compact"><div><h3>Auction Board</h3><p className="muted">Verified users can create auctions, bid, or buy out instantly.</p></div><div className="segmented-control compact"><button type="button" className={auctionStatus === 'active' ? 'active' : ''} onClick={() => setAuctionStatus('active')}>Active</button><button type="button" className={auctionStatus === 'all' ? 'active' : ''} onClick={() => setAuctionStatus('all')}>All</button></div></div>{isVerifiedUser(currentUser) ? <><button type="button" className="ghost" onClick={() => setCreateOpen(value => !value)}>{createOpen ? 'Hide Create Auction' : 'Create Auction'}</button>{createOpen && <form className="auction-create-form" onSubmit={createAuction}><label><span>Item ID</span><input value={auctionForm.itemId} onChange={event => setAuctionForm(current => ({ ...current, itemId: numericInput(event.target.value) }))} placeholder="Inventory item ID" required /></label><label><span>Starting bid</span><input value={auctionForm.startingBid} onChange={event => setAuctionForm(current => ({ ...current, startingBid: numericInput(event.target.value) }))} placeholder="100000" required /></label><label><span>Buyout price</span><input value={auctionForm.buyoutPrice} onChange={event => setAuctionForm(current => ({ ...current, buyoutPrice: numericInput(event.target.value) }))} placeholder="Optional" /></label><label><span>Hours</span><input value={auctionForm.durationHours} onChange={event => setAuctionForm(current => ({ ...current, durationHours: numericInput(event.target.value) }))} placeholder="24" /></label><button type="submit">Start Auction</button></form>}</> : <p className="muted">Only verified users can create auctions or bid.</p>}</section>
+      <section className="tidy-tab-panel bazaar-clean-tools"><div className="panel-title-row compact"><div><h3>Auction Board</h3><p className="muted">Verified users can create auctions, bid, or buy out instantly.</p></div><div className="segmented-control compact"><button type="button" className={auctionStatus === 'active' ? 'active' : ''} onClick={() => setAuctionStatus('active')}>Active</button><button type="button" className={auctionStatus === 'all' ? 'active' : ''} onClick={() => setAuctionStatus('all')}>All</button></div></div>{isVerifiedUser(currentUser) ? <><button type="button" className="ghost" onClick={() => setCreateOpen(value => !value)}>{createOpen ? 'Hide Create Auction' : 'Create Auction'}</button>{createOpen && <form className="auction-create-form" onSubmit={createAuction}><label><span>Item ID</span><input value={auctionForm.itemId} onChange={event => setAuctionForm(current => ({ ...current, itemId: numericInput(event.target.value) }))} placeholder="Inventory item ID" required /></label><label><span>Starting bid</span><input value={auctionForm.startingBid} onChange={event => setAuctionForm(current => ({ ...current, startingBid: numericInput(event.target.value) }))} placeholder="100000" required /></label><label><span>Buyout price</span><input value={auctionForm.buyoutPrice} onChange={event => setAuctionForm(current => ({ ...current, buyoutPrice: numericInput(event.target.value) }))} placeholder="Optional" /></label><button type="submit">Start Auction</button></form>}</> : <p className="muted">Only verified users can create auctions or bid.</p>}</section>
       <p className="muted tidy-count">{auctionLoading ? 'Loading auctions...' : `Showing ${auctions.length} auction${auctions.length === 1 ? '' : 's'}.`}</p>{auctions.length === 0 && !auctionLoading && <p className="muted tidy-empty">No auctions found.</p>}<div className="inventory-mosaic-grid bazaar-grid bazaar-mosaic-grid item-grid inventory-grid vt-unified-mosaic-grid">{auctions.map(auction => <AuctionMosaicItem key={auction.id} auction={auction} currentUser={currentUser} onBid={placeBid} onBuyout={buyoutAuction} />)}</div>
     </>}
   </section>;
