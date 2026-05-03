@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import { velkToast } from '../velktrade-feature-foundation.js';
 
@@ -8,7 +8,23 @@ export const FOLDER_ICON_PRESETS = [
   '✦', '◆', '◇', '★', '☢', '☣', 'Ω', 'α', 'β', 'Δ', '#', '$', 'IC', 'S', 'A', 'B', 'C'
 ];
 
-const FOLDER_COLOR_PRESETS = ['#ffdc93', '#00fa9a', '#c200fa', '#8e71ff', '#5ddcff', '#ff5d77', '#ffd166', '#f4f4f5'];
+const FOLDER_COLOR_PRESETS = [
+  { label: 'Gold', value: '#ffdc93' },
+  { label: 'Velk Green', value: '#00fa9a' },
+  { label: 'Arcane Purple', value: '#c200fa' },
+  { label: 'Royal Violet', value: '#8e71ff' },
+  { label: 'Crystal Blue', value: '#5ddcff' },
+  { label: 'Crimson', value: '#ff5d77' },
+  { label: 'Sunfire', value: '#ffd166' },
+  { label: 'Frost', value: '#f4f4f5' },
+  { label: 'Custom hex…', value: 'custom' }
+];
+
+function cleanHex(value, fallback = '#ffdc93') {
+  const clean = String(value || '').trim();
+  if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(clean)) return clean;
+  return fallback;
+}
 
 function formatPrice(value) {
   const raw = String(value || '').trim();
@@ -24,10 +40,33 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
   const [folderName, setFolderName] = useState('');
   const [folderIcon, setFolderIcon] = useState('📁');
   const [folderColor, setFolderColor] = useState('#ffdc93');
+  const [folderColorMode, setFolderColorMode] = useState('#ffdc93');
+  const [customFolderColor, setCustomFolderColor] = useState('#ffdc93');
   const [folderId, setFolderId] = useState('');
   const [bulkPrice, setBulkPrice] = useState('');
   const [cleanup, setCleanup] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  const normalizedFolderColor = useMemo(() => cleanHex(folderColor), [folderColor]);
+
+  function setColorFromValue(value) {
+    if (value === 'custom') {
+      setFolderColorMode('custom');
+      setFolderColor(cleanHex(customFolderColor));
+      return;
+    }
+    setFolderColorMode(value);
+    setFolderColor(cleanHex(value));
+    setCustomFolderColor(cleanHex(value));
+  }
+
+  function syncColorControls(color) {
+    const clean = cleanHex(color);
+    const preset = FOLDER_COLOR_PRESETS.find(entry => entry.value.toLowerCase?.() === clean.toLowerCase());
+    setFolderColor(clean);
+    setCustomFolderColor(clean);
+    setFolderColorMode(preset ? preset.value : 'custom');
+  }
 
   async function loadFolders() {
     try {
@@ -37,7 +76,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
       if (!folderId && next[0]?.id) {
         setFolderId(String(next[0].id));
         setFolderIcon(next[0].icon || '📁');
-        setFolderColor(next[0].color || '#ffdc93');
+        syncColorControls(next[0].color || '#ffdc93');
       }
     } catch (error) {
       velkToast(error.message || 'Could not load folders.', 'error');
@@ -51,7 +90,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
     if (!name) return;
     setBusy(true);
     try {
-      const data = await api('/api/item-folders', { method: 'POST', body: JSON.stringify({ name, icon: folderIcon, color: folderColor }) });
+      const data = await api('/api/item-folders', { method: 'POST', body: JSON.stringify({ name, icon: folderIcon, color: normalizedFolderColor }) });
       setFolderName('');
       await loadFolders();
       if (data.folder?.id) setFolderId(String(data.folder.id));
@@ -69,7 +108,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
     if (!folderId) return;
     setBusy(true);
     try {
-      await api(`/api/item-folders/${encodeURIComponent(folderId)}`, { method: 'PATCH', body: JSON.stringify({ icon: folderIcon, color: folderColor }) });
+      await api(`/api/item-folders/${encodeURIComponent(folderId)}`, { method: 'PATCH', body: JSON.stringify({ icon: folderIcon, color: normalizedFolderColor }) });
       await loadFolders();
       window.dispatchEvent(new CustomEvent('velktrade:folders-changed'));
       onRefresh?.();
@@ -150,12 +189,15 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
               <select className="folder-icon-select" value={folderIcon} disabled={busy} onChange={event => setFolderIcon(event.target.value)} aria-label="Folder icon">
                 {FOLDER_ICON_PRESETS.map(icon => <option key={icon} value={icon}>{icon}</option>)}
               </select>
-              <input type="color" className="folder-color-input" value={folderColor} disabled={busy} onChange={event => setFolderColor(event.target.value)} aria-label="Folder color" />
+              <select className="folder-color-select" value={folderColorMode} disabled={busy} onChange={event => setColorFromValue(event.target.value)} aria-label="Folder color preset">
+                {FOLDER_COLOR_PRESETS.map(entry => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
+              </select>
+              {folderColorMode === 'custom' && <input className="folder-hex-input" value={customFolderColor} disabled={busy} onChange={event => { setCustomFolderColor(event.target.value); setFolderColor(cleanHex(event.target.value)); }} placeholder="#00fa9a" maxLength={7} aria-label="Custom folder hex color" />}
+              <span className="folder-color-preview" style={{ backgroundColor: normalizedFolderColor }} aria-hidden="true" />
               <input value={folderName} onChange={event => setFolderName(event.target.value)} placeholder="New folder name" />
               <button type="button" disabled={busy || !folderName.trim()} onClick={createFolder}>Create</button>
             </div>
-            <div className="folder-color-presets">{FOLDER_COLOR_PRESETS.map(color => <button key={color} type="button" disabled={busy} className={folderColor.toLowerCase() === color.toLowerCase() ? 'active' : ''} style={{ backgroundColor: color }} onClick={() => setFolderColor(color)} aria-label={`Set folder color ${color}`} />)}</div>
-            <div className="inline-controls"><select value={folderId} onChange={event => { setFolderId(event.target.value); const next = folders.find(folder => String(folder.id) === event.target.value); if (next?.icon) setFolderIcon(next.icon); if (next?.color) setFolderColor(next.color); }}><option value="">Choose folder</option>{folders.map(folder => <option key={folder.id} value={folder.id}>{folder.icon || '📁'} {folder.name} ({folder.itemCount || 0})</option>)}</select><button type="button" disabled={busy || !folderId || !selectedIds.length} onClick={assignFolder}>Add Selected</button></div>
+            <div className="inline-controls"><select value={folderId} onChange={event => { setFolderId(event.target.value); const next = folders.find(folder => String(folder.id) === event.target.value); if (next?.icon) setFolderIcon(next.icon); if (next?.color) syncColorControls(next.color); }}><option value="">Choose folder</option>{folders.map(folder => <option key={folder.id} value={folder.id}>{folder.icon || '📁'} {folder.name} ({folder.itemCount || 0})</option>)}</select><button type="button" disabled={busy || !folderId || !selectedIds.length} onClick={assignFolder}>Add Selected</button></div>
             <div className="inline-controls"><button type="button" className="ghost" disabled={busy || !folderId} onClick={updateSelectedFolderStyle}>Apply Icon/Color To Folder</button></div>
           </div>
           <div className="inventory-tool-card">
