@@ -15,6 +15,12 @@ const VERIFIED_FILTERS = [
   { key: 'nonverified', label: 'Non-Verified' }
 ];
 
+const AUCTION_TABS = [
+  { key: 'active', label: 'Active' },
+  { key: 'recent', label: 'Recently Ended' },
+  { key: 'history', label: 'History' }
+];
+
 function vtText(value, fallback = '') {
   if (value === undefined || value === null) return fallback;
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
@@ -33,6 +39,13 @@ function formatNumber(value) {
   return number.toLocaleString();
 }
 
+function formatDateTime(value) {
+  if (!value) return 'Unknown time';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'Unknown time';
+  return date.toLocaleString();
+}
+
 function itemPrice(item) {
   const amount = formatNumber(item.priceAmount ?? item.price_amount ?? item.price);
   return amount ? `${amount} IC` : vtText(item.price, '');
@@ -42,6 +55,9 @@ function safeArray(value) { return Array.isArray(value) ? value : []; }
 function isVerifiedUser(user) { return Boolean(user?.isVerified || user?.is_verified || user?.verified || user?.isTrusted || user?.is_trusted || user?.isAdmin || user?.is_admin); }
 function numericInput(value) { return String(value || '').replace(/[^\d]/g, ''); }
 function currentFilters({ search, sort, verified, min, max, minInterest }) { return { search, sort, verified, min, max, minInterest }; }
+function auctionIsEnded(auction) { return ['completed', 'no_winner', 'bought_out', 'ended'].includes(String(auction?.status || '').toLowerCase()); }
+function auctionBidLabel(auction) { return auction?.hasBids || Number(auction?.bidCount || 0) > 0 ? 'Current bid' : 'Starting bid'; }
+function nextMinimumBid(auction) { return Number(auction?.minimumNextBid || 0) || (Number(auction?.currentBid || auction?.startingBid || 0) + Number(auction?.minIncrement || 1)); }
 function filterSummary(filters = {}) {
   const parts = [];
   if (filters.search) parts.push(`Search: ${filters.search}`);
@@ -72,47 +88,68 @@ function BazaarMosaicItem({ item, currentUser }) {
   </article>;
 }
 
-function AuctionMosaicItem({ auction, currentUser, onBid, onBuyout }) {
+function AuctionMosaicItem({ auction, onOpen }) {
   const [hovered, setHovered] = useState(false);
-  const [bid, setBid] = useState('');
   const title = vtText(auction.title, 'Auction Item');
   const image = vtText(auction.image);
   const currentBid = Number(auction.currentBid || auction.winningBid || auction.startingBid || 0);
   const buyout = Number(auction.buyoutPrice || 0);
-  const price = hovered ? `${formatNumber(currentBid)} IC bid` : title;
-  const minBid = currentBid + 1;
-  const canAct = isVerifiedUser(currentUser) && !auction.viewerIsSeller && auction.status === 'active';
-  return <article className={`inventory-mosaic-item bazaar-mosaic-item bazaar-auction-item item-card vt-unified-item-card ${hovered ? 'vt-hover-price-title' : ''}`} data-item-id={auction.itemId || ''} data-id={auction.itemId || ''} data-title={title} data-vt-original-title={title} data-price={`${formatNumber(currentBid)} IC`} data-vt-price={`${formatNumber(currentBid)} IC`} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+  const label = auctionBidLabel(auction);
+  const price = hovered ? `${label}: ${formatNumber(currentBid)} IC` : title;
+  const ended = auctionIsEnded(auction);
+  return <article className={`inventory-mosaic-item bazaar-mosaic-item bazaar-auction-item item-card vt-unified-item-card ${hovered ? 'vt-hover-price-title' : ''}`} data-auction-id={auction.id} data-title={title} data-vt-original-title={title} data-price={`${formatNumber(currentBid)} IC`} data-vt-price={`${formatNumber(currentBid)} IC`} onClick={event => { event.preventDefault(); event.stopPropagation(); onOpen(auction); }} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
     <div className="inventory-mosaic-image-frame bazaar-mosaic-image-frame">{image ? <img src={image} alt={title} draggable="false" /> : <div className="inventory-mosaic-placeholder">?</div>}</div>
     <span className="item-title inventory-mosaic-title">{price}</span>
     <div className="bazaar-mosaic-meta auction-meta">
-      <span><strong>Current:</strong> {formatNumber(currentBid)} IC</span>
+      <span><strong>{label}:</strong> {formatNumber(currentBid)} IC</span>
       <span><strong>Buyout:</strong> {buyout ? `${formatNumber(buyout)} IC` : 'None'}</span>
+      <span><strong>Increment:</strong> {formatNumber(auction.minIncrement || 1)} IC</span>
       <span><strong>Bids:</strong> {auction.bidCount || 0}</span>
-      {auction.sellerUsername && <span>Seller: <strong>{auction.sellerUsername}</strong>{auction.sellerVerified && <span className="verified-badge mini">✓</span>}</span>}
+      {ended ? <><span>Seller: <strong>{auction.sellerUsername || 'Unknown'}</strong></span><span>Winner: <strong>{auction.winnerUsername || 'No winner'}</strong></span><span>Final: <strong>{formatNumber(currentBid)} IC</strong></span></> : <span className="muted">Seller hidden until ended</span>}
       {auction.viewerIsWinner && <span className="status-pill bazaar-watch-pill">you are winning</span>}
     </div>
-    {canAct && <div className="auction-action-row" onClick={event => event.stopPropagation()}>
-      <input value={bid} onChange={event => setBid(numericInput(event.target.value))} placeholder={`Min ${formatNumber(minBid)}`} inputMode="numeric" />
-      <button type="button" onClick={() => onBid(auction, bid || minBid)}>Bid</button>
-      {buyout > 0 && <button type="button" className="ghost" onClick={() => onBuyout(auction)}>Buyout</button>}
-    </div>}
-    {!isVerifiedUser(currentUser) && <p className="muted auction-verified-note">Verified users only.</p>}
   </article>;
 }
 
-function AuctionPreview({ item, startingBid, buyoutPrice }) {
+function AuctionPreview({ item, startingBid, buyoutPrice, minIncrement }) {
   if (!item) return <p className="muted auction-preview-empty">Choose an item to preview the auction card.</p>;
   const bid = Number(startingBid || 0);
   const buyout = Number(buyoutPrice || 0);
-  return <div className="auction-preview-card">
-    <div className="auction-preview-image">{item.image ? <img src={item.image} alt={item.title} draggable="false" /> : <div className="inventory-mosaic-placeholder">?</div>}</div>
-    <div className="auction-preview-info">
-      <strong>{item.title}</strong>
-      <span>Starting bid: {bid > 0 ? `${formatNumber(bid)} IC` : 'Not set'}</span>
-      <span>Buyout: {buyout > 0 ? `${formatNumber(buyout)} IC` : 'None'}</span>
-      {item.price && <span>Current list price: {item.price}</span>}
-    </div>
+  const fakeAuction = { title: item.title, image: item.image, startingBid: bid, currentBid: bid, buyoutPrice: buyout, minIncrement: Number(minIncrement || 1), bidCount: 0, hasBids: false, status: 'active' };
+  return <div className="auction-visual-preview"><strong>Preview</strong><div className="inventory-mosaic-grid bazaar-grid bazaar-mosaic-grid item-grid inventory-grid vt-unified-mosaic-grid"><AuctionMosaicItem auction={fakeAuction} onOpen={() => {}} /></div></div>;
+}
+
+function AuctionBidModal({ auction, bids, bidAmount, setBidAmount, onClose, onBid, onBuyout, onEnd, onDelete, currentUser }) {
+  if (!auction) return null;
+  const currentBid = Number(auction.currentBid || auction.startingBid || 0);
+  const buyout = Number(auction.buyoutPrice || 0);
+  const canBid = isVerifiedUser(currentUser) && !auction.viewerIsSeller && auction.status === 'active';
+  const canManage = auction.viewerCanManage && auction.status === 'active';
+  const canDelete = auction.viewerCanManage || currentUser?.isAdmin || currentUser?.is_admin;
+  const minimum = nextMinimumBid(auction);
+  const uniqueBidders = Array.from(new Map(bids.map(bid => [String(bid.bidderId), bid])).values());
+
+  return <div className="auction-modal-backdrop" onMouseDown={onClose}>
+    <section className="auction-modal" onMouseDown={event => event.stopPropagation()}>
+      <button type="button" className="auction-modal-close" onClick={onClose}>×</button>
+      <div className="auction-modal-grid">
+        <div className="auction-modal-image">{auction.image ? <img src={auction.image} alt={auction.title} /> : <div className="inventory-mosaic-placeholder">?</div>}</div>
+        <div className="auction-modal-info">
+          <h3>{auction.title}</h3>
+          <p><strong>{auctionBidLabel(auction)}:</strong> {formatNumber(currentBid)} IC</p>
+          <p><strong>Minimum next bid:</strong> {formatNumber(minimum)} IC</p>
+          <p><strong>Minimum increment:</strong> {formatNumber(auction.minIncrement || 1)} IC</p>
+          <p><strong>Buyout:</strong> {buyout ? `${formatNumber(buyout)} IC` : 'None'}</p>
+          {auctionIsEnded(auction) ? <><p><strong>Seller:</strong> {auction.sellerUsername || 'Unknown'}</p><p><strong>Winner:</strong> {auction.winnerUsername || 'No winner'}</p></> : <p className="muted">Seller is hidden until the auction ends.</p>}
+
+          {canBid && <div className="auction-modal-actions"><input value={bidAmount} onChange={event => setBidAmount(numericInput(event.target.value))} placeholder={`Min ${formatNumber(minimum)}`} inputMode="numeric" /><button type="button" onClick={() => onBid(auction, bidAmount || minimum)}>Place Bid</button>{buyout > 0 && <button type="button" className="ghost" onClick={() => onBuyout(auction)}>Buyout</button>}</div>}
+
+          {canManage && <div className="auction-manager-box"><strong>Seller controls</strong><select id="auction-winner-select"><option value="">No winner</option>{uniqueBidders.map(bid => <option key={bid.bidderId} value={bid.bidderId}>{bid.bidderUsername} — {formatNumber(bid.amount)} IC</option>)}</select><button type="button" onClick={() => onEnd(auction, document.getElementById('auction-winner-select')?.value || '')}>End Auction</button></div>}
+          {canDelete && <button type="button" className="danger" onClick={() => onDelete(auction)}>Delete Auction</button>}
+        </div>
+      </div>
+      <div className="auction-bid-history"><h4>Public Bid History</h4>{bids.length === 0 ? <p className="muted">No bids yet.</p> : <table><thead><tr><th>Bidder</th><th>Bid</th><th>Date / Time</th></tr></thead><tbody>{bids.map(bid => <tr key={bid.id}><td>{bid.bidderUsername}{bid.bidderVerified && <span className="verified-badge mini">✓</span>}</td><td>{formatNumber(bid.amount)} IC</td><td>{formatDateTime(bid.createdAt)}</td></tr>)}</tbody></table>}</div>
+    </section>
   </div>;
 }
 
@@ -123,7 +160,10 @@ export default function Bazaar({ currentUser }) {
   const [auctionItems, setAuctionItems] = useState([]);
   const [auctionStatus, setAuctionStatus] = useState('active');
   const [createOpen, setCreateOpen] = useState(false);
-  const [auctionForm, setAuctionForm] = useState({ itemId: '', startingBid: '', buyoutPrice: '' });
+  const [auctionForm, setAuctionForm] = useState({ itemId: '', startingBid: '', buyoutPrice: '', minIncrement: '1' });
+  const [selectedAuction, setSelectedAuction] = useState(null);
+  const [auctionBids, setAuctionBids] = useState([]);
+  const [modalBidAmount, setModalBidAmount] = useState('');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('newest');
   const [verified, setVerified] = useState('all');
@@ -140,21 +180,12 @@ export default function Bazaar({ currentUser }) {
   const [error, setError] = useState('');
 
   const selectedAuctionItem = useMemo(() => auctionItems.find(item => String(item.id) === String(auctionForm.itemId)) || null, [auctionItems, auctionForm.itemId]);
-
-  const queryString = useMemo(() => {
-    const params = new URLSearchParams();
-    if (search.trim()) params.set('search', search.trim());
-    if (sort) params.set('sort', sort);
-    if (verified && verified !== 'all') params.set('verified', verified);
-    if (min !== '') params.set('min', min);
-    if (max !== '') params.set('max', max);
-    if (minInterest !== '') params.set('minInterest', minInterest);
-    return params.toString();
-  }, [search, sort, verified, min, max, minInterest]);
+  const queryString = useMemo(() => { const params = new URLSearchParams(); if (search.trim()) params.set('search', search.trim()); if (sort) params.set('sort', sort); if (verified && verified !== 'all') params.set('verified', verified); if (min !== '') params.set('min', min); if (max !== '') params.set('max', max); if (minInterest !== '') params.set('minInterest', minInterest); return params.toString(); }, [search, sort, verified, min, max, minInterest]);
 
   async function loadBazaar() { setLoading(true); setError(''); try { const data = await api(`/api/bazaar${queryString ? `?${queryString}` : ''}`); setItems(data.items || []); } catch (err) { setError(err.message || 'Could not load Bazaar.'); } finally { setLoading(false); } }
   async function loadAuctions() { setAuctionLoading(true); try { const data = await api(`/api/bazaar/auctions?status=${encodeURIComponent(auctionStatus)}`); setAuctions(data.auctions || []); } catch (err) { velkToast(err.message || 'Could not load auctions.', 'error'); } finally { setAuctionLoading(false); } }
   async function loadAuctionItems() { if (!isVerifiedUser(currentUser)) return; try { const data = await api('/api/bazaar/auction-items'); const next = safeArray(data.items); setAuctionItems(next); if (!auctionForm.itemId && next[0]?.id) setAuctionForm(current => ({ ...current, itemId: String(next[0].id) })); } catch (err) { velkToast(err.message || 'Could not load your auctionable items.', 'error'); } }
+  async function loadAuctionBids(auctionId) { try { const data = await api(`/api/bazaar/auctions/${auctionId}/bids`); setAuctionBids(safeArray(data.bids)); } catch (err) { setAuctionBids([]); velkToast(err.message || 'Could not load bids.', 'error'); } }
   async function loadFilterTools() { try { const [filtersData, watchData] = await Promise.allSettled([api('/api/bazaar/saved-filters'), api('/api/bazaar/watchlist')]); if (filtersData.status === 'fulfilled') setSavedFilters(safeArray(filtersData.value.filters || filtersData.value.savedFilters)); if (watchData.status === 'fulfilled') setWatchlist(safeArray(watchData.value.watchlist || watchData.value.watches)); } catch {} }
   useEffect(() => { loadFilterTools(); }, []);
   useEffect(() => { const timer = window.setTimeout(loadBazaar, 180); return () => window.clearTimeout(timer); }, [queryString]);
@@ -166,9 +197,12 @@ export default function Bazaar({ currentUser }) {
   async function deleteSavedFilter(id) { try { await api(`/api/bazaar/saved-filters/${encodeURIComponent(id)}`, { method: 'DELETE' }); await loadFilterTools(); velkToast('Saved filter deleted.', 'success'); } catch (err) { velkToast(err.message || 'Could not delete saved filter.', 'error'); } }
   async function addWatch() { const keyword = watchKeyword.trim() || search.trim(); if (!keyword) return velkToast('Enter a keyword or search first.', 'warning'); try { await api('/api/bazaar/watchlist', { method: 'POST', body: JSON.stringify({ keyword, minPrice: min, maxPrice: max, verifiedOnly: verified === 'verified' }) }); setWatchKeyword(''); await loadFilterTools(); velkToast('Watchlist entry added.', 'success'); } catch (err) { velkToast(err.message || 'Could not add watchlist entry.', 'error'); } }
   async function deleteWatch(id) { try { await api(`/api/bazaar/watchlist/${encodeURIComponent(id)}`, { method: 'DELETE' }); await loadFilterTools(); velkToast('Watchlist entry removed.', 'success'); } catch (err) { velkToast(err.message || 'Could not remove watchlist entry.', 'error'); } }
-  async function createAuction(event) { event.preventDefault(); if (!isVerifiedUser(currentUser)) return velkToast('Verified users only.', 'warning'); if (!auctionForm.itemId) return velkToast('Choose an item first.', 'warning'); try { await api('/api/bazaar/auctions', { method: 'POST', body: JSON.stringify(auctionForm) }); setAuctionForm({ itemId: '', startingBid: '', buyoutPrice: '' }); setCreateOpen(false); await Promise.all([loadAuctions(), loadAuctionItems()]); velkToast('Auction created.', 'success'); } catch (err) { velkToast(err.message || 'Could not create auction.', 'error'); } }
-  async function placeBid(auction, amount) { try { await api(`/api/bazaar/auctions/${auction.id}/bid`, { method: 'POST', body: JSON.stringify({ amount }) }); await loadAuctions(); velkToast('Bid placed.', 'success'); } catch (err) { velkToast(err.message || 'Could not place bid.', 'error'); } }
-  async function buyoutAuction(auction) { if (!window.confirm(`Buy out ${auction.title} for ${formatNumber(auction.buyoutPrice)} IC?`)) return; try { await api(`/api/bazaar/auctions/${auction.id}/buyout`, { method: 'POST' }); await loadAuctions(); velkToast('Auction bought out.', 'success'); } catch (err) { velkToast(err.message || 'Could not buy out auction.', 'error'); } }
+  async function createAuction(event) { event.preventDefault(); if (!isVerifiedUser(currentUser)) return velkToast('Verified users only.', 'warning'); if (!auctionForm.itemId) return velkToast('Choose an item first.', 'warning'); try { await api('/api/bazaar/auctions', { method: 'POST', body: JSON.stringify(auctionForm) }); setAuctionForm({ itemId: '', startingBid: '', buyoutPrice: '', minIncrement: '1' }); setCreateOpen(false); await Promise.all([loadAuctions(), loadAuctionItems()]); velkToast('Auction created.', 'success'); } catch (err) { velkToast(err.message || 'Could not create auction.', 'error'); } }
+  async function placeBid(auction, amount) { try { await api(`/api/bazaar/auctions/${auction.id}/bid`, { method: 'POST', body: JSON.stringify({ amount }) }); await Promise.all([loadAuctions(), loadAuctionBids(auction.id)]); setModalBidAmount(''); velkToast('Bid placed.', 'success'); } catch (err) { velkToast(err.message || 'Could not place bid.', 'error'); } }
+  async function buyoutAuction(auction) { if (!window.confirm(`Buy out ${auction.title} for ${formatNumber(auction.buyoutPrice)} IC?`)) return; try { await api(`/api/bazaar/auctions/${auction.id}/buyout`, { method: 'POST' }); await Promise.all([loadAuctions(), loadAuctionBids(auction.id)]); velkToast('Auction bought out.', 'success'); } catch (err) { velkToast(err.message || 'Could not buy out auction.', 'error'); } }
+  async function endAuction(auction, winnerId) { try { await api(`/api/bazaar/auctions/${auction.id}/end`, { method: 'POST', body: JSON.stringify({ winnerId: winnerId || null }) }); setSelectedAuction(null); await loadAuctions(); velkToast('Auction ended.', 'success'); } catch (err) { velkToast(err.message || 'Could not end auction.', 'error'); } }
+  async function deleteAuction(auction) { if (!window.confirm(`Delete auction for ${auction.title}?`)) return; try { await api(`/api/bazaar/auctions/${auction.id}`, { method: 'DELETE' }); setSelectedAuction(null); await loadAuctions(); velkToast('Auction deleted.', 'success'); } catch (err) { velkToast(err.message || 'Could not delete auction.', 'error'); } }
+  function openAuction(auction) { setSelectedAuction(auction); setModalBidAmount(''); loadAuctionBids(auction.id); }
 
   return <section className="card bazaar-page bazaar-rewrite-shell inventory-rewrite-shell">
     <div className="panel-title-row"><div><h2>Bazaar</h2><p className="muted">Listings and verified-user auctions with buyout support.</p></div><button type="button" onClick={activeTab === 'auctions' ? loadAuctions : loadBazaar}>Refresh</button></div>
@@ -182,8 +216,10 @@ export default function Bazaar({ currentUser }) {
     </>}
 
     {activeTab === 'auctions' && <>
-      <section className="tidy-tab-panel bazaar-clean-tools"><div className="panel-title-row compact"><div><h3>Auction Board</h3><p className="muted">Verified users can create auctions, bid, or buy out instantly.</p></div><div className="segmented-control compact"><button type="button" className={auctionStatus === 'active' ? 'active' : ''} onClick={() => setAuctionStatus('active')}>Active</button><button type="button" className={auctionStatus === 'all' ? 'active' : ''} onClick={() => setAuctionStatus('all')}>All</button></div></div>{isVerifiedUser(currentUser) ? <><button type="button" className="ghost" onClick={() => { setCreateOpen(value => !value); loadAuctionItems(); }}>{createOpen ? 'Hide Create Auction' : 'Create Auction'}</button>{createOpen && <form className="auction-create-form auction-create-enhanced" onSubmit={createAuction}><label className="auction-item-select-label"><span>Item</span><select value={auctionForm.itemId} onChange={event => setAuctionForm(current => ({ ...current, itemId: event.target.value }))} required><option value="">Choose one of your items...</option>{auctionItems.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><label><span>Starting bid</span><input value={auctionForm.startingBid} onChange={event => setAuctionForm(current => ({ ...current, startingBid: numericInput(event.target.value) }))} placeholder="100000" required /></label><label><span>Buyout price</span><input value={auctionForm.buyoutPrice} onChange={event => setAuctionForm(current => ({ ...current, buyoutPrice: numericInput(event.target.value) }))} placeholder="Optional" /></label><button type="submit">Start Auction</button><AuctionPreview item={selectedAuctionItem} startingBid={auctionForm.startingBid} buyoutPrice={auctionForm.buyoutPrice} />{auctionItems.length === 0 && <p className="muted">No auctionable items found. Items already in active auctions or trade-pending are hidden.</p>}</form>}</> : <p className="muted">Only verified users can create auctions or bid.</p>}</section>
-      <p className="muted tidy-count">{auctionLoading ? 'Loading auctions...' : `Showing ${auctions.length} auction${auctions.length === 1 ? '' : 's'}.`}</p>{auctions.length === 0 && !auctionLoading && <p className="muted tidy-empty">No auctions found.</p>}<div className="inventory-mosaic-grid bazaar-grid bazaar-mosaic-grid item-grid inventory-grid vt-unified-mosaic-grid">{auctions.map(auction => <AuctionMosaicItem key={auction.id} auction={auction} currentUser={currentUser} onBid={placeBid} onBuyout={buyoutAuction} />)}</div>
+      <section className="tidy-tab-panel bazaar-clean-tools"><div className="panel-title-row compact"><div><h3>Auction Board</h3><p className="muted">Click an auction to view public bid history and place a bid.</p></div><div className="segmented-control compact">{AUCTION_TABS.map(tab => <button type="button" key={tab.key} className={auctionStatus === tab.key ? 'active' : ''} onClick={() => setAuctionStatus(tab.key)}>{tab.label}</button>)}</div></div>{isVerifiedUser(currentUser) ? <><button type="button" className="ghost" onClick={() => { setCreateOpen(value => !value); loadAuctionItems(); }}>{createOpen ? 'Hide Create Auction' : 'Create Auction'}</button>{createOpen && <form className="auction-create-form auction-create-enhanced" onSubmit={createAuction}><label className="auction-item-select-label"><span>Item</span><select value={auctionForm.itemId} onChange={event => setAuctionForm(current => ({ ...current, itemId: event.target.value }))} required><option value="">Choose one of your items...</option>{auctionItems.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><label><span>Starting bid</span><input value={auctionForm.startingBid} onChange={event => setAuctionForm(current => ({ ...current, startingBid: numericInput(event.target.value) }))} placeholder="100000" required /></label><label><span>Minimum bid increment</span><input value={auctionForm.minIncrement} onChange={event => setAuctionForm(current => ({ ...current, minIncrement: numericInput(event.target.value) || '1' }))} placeholder="1" /></label><label><span>Buyout price</span><input value={auctionForm.buyoutPrice} onChange={event => setAuctionForm(current => ({ ...current, buyoutPrice: numericInput(event.target.value) }))} placeholder="Optional" /></label><button type="submit">Start Auction</button><AuctionPreview item={selectedAuctionItem} startingBid={auctionForm.startingBid} buyoutPrice={auctionForm.buyoutPrice} minIncrement={auctionForm.minIncrement} />{auctionItems.length === 0 && <p className="muted">No auctionable items found. Items already in active auctions or trade-pending are hidden.</p>}</form>}</> : <p className="muted">Only verified users can create auctions or bid.</p>}</section>
+      <p className="muted tidy-count">{auctionLoading ? 'Loading auctions...' : `Showing ${auctions.length} auction${auctions.length === 1 ? '' : 's'}.`}</p>{auctions.length === 0 && !auctionLoading && <p className="muted tidy-empty">No auctions found.</p>}<div className="inventory-mosaic-grid bazaar-grid bazaar-mosaic-grid item-grid inventory-grid vt-unified-mosaic-grid">{auctions.map(auction => <AuctionMosaicItem key={auction.id} auction={auction} onOpen={openAuction} />)}</div>
     </>}
+
+    <AuctionBidModal auction={selectedAuction} bids={auctionBids} bidAmount={modalBidAmount} setBidAmount={setModalBidAmount} onClose={() => setSelectedAuction(null)} onBid={placeBid} onBuyout={buyoutAuction} onEnd={endAuction} onDelete={deleteAuction} currentUser={currentUser} />
   </section>;
 }
