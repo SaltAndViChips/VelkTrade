@@ -149,7 +149,12 @@
   margin-top: 16px !important;
 }
 
-/* Hard style the injected Inventory nav button to match the existing Dashboard/Profile outline buttons. */
+/* Top bar glow treatment for Dashboard / Inventory / Profile. */
+.velktrade-topbar-inventory-button,
+button:where(:not(.dashboard-tile)):where(:not(.dashboard-faq-help-button)):where(:not(.dashboard-faq-close)):where(:not(.auction-clean-close)):where(:not(.vt-icon-button)) {
+  transition: border-color .16s ease, background .16s ease, box-shadow .16s ease, color .16s ease, transform .16s ease !important;
+}
+
 .velktrade-topbar-inventory-button {
   appearance: none !important;
   display: inline-flex !important;
@@ -163,7 +168,7 @@
   border: 1px solid rgba(151, 126, 255, .45) !important;
   background: rgba(16, 13, 28, .78) !important;
   color: #f4f0ff !important;
-  box-shadow: none !important;
+  box-shadow: 0 0 18px rgba(124, 76, 255, .16), inset 0 0 18px rgba(124, 76, 255, .05) !important;
   text-shadow: none !important;
   font: inherit !important;
   font-size: 16px !important;
@@ -175,10 +180,20 @@
 
 .velktrade-topbar-inventory-button:hover,
 .velktrade-topbar-inventory-button:focus-visible {
-  border-color: rgba(178, 155, 255, .72) !important;
-  background: rgba(28, 22, 48, .88) !important;
+  border-color: rgba(178, 155, 255, .82) !important;
+  background: rgba(28, 22, 48, .9) !important;
   color: #ffffff !important;
-  box-shadow: 0 0 18px rgba(142, 113, 255, .18) !important;
+  box-shadow: 0 0 22px rgba(142, 113, 255, .36), 0 0 42px rgba(124, 76, 255, .22), inset 0 0 20px rgba(142, 113, 255, .08) !important;
+}
+
+/* Apply the same purple glow to existing Dashboard/Profile nav buttons without touching dashboard tiles. */
+body button:not(.dashboard-tile):not(.dashboard-faq-help-button):not(.dashboard-faq-close):not(.auction-clean-close):not(.vt-icon-button):not(.danger):not(.vt-primary-action):not(.vt-secondary-action):not(.vt-danger-button) {
+  box-shadow: 0 0 18px rgba(124, 76, 255, .16), inset 0 0 18px rgba(124, 76, 255, .04) !important;
+}
+
+body button:not(.dashboard-tile):not(.dashboard-faq-help-button):not(.dashboard-faq-close):not(.auction-clean-close):not(.vt-icon-button):not(.danger):not(.vt-primary-action):not(.vt-secondary-action):not(.vt-danger-button):hover,
+body button:not(.dashboard-tile):not(.dashboard-faq-help-button):not(.dashboard-faq-close):not(.auction-clean-close):not(.vt-icon-button):not(.danger):not(.vt-primary-action):not(.vt-secondary-action):not(.vt-danger-button):focus-visible {
+  box-shadow: 0 0 22px rgba(142, 113, 255, .36), 0 0 42px rgba(124, 76, 255, .22), inset 0 0 20px rgba(142, 113, 255, .08) !important;
 }
 
 @media (max-width: 720px) {
