@@ -36,6 +36,10 @@ function formatPrice(value) {
   return Number.isFinite(num) && num > 0 ? `${num.toLocaleString()} IC` : raw;
 }
 
+function normalizeBulkResponse(data) {
+  return Number(data?.updated ?? data?.count ?? data?.affectedRows ?? data?.changed ?? 0);
+}
+
 export default function InventoryToolsPanel({ items = [], selectedIds = [], setSelectedIds, onRefresh, open: controlledOpen, onOpenChange }) {
   const [localOpen, setLocalOpen] = useState(false);
   const open = typeof controlledOpen === 'boolean' ? controlledOpen : localOpen;
@@ -144,11 +148,16 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
 
   async function bulkUpdate(payload, message) {
     if (!selectedIds.length) return velkToast('Select at least one item first.', 'warning');
+    const ids = Array.from(new Set(selectedIds.map(Number).filter(Number.isInteger).filter(id => id > 0)));
+    if (!ids.length) return velkToast('Selected items did not contain valid item ids.', 'error');
     setBusy(true);
     try {
-      await api('/api/inventory/bulk-update', { method: 'POST', body: JSON.stringify({ itemIds: selectedIds, ...payload }) });
-      velkToast(message, 'success');
+      const data = await api('/api/inventory/bulk-update', { method: 'POST', body: JSON.stringify({ itemIds: ids, ids, ...payload }) });
+      const updated = normalizeBulkResponse(data);
+      if (updated === 0 && data?.ok !== true) throw new Error('Bulk update returned no changed items.');
+      velkToast(updated > 0 ? `${message} (${updated} item${updated === 1 ? '' : 's'})` : message, 'success');
       window.dispatchEvent(new CustomEvent('velktrade:folders-changed'));
+      window.dispatchEvent(new CustomEvent('velktrade:inventory-bulk-updated', { detail: { itemIds: ids, payload } }));
       onRefresh?.();
     } catch (error) {
       velkToast(error.message || 'Bulk update failed.', 'error');
@@ -212,7 +221,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
           <div className="inventory-tool-card">
             <strong>Bulk Edit</strong>
             <div className="inline-controls"><input value={bulkPrice} onChange={event => setBulkPrice(event.target.value)} placeholder="Set selected price" /><button type="button" disabled={busy || !selectedIds.length || !bulkPrice.trim()} onClick={() => bulkUpdate({ price: formatPrice(bulkPrice) }, 'Bulk price updated.')}>Set Price</button></div>
-            <div className="inline-controls"><button type="button" disabled={busy || !selectedIds.length} onClick={() => bulkUpdate({ showBazaar: true }, 'Selected items shown on Bazaar.')}>Show Bazaar</button><button type="button" disabled={busy || !selectedIds.length} onClick={() => bulkUpdate({ showBazaar: false }, 'Selected items hidden from Bazaar.')}>Hide Bazaar</button></div>
+            <div className="inline-controls"><button type="button" disabled={busy || !selectedIds.length} onClick={() => bulkUpdate({ showBazaar: true, show_bazaar: true, bazaar: true }, 'Selected items shown on Bazaar.')}>Show Bazaar</button><button type="button" disabled={busy || !selectedIds.length} onClick={() => bulkUpdate({ showBazaar: false, show_bazaar: false, bazaar: false }, 'Selected items hidden from Bazaar.')}>Hide Bazaar</button></div>
           </div>
         </div>
         {cleanup && <div className="inventory-cleanup-results"><strong>Cleanup Results</strong><div className="tidy-meta-grid"><span><strong>Total</strong>{cleanup.summary?.totalItems ?? 0}</span><span><strong>Duplicate Groups</strong>{cleanup.summary?.duplicateImageGroups ?? 0}</span><span><strong>Missing Titles</strong>{cleanup.summary?.missingTitles ?? 0}</span><span><strong>Missing Images</strong>{cleanup.summary?.missingImages ?? 0}</span><span><strong>Blank Prices</strong>{cleanup.summary?.blankPrices ?? 0}</span><span><strong>Bad Imgur Links</strong>{cleanup.summary?.brokenImgurLinks ?? 0}</span></div></div>}
