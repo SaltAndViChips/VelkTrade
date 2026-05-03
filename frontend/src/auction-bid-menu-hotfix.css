@@ -1,4 +1,29 @@
-/* Simplified auction bid modal. Keeps auction clicks out of the regular item popup. */
+/* Auction bid menu emergency cleanup. Forces a usable layout and suppresses the old broken React auction popup. */
+
+/* Completely remove the old React auction popup, including descendants and common variants. */
+.auction-modal-backdrop,
+.auction-modal-backdrop *,
+.auction-modal,
+.auction-modal *,
+.auction-modal-grid,
+.auction-modal-info,
+.auction-modal-image,
+.auction-modal-close,
+.auction-bid-history,
+.auction-manager-box {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  max-width: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  position: fixed !important;
+  left: -99999px !important;
+  top: -99999px !important;
+}
 
 .auction-simple-backdrop {
   position: fixed !important;
@@ -6,7 +31,7 @@
   z-index: 2147482600 !important;
   display: grid !important;
   place-items: center !important;
-  padding: clamp(10px, 2vw, 22px) !important;
+  padding: 18px !important;
   background: rgba(0, 0, 0, .72) !important;
   backdrop-filter: blur(7px) !important;
 }
@@ -16,7 +41,7 @@
   max-height: min(860px, calc(100vh - 28px)) !important;
   overflow: auto !important;
   position: relative !important;
-  padding: clamp(16px, 2vw, 22px) !important;
+  padding: 22px !important;
   border-radius: 24px !important;
   border: 1px solid rgba(142, 113, 255, .38) !important;
   background:
@@ -58,16 +83,17 @@
   color: #ffffff !important;
   font-size: clamp(24px, 3.2vw, 34px) !important;
   line-height: 1.05 !important;
-  overflow-wrap: anywhere !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  white-space: normal !important;
 }
 
 .auction-simple-buyout-pill {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  max-width: 190px !important;
-  white-space: normal !important;
-  overflow-wrap: anywhere !important;
+  max-width: 240px !important;
+  white-space: nowrap !important;
   text-align: center !important;
   padding: 7px 11px !important;
   border-radius: 999px !important;
@@ -201,21 +227,14 @@
   margin: 0 !important;
 }
 
-/* Hide the old React auction modal/backdrop if it renders; the simple modal replaces it. */
-.auction-modal-backdrop,
-.auction-modal {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
-
-/* Auction cards must not use the tiny mobile two-column inventory sizing. */
+/* Stable Bazaar auction cards. */
 .bazaar-rewrite-shell .bazaar-auction-item,
 .bazaar-rewrite-shell .bazaar-auction-item.inventory-mosaic-item {
   min-width: 285px !important;
   max-width: 320px !important;
   width: 300px !important;
+  display: block !important;
+  overflow: visible !important;
 }
 
 .bazaar-rewrite-shell .bazaar-auction-item .inventory-mosaic-image-frame,
@@ -268,5 +287,6 @@
   .auction-simple-buyout-pill {
     justify-self: start !important;
     max-width: calc(100% - 8px) !important;
+    white-space: normal !important;
   }
 }
