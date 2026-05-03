@@ -4,12 +4,14 @@ import './auto-refresh-on-update.js';
 import './select-and-screen-persistence.js';
 import './topbar-inventory-button.js';
 import './activity-notification-poller.js';
+import './inventory-escrow-controls.js';
 import App from './App.jsx';
 import AppErrorBoundary from './components/AppErrorBoundary.jsx';
 import './styles.css';
 import './folder-trade-player-hotfix.css';
 import './dashboard-faq-topbar-hotfix.css';
 import './auction-rewrite-v2.css';
+import './inventory-escrow-controls.css';
 import './trade-click-hotfix.js';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
