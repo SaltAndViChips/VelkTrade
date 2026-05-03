@@ -38,12 +38,70 @@ function formatNumber(value) {
   return number.toLocaleString();
 }
 
+function itemPrice(item) {
+  const amount = formatNumber(item.priceAmount ?? item.price_amount ?? item.price);
+  return amount ? `${amount} IC` : vtText(item.price, '');
+}
+
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
 function currentFilters({ search, sort, verified, min, max, minInterest }) {
   return { search, sort, verified, min, max, minInterest };
+}
+
+function filterSummary(filters = {}) {
+  const parts = [];
+  if (filters.search) parts.push(`Search: ${filters.search}`);
+  if (filters.sort && filters.sort !== 'newest') parts.push(SORTS.find(sort => sort.key === filters.sort)?.label || filters.sort);
+  if (filters.verified && filters.verified !== 'all') parts.push(VERIFIED_FILTERS.find(filter => filter.key === filters.verified)?.label || filters.verified);
+  if (filters.min) parts.push(`Min ${filters.min} IC`);
+  if (filters.max) parts.push(`Max ${filters.max} IC`);
+  if (filters.minInterest) parts.push(`${filters.minInterest}+ interested`);
+  return parts.length ? parts.join(' · ') : 'No extra filters';
+}
+
+function BazaarMosaicItem({ item, currentUser }) {
+  const [hovered, setHovered] = useState(false);
+  const title = vtText(item.title, 'Item');
+  const image = vtText(item.image);
+  const price = itemPrice(item);
+  const shownTitle = hovered && price ? price : title;
+  const verifiedInterestCount = Number(item.interestCount || 0);
+
+  return (
+    <article
+      className={`inventory-mosaic-item bazaar-mosaic-item item-card vt-unified-item-card ${hovered && price ? 'vt-hover-price-title' : ''}`}
+      data-item-id={item.id || ''}
+      data-id={item.id || ''}
+      data-title={title}
+      data-vt-original-title={title}
+      data-price={price}
+      data-vt-price={price}
+      data-vt-react-hover="true"
+      data-vt-hover-swap-bound="true"
+      data-owner-id={item.ownerId || item.owner_id || item.userId || item.userid || ''}
+      data-owner-username={item.ownerUsername || ''}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
+    >
+      <div className="inventory-mosaic-image-frame bazaar-mosaic-image-frame">
+        {image ? <img src={image} alt={title} draggable="false" /> : <div className="inventory-mosaic-placeholder">?</div>}
+      </div>
+      <span className="item-title inventory-mosaic-title">{shownTitle}</span>
+      <div className="bazaar-mosaic-meta" aria-label="Bazaar listing details">
+        {currentUser?.isAdmin && item.ownerUsername && (
+          <span className="bazaar-owner-line">Owner: <strong>{item.ownerUsername}</strong>{item.ownerVerified && <span className="verified-badge mini" title="Verified user">✓</span>}</span>
+        )}
+        {item.ownerVerified && !currentUser?.isAdmin && <span className="bazaar-owner-line"><span className="verified-badge mini" title="Verified user">✓</span> Verified seller</span>}
+        <span className="bazaar-interest-line">{verifiedInterestCount} verified interested</span>
+        {item.viewerInterested && <span className="status-pill bazaar-watch-pill">you are interested</span>}
+      </div>
+    </article>
+  );
 }
 
 export default function Bazaar({ currentUser }) {
@@ -58,6 +116,7 @@ export default function Bazaar({ currentUser }) {
   const [watchlist, setWatchlist] = useState([]);
   const [filterName, setFilterName] = useState('');
   const [watchKeyword, setWatchKeyword] = useState('');
+  const [toolsOpen, setToolsOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -96,14 +155,21 @@ export default function Bazaar({ currentUser }) {
     } catch {}
   }
 
-  useEffect(() => {
-    loadFilterTools();
-  }, []);
+  useEffect(() => { loadFilterTools(); }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(loadBazaar, 180);
     return () => window.clearTimeout(timer);
   }, [queryString]);
+
+  function resetFilters() {
+    setSearch('');
+    setSort('newest');
+    setVerified('all');
+    setMin('');
+    setMax('');
+    setMinInterest('');
+  }
 
   function applySavedFilter(filter) {
     const next = filter.filters || {};
@@ -172,7 +238,7 @@ export default function Bazaar({ currentUser }) {
   }
 
   return (
-    <section className="card bazaar-page">
+    <section className="card bazaar-page bazaar-rewrite-shell inventory-rewrite-shell">
       <div className="panel-title-row">
         <div>
           <h2>Bazaar</h2>
@@ -183,14 +249,17 @@ export default function Bazaar({ currentUser }) {
 
       {error && <p className="error">{error}</p>}
 
-      <section className="tidy-tab-panel bazaar-controls">
-        <div className="tidy-toolbar bazaar-toolbar">
-          <input value={search} onChange={event => setSearch(event.target.value)} placeholder={currentUser?.isAdmin ? 'Search by item, IC price, or owner...' : 'Search by item or IC price...'} />
-          <input value={min} onChange={event => setMin(event.target.value.replace(/[^\d.]/g, ''))} placeholder="Min IC" inputMode="decimal" />
-          <input value={max} onChange={event => setMax(event.target.value.replace(/[^\d.]/g, ''))} placeholder="Max IC" inputMode="decimal" />
-          <input value={minInterest} onChange={event => setMinInterest(event.target.value.replace(/[^\d]/g, ''))} placeholder="Min interest" inputMode="numeric" />
+      <section className="tidy-tab-panel bazaar-controls bazaar-clean-controls">
+        <div className="bazaar-control-header">
+          <strong>Search & Filters</strong>
+          <button type="button" className="ghost" onClick={resetFilters}>Reset</button>
         </div>
-
+        <div className="bazaar-filter-grid">
+          <label><span>Search</span><input value={search} onChange={event => setSearch(event.target.value)} placeholder={currentUser?.isAdmin ? 'Item, IC price, or owner...' : 'Item or IC price...'} /></label>
+          <label><span>Min IC</span><input value={min} onChange={event => setMin(event.target.value.replace(/[^\d.]/g, ''))} placeholder="0" inputMode="decimal" /></label>
+          <label><span>Max IC</span><input value={max} onChange={event => setMax(event.target.value.replace(/[^\d.]/g, ''))} placeholder="Any" inputMode="decimal" /></label>
+          <label><span>Min Interest</span><input value={minInterest} onChange={event => setMinInterest(event.target.value.replace(/[^\d]/g, ''))} placeholder="0" inputMode="numeric" /></label>
+        </div>
         <div className="bazaar-filter-row">
           <div className="segmented-control compact bazaar-sort-tabs">
             {SORTS.map(option => <button type="button" key={option.key} className={sort === option.key ? 'active' : ''} onClick={() => setSort(option.key)}>{option.label}</button>)}
@@ -201,47 +270,35 @@ export default function Bazaar({ currentUser }) {
         </div>
       </section>
 
-      <section className="tidy-tab-panel bazaar-tools-panel">
-        <div className="panel-title-row compact"><div><h3>Saved Filters & Watchlist</h3><p className="muted">Save current Bazaar filters or watch for future matching listings.</p></div></div>
-        <div className="tidy-toolbar bazaar-save-toolbar">
-          <input value={filterName} onChange={event => setFilterName(event.target.value)} placeholder="Filter name" />
-          <button type="button" onClick={saveCurrentFilter}>Save Current Filter</button>
-          <input value={watchKeyword} onChange={event => setWatchKeyword(event.target.value)} placeholder="Watch keyword" />
-          <button type="button" className="ghost" onClick={addWatch}>Add Watch</button>
-        </div>
-        <div className="bazaar-tool-columns">
-          <div>
-            <strong>Saved Filters</strong>
-            {savedFilters.length === 0 && <p className="muted">No saved filters yet.</p>}
-            {savedFilters.map(filter => <p className="bazaar-tool-pill" key={filter.id}><button type="button" onClick={() => applySavedFilter(filter)}>{filter.name}</button><button type="button" className="danger mini" onClick={() => deleteSavedFilter(filter.id)}>×</button></p>)}
+      <section className="tidy-tab-panel bazaar-tools-panel bazaar-clean-tools">
+        <div className="panel-title-row compact"><div><h3>Saved Filters & Watchlist</h3><p className="muted">Save this search, or watch for future listings.</p></div><button type="button" className="ghost" onClick={() => setToolsOpen(value => !value)}>{toolsOpen ? 'Hide' : 'Show'}</button></div>
+        {toolsOpen && <>
+          <div className="bazaar-save-grid">
+            <label><span>Filter name</span><input value={filterName} onChange={event => setFilterName(event.target.value)} placeholder="Ex: Cheap cosmics" /></label>
+            <button type="button" onClick={saveCurrentFilter}>Save Filter</button>
+            <label><span>Watch keyword</span><input value={watchKeyword} onChange={event => setWatchKeyword(event.target.value)} placeholder="Uses current price/verified filters" /></label>
+            <button type="button" className="ghost" onClick={addWatch}>Add Watch</button>
           </div>
-          <div>
-            <strong>Watchlist</strong>
-            {watchlist.length === 0 && <p className="muted">No watched keywords yet.</p>}
-            {watchlist.map(watch => <p className="bazaar-tool-pill" key={watch.id}><span>{watch.keyword}{watch.verifiedOnly ? ' · verified only' : ''}</span><button type="button" className="danger mini" onClick={() => deleteWatch(watch.id)}>×</button></p>)}
+          <div className="bazaar-tool-columns clean">
+            <div className="bazaar-tool-card">
+              <strong>Saved Filters</strong>
+              {savedFilters.length === 0 && <p className="muted">No saved filters yet.</p>}
+              {savedFilters.map(filter => <div className="bazaar-tool-entry" key={filter.id}><button type="button" className="bazaar-tool-main" onClick={() => applySavedFilter(filter)}><strong>{filter.name}</strong><span>{filterSummary(filter.filters)}</span></button><button type="button" className="danger mini" onClick={() => deleteSavedFilter(filter.id)}>×</button></div>)}
+            </div>
+            <div className="bazaar-tool-card">
+              <strong>Watchlist</strong>
+              {watchlist.length === 0 && <p className="muted">No watched keywords yet.</p>}
+              {watchlist.map(watch => <div className="bazaar-tool-entry" key={watch.id}><div className="bazaar-tool-main as-text"><strong>{watch.keyword}</strong><span>{watch.verifiedOnly ? 'Verified only' : 'All sellers'}{watch.minPrice ? ` · Min ${watch.minPrice} IC` : ''}{watch.maxPrice ? ` · Max ${watch.maxPrice} IC` : ''}</span></div><button type="button" className="danger mini" onClick={() => deleteWatch(watch.id)}>×</button></div>)}
+            </div>
           </div>
-        </div>
+        </>}
       </section>
 
       <p className="muted tidy-count">{loading ? 'Loading Bazaar...' : `Showing ${items.length} listing${items.length === 1 ? '' : 's'}.`}</p>
       {items.length === 0 && !loading && <p className="muted tidy-empty">No valid IC listings found for recently active players.</p>}
 
-      <div className="bazaar-grid">
-        {items.map(item => {
-          const verifiedInterestCount = Number(item.interestCount || 0);
-          return (
-            <article className="bazaar-item-card vt-unified-item-card" key={item.id} data-item-id={item.id || ''} data-id={item.id || ''} data-title={vtText(item.title, 'Item')} data-price={`${formatNumber(item.priceAmount)} IC`} data-owner-id={item.ownerId || item.owner_id || item.userId || item.userid || ''} data-owner-username={item.ownerUsername || ''}>
-              <div className="bazaar-image-wrap"><img src={vtText(item.image)} alt={vtText(item.title, 'Item')} /></div>
-              <div className="bazaar-item-body">
-                <h3>{vtText(item.title, 'Item')}</h3>
-                {currentUser?.isAdmin && item.ownerUsername && <p className="bazaar-admin-owner">Owner: <strong>{item.ownerUsername}</strong>{item.ownerVerified && <span className="verified-badge mini" title="Verified user">✓</span>}</p>}
-                <strong className="bazaar-price">{formatNumber(item.priceAmount)} IC</strong>
-                {item.ownerVerified && !currentUser?.isAdmin && <span className="bazaar-verified-owner"><span className="verified-badge mini" title="Verified user">✓</span> Verified seller</span>}
-                <div className="bazaar-interest-row"><span>{verifiedInterestCount} verified user{verifiedInterestCount === 1 ? '' : 's'} interested</span>{item.viewerInterested && <span className="status-pill">you are interested</span>}</div>
-              </div>
-            </article>
-          );
-        })}
+      <div className="inventory-mosaic-grid bazaar-grid bazaar-mosaic-grid item-grid inventory-grid vt-unified-mosaic-grid">
+        {items.map(item => <BazaarMosaicItem key={item.id || item.image || vtText(item.title)} item={item} currentUser={currentUser} />)}
       </div>
     </section>
   );
