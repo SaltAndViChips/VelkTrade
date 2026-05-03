@@ -7,7 +7,7 @@ const MAX_ALERTS = 30;
 function readAlerts() {
   try {
     const value = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '[]');
-    return Array.isArray(value) ? value.slice(0, MAX_ALERTS) : [];
+    return Array.isArray(value) ? value.slice(0, MAX_ALERTS).filter(alert => !isActiveTopBidAlert(alert)) : [];
   } catch {
     return [];
   }
@@ -15,7 +15,7 @@ function readAlerts() {
 
 function writeAlerts(alerts) {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(alerts.slice(0, MAX_ALERTS)));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(alerts.slice(0, MAX_ALERTS).filter(alert => !isActiveTopBidAlert(alert))));
   } catch {}
 }
 
@@ -34,6 +34,17 @@ function ic(value) {
   return parsed > 0 ? `${parsed.toLocaleString()} IC` : '0 IC';
 }
 
+function endedStatus(status) {
+  return ['completed', 'bought_out', 'ended', 'no_winner'].includes(text(status).toLowerCase());
+}
+
+function isActiveTopBidAlert(alert) {
+  const title = text(alert?.title).toLowerCase();
+  const key = text(alert?.key).toLowerCase();
+  const message = text(alert?.message).toLowerCase();
+  return (title.includes('won') || message.includes('you won') || message.includes('auction you won')) && key.includes(':active:');
+}
+
 async function apiGet(path) {
   const token = getToken();
   if (!token) throw new Error('No token');
@@ -49,8 +60,9 @@ async function apiGet(path) {
 }
 
 function isImportantAuction(auction) {
-  const status = text(auction.status).toLowerCase();
-  return auction.viewerIsSeller || auction.viewerIsWinner || ['completed', 'bought_out', 'ended', 'no_winner'].includes(status);
+  const ended = endedStatus(auction.status);
+  // Being the current top bidder on an active auction is not a win notification.
+  return ended || auction.viewerIsSeller;
 }
 
 function alertFromAuction(auction) {
@@ -58,12 +70,13 @@ function alertFromAuction(auction) {
   const title = text(auction.title, 'Auction item');
   const winner = text(auction.winnerUsername, 'No winner');
   const amount = ic(auction.currentBid ?? auction.winningBid ?? auction.startingBid);
-  const role = auction.viewerIsSeller ? 'Your auction' : auction.viewerIsWinner ? 'Auction you won' : 'Auction update';
+  const ended = endedStatus(auction.status);
+  const role = ended && auction.viewerIsWinner ? 'Auction won' : auction.viewerIsSeller ? 'Your auction' : 'Auction update';
   return {
     key: `auction:${auction.id}:${auction.status}:${auction.winnerId || ''}:${auction.currentBid || auction.winningBid || ''}`,
     type: 'auction',
     title: role,
-    message: `${title} was ${status}. Winner: ${winner}. Final/current bid: ${amount}.`,
+    message: ended ? `${title} was ${status}. Winner: ${winner}. Final bid: ${amount}.` : `${title} has auction activity. Current bid: ${amount}.`,
     createdAt: new Date().toISOString(),
     href: 'auction'
   };
@@ -72,9 +85,9 @@ function alertFromAuction(auction) {
 function mergeAlerts(nextAlerts) {
   const existing = readAlerts();
   const keys = new Set(existing.map(alert => alert.key));
-  const fresh = nextAlerts.filter(alert => alert.key && !keys.has(alert.key));
+  const fresh = nextAlerts.filter(alert => alert.key && !keys.has(alert.key) && !isActiveTopBidAlert(alert));
   const merged = [...fresh, ...existing].slice(0, MAX_ALERTS);
-  if (fresh.length) writeAlerts(merged);
+  if (fresh.length || existing.length !== readAlerts().length) writeAlerts(merged);
   return { merged, fresh };
 }
 
@@ -144,10 +157,14 @@ function renderAlerts() {
 function install() {
   if (typeof window === 'undefined' || window.__VELKTRADE_PERSISTENT_AUCTION_ALERTS__) return;
   window.__VELKTRADE_PERSISTENT_AUCTION_ALERTS__ = true;
+  // Purge old active "won" alerts created by the previous logic.
+  writeAlerts(readAlerts());
   window.addEventListener('velktrade:activity-notification', event => {
     const activity = event.detail || {};
     if (activity.kind !== 'auction') return;
-    mergeAlerts([{ key: activity.key, type: 'auction', title: activity.title || 'Auction activity', message: activity.message || 'Auction updated.', createdAt: new Date().toISOString() }]);
+    const alert = { key: activity.key, type: 'auction', title: activity.title || 'Auction activity', message: activity.message || 'Auction updated.', createdAt: new Date().toISOString() };
+    if (isActiveTopBidAlert(alert)) return;
+    mergeAlerts([alert]);
     renderAlerts();
   });
   window.addEventListener('velktrade:auction-changed', () => window.setTimeout(pollAuctions, 900));
