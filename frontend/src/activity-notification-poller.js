@@ -48,6 +48,10 @@ function keyOf(prefix, value, fallback = '') {
   return `${prefix}:${txt(value?.id ?? value?.offerId ?? value?.tradeId ?? value?.auctionId ?? value?.roomId ?? value?.code ?? fallback)}`;
 }
 
+function isEndedAuctionStatus(status) {
+  return ['completed', 'bought_out', 'no_winner', 'ended'].includes(txt(status).toLowerCase());
+}
+
 async function request(path) {
   const token = getToken();
   if (!token) throw new Error('Not logged in');
@@ -141,19 +145,27 @@ function normalizeInvites(data) {
 
 function normalizeAuctions(data) {
   return arrays(data, ['auctions']).filter(auction => {
-    const status = txt(auction.status).toLowerCase();
-    return ['completed', 'bought_out', 'no_winner', 'ended'].includes(status) || auction.viewerIsWinner || auction.viewerIsSeller;
+    const ended = isEndedAuctionStatus(auction.status);
+    // Do not treat being the current top bidder on an active auction as "won".
+    // Only ended/completed auctions create winner alerts. Sellers still get active
+    // auction activity when bids change because the key includes the current bid.
+    return ended || auction.viewerIsSeller;
   }).map(auction => {
     const title = txt(auction.title, 'an auction item');
     const status = txt(auction.status, 'updated').replace(/_/g, ' ');
     const winner = txt(auction.winnerUsername || auction.winner_username, 'No winner');
     const amount = money(auction.currentBid ?? auction.current_bid ?? auction.winningBid ?? auction.winning_bid);
+    const ended = isEndedAuctionStatus(auction.status);
+    const notificationTitle = ended && auction.viewerIsWinner ? 'Auction won' : auction.viewerIsSeller ? 'Your auction activity' : 'Auction activity';
+    const message = ended
+      ? `${title} was ${status}. Winner: ${winner}. Final bid: ${amount}.`
+      : `${title} has auction activity. Current bid: ${amount}.`;
     return {
       key: `auction:${auction.id}:${auction.status}:${auction.winnerId || auction.winner_id || ''}:${auction.currentBid || auction.current_bid || ''}`,
       kind: 'auction',
-      title: 'Auction activity',
-      message: `${title} was ${status}. Winner: ${winner}. Final bid: ${amount}.`,
-      variant: 'success',
+      title: notificationTitle,
+      message,
+      variant: ended ? 'success' : 'info',
       verifiedOnly: false
     };
   });
