@@ -32,7 +32,8 @@ const routeInstallers = [
   ['inventory-bulk-cleanup-routes', optionalInstaller('./inventory-bulk-cleanup-routes', 'inventory-bulk-cleanup-routes')],
   ['developer-maintenance-routes', optionalInstaller('./developer-maintenance-routes', 'developer-maintenance-routes')],
   ['notification-preference-routes', optionalInstaller('./notification-preference-routes', 'notification-preference-routes')],
-  ['notification-feed-routes', optionalInstaller('./notification-feed-routes', 'notification-feed-routes')]
+  ['notification-feed-routes', optionalInstaller('./notification-feed-routes', 'notification-feed-routes')],
+  ['admin-verify-compat-routes', optionalInstaller('./admin-verify-compat-routes', 'admin-verify-compat-routes')]
 ].filter(([, installer]) => typeof installer === 'function');
 
 const DELETE_PATHS = new Set([
