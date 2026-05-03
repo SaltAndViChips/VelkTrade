@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const RANGE_OPTIONS = [
   { key: 'weekly', label: 'Weekly' },
@@ -6,6 +6,8 @@ const RANGE_OPTIONS = [
   { key: 'ytd', label: 'YTD' },
   { key: 'yearly', label: 'Yearly' }
 ];
+
+const DASHBOARD_FAQ_KEY = 'velktrade:dashboard-faq-seen:v1';
 
 function shortDate(value, range) {
   const date = new Date(value);
@@ -350,6 +352,67 @@ function TradesPieChart({ trades }) {
   );
 }
 
+function DashboardFaqModal({ onClose }) {
+  return (
+    <div className="dashboard-faq-backdrop" onMouseDown={onClose}>
+      <section className="dashboard-faq-modal" onMouseDown={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="dashboard-faq-title">
+        <button type="button" className="dashboard-faq-close" onClick={onClose}>×</button>
+        <div className="dashboard-faq-header">
+          <span className="dashboard-faq-icon">?</span>
+          <div>
+            <h2 id="dashboard-faq-title">VelkTrade Quick FAQ</h2>
+            <p className="muted">A quick rundown of the main menu and what each option does.</p>
+          </div>
+        </div>
+
+        <div className="dashboard-faq-grid">
+          <article>
+            <h3>My Inventory</h3>
+            <p>Add your items, organize folders, set Bazaar prices, lock items, use bulk tools, and manage notes/cleanup options.</p>
+          </article>
+          <article>
+            <h3>Trades</h3>
+            <p>View incoming/outgoing trade offers, buy offers, counters, accepted trades, completed trades, declined trades, and trade history.</p>
+          </article>
+          <article>
+            <h3>Bazaar</h3>
+            <p>Browse listed items, save filters, use the watchlist, mark interest, and access verified-user auctions with bids and buyouts.</p>
+          </article>
+          <article>
+            <h3>Create Room</h3>
+            <p>Starts a live trade room you can share with another player for real-time trading.</p>
+          </article>
+          <article>
+            <h3>Join Room</h3>
+            <p>Enter a room code from another player to join their live trade room.</p>
+          </article>
+          <article>
+            <h3>View Player Inventory</h3>
+            <p>Open another player's public profile and inventory by username.</p>
+          </article>
+          <article>
+            <h3>Make Offline Trade Offer</h3>
+            <p>Send a trade offer to another player without needing both players online at the same time.</p>
+          </article>
+          <article>
+            <h3>Admin Panel</h3>
+            <p>Visible only to admins/developers. Used for moderation, user controls, audit logs, verified status, and maintenance actions.</p>
+          </article>
+        </div>
+
+        <div className="dashboard-faq-verify-box">
+          <strong>Getting verified</strong>
+          <p>To get verified, copy your profile link and message Salt on Discord with that link. Verification unlocks verified-only features like auctions and improves trust on the Bazaar.</p>
+        </div>
+
+        <div className="dashboard-faq-actions">
+          <button type="button" onClick={onClose}>Got it</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export default function Dashboard({
   user,
   isAdmin,
@@ -361,6 +424,17 @@ export default function Dashboard({
 }) {
   const [roomId, setRoomId] = useState('');
   const [profileUsername, setProfileUsername] = useState('');
+  const [showFaq, setShowFaq] = useState(false);
+
+  useEffect(() => {
+    const hasSeenFaq = window.localStorage.getItem(DASHBOARD_FAQ_KEY) === 'true';
+    if (!hasSeenFaq) setShowFaq(true);
+  }, []);
+
+  function closeFaq() {
+    window.localStorage.setItem(DASHBOARD_FAQ_KEY, 'true');
+    setShowFaq(false);
+  }
 
   function submitJoinRoom(event) {
     event.preventDefault();
@@ -384,6 +458,7 @@ export default function Dashboard({
 
   return (
     <section className="dashboard-layout">
+      {showFaq && <DashboardFaqModal onClose={closeFaq} />}
       <div className="charts-panel">
         <StatLineChart inventory={inventory} trades={trades} user={user} />
         <TradesPieChart trades={trades} />
@@ -392,7 +467,10 @@ export default function Dashboard({
       <div className="dashboard-menu">
         <div className="dashboard-welcome">
           <h2>Welcome, {user.username}</h2>
-          <p className="muted">Manage inventory, trades, rooms, and player profiles.</p>
+          <p className="muted dashboard-subtitle-with-help">
+            <span>Manage inventory, trades, rooms, and player profiles.</span>
+            <button type="button" className="dashboard-faq-help-button" onClick={() => setShowFaq(true)} aria-label="Open VelkTrade FAQ">?</button>
+          </p>
         </div>
 
         <button className="dashboard-tile" onClick={() => onNavigate('inventory')}>
