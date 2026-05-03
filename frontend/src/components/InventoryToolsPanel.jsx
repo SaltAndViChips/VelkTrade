@@ -36,8 +36,14 @@ function formatPrice(value) {
   return Number.isFinite(num) && num > 0 ? `${num.toLocaleString()} IC` : raw;
 }
 
-export default function InventoryToolsPanel({ items = [], selectedIds = [], setSelectedIds, onRefresh }) {
-  const [open, setOpen] = useState(false);
+export default function InventoryToolsPanel({ items = [], selectedIds = [], setSelectedIds, onRefresh, open: controlledOpen, onOpenChange }) {
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = typeof controlledOpen === 'boolean' ? controlledOpen : localOpen;
+  function setOpen(next) {
+    const value = typeof next === 'function' ? next(open) : next;
+    if (typeof onOpenChange === 'function') onOpenChange(Boolean(value));
+    setLocalOpen(Boolean(value));
+  }
   const [folders, setFolders] = useState([]);
   const [folderName, setFolderName] = useState('');
   const [folderIcon, setFolderIcon] = useState('📁');
@@ -86,6 +92,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
   }
 
   useEffect(() => { if (open) loadFolders(); }, [open]);
+  useEffect(() => { if (!open && selectedIds.length) setSelectedIds([]); }, [open]);
 
   async function createFolder() {
     const name = folderName.trim();
@@ -169,7 +176,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
   }
 
   return (
-    <section className="inventory-tools-panel tidy-tab-panel">
+    <section className={`inventory-tools-panel tidy-tab-panel ${open ? 'bulk-tools-open' : 'bulk-tools-closed'}`}>
       <div className="panel-title-row compact">
         <div>
           <h3>Inventory Tools</h3>
