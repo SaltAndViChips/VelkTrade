@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { DndContext, DragOverlay, useDraggable, useDroppable } from '@dnd-kit/core';
 import { api } from '../api';
-import Inventory from './Inventory.jsx';
 import { velkToast } from '../velktrade-feature-foundation.js';
 
 function normalizeIcInput(value) {
@@ -19,6 +18,7 @@ function normalizeIcInput(value) {
 }
 
 function itemTitle(item) { return String(item?.title || item?.name || 'item'); }
+function itemPrice(item) { return String(item?.price || item?.itemPrice || '').trim(); }
 
 function IcEditor({ label, value, onSave, onClear }) {
   const [open, setOpen] = useState(false);
@@ -39,18 +39,57 @@ function IcEditor({ label, value, onSave, onClear }) {
 
 function DropZone({ id, title, items, icAmount, onDoubleClickItem, onAddIc, onRemoveIc }) {
   const { setNodeRef } = useDroppable({ id });
-  return <section className="card"><div className="panel-title-row"><h2>{title}</h2></div><IcEditor label="IC" value={icAmount} onSave={onAddIc} onClear={onRemoveIc} /><div ref={setNodeRef} className="item-grid drop-zone trade-zone">{!icAmount && items.length === 0 && <p className="muted">No items selected.</p>}{icAmount && <div className="item-card ic-offer-card"><div className="ic-token">IC</div><span>{icAmount}</span></div>}{items.map(item => <TradeItem key={item.id} item={item} dragPrefix="selected" onDoubleClick={() => onDoubleClickItem(item.id, item)} />)}</div></section>;
+  return <section className="card trade-drop-section" data-trade-context="true"><div className="panel-title-row"><h2>{title}</h2></div><IcEditor label="IC" value={icAmount} onSave={onAddIc} onClear={onRemoveIc} /><div ref={setNodeRef} className="item-grid drop-zone trade-zone trade-drop-zone" data-trade-context="true">{!icAmount && items.length === 0 && <p className="muted">No items selected.</p>}{icAmount && <div className="item-card ic-offer-card" data-no-item-popup="true"><div className="ic-token">IC</div><span>{icAmount}</span></div>}{items.map(item => <TradeItem key={item.id} item={item} dragPrefix="selected" onDoubleClick={() => onDoubleClickItem(item.id, item)} />)}</div></section>;
 }
 
 function TradeItem({ item, dragPrefix, onDoubleClick }) {
   const dragId = `${dragPrefix}-${item.id}`;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: dragId });
-  return <div ref={setNodeRef} className={`item-card ${isDragging ? 'is-dragging' : ''}`} {...listeners} {...attributes} onDoubleClick={onDoubleClick}><img src={item.image} alt={item.title} draggable="false" /><span>{item.title}</span>{item.price && <strong className="item-price">{item.price}</strong>}</div>;
+  const title = itemTitle(item);
+  const price = itemPrice(item);
+  return (
+    <div
+      ref={setNodeRef}
+      className={`item-card trade-item vt-trade-draggable-item ${isDragging ? 'is-dragging' : ''}`}
+      data-trade-context="true"
+      data-no-item-popup="true"
+      data-item-id={item.id || ''}
+      data-id={item.id || ''}
+      data-title={title}
+      data-price={price}
+      data-vt-price={price}
+      {...listeners}
+      {...attributes}
+      onClick={event => {
+        // In trade surfaces, single click should not open the regular item popup.
+        // Drag and double-click remain available.
+        event.stopPropagation();
+      }}
+      onDoubleClick={event => {
+        event.preventDefault();
+        event.stopPropagation();
+        onDoubleClick?.(event);
+      }}
+    >
+      <img src={item.image} alt={title} draggable="false" />
+      <span className="item-title">{title}</span>
+      {price && <strong className="item-price">{price}</strong>}
+    </div>
+  );
 }
 
-function InventoryDrop({ id, children }) {
+function InventoryDrop({ id, title, items, dragPrefix, emptyText, onDoubleClickItem }) {
   const { setNodeRef } = useDroppable({ id });
-  return <div ref={setNodeRef} className="item-grid drop-zone trade-zone">{children}{!children?.length && <p className="muted">No items.</p>}</div>;
+  return (
+    <section className="card trade-inventory-section" data-trade-context="true">
+      <div className="panel-title-row"><h2>{title}</h2></div>
+      <p className="muted trade-help-text">Drag items into the offer/request boxes, or double-click to add/remove.</p>
+      <div ref={setNodeRef} className="item-grid drop-zone trade-zone trade-inventory-drop" data-trade-context="true">
+        {items.length === 0 && <p className="muted">{emptyText || 'No items.'}</p>}
+        {items.map(item => <TradeItem key={item.id} item={item} dragPrefix={dragPrefix} onDoubleClick={() => onDoubleClickItem(item.id, item)} />)}
+      </div>
+    </section>
+  );
 }
 
 function extractIcFromTrade(trade, userId) {
@@ -154,5 +193,5 @@ export default function TradeOfferPanel({ currentUser, inventory, counterTrade, 
     } catch (err) { setError(err.message); }
   }
 
-  return <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}><section className="card"><div className="panel-title-row"><div><h2>{counterTrade ? 'Counter Offer' : 'Offline Trade Offer'}</h2><p className="muted">Drag items into the trade, or click an item to add it. Add IC separately.</p></div><button className="ghost" onClick={onClose}>Close</button></div>{error && <p className="error">{error}</p>}<div className="inline-controls"><input value={targetUsername} onChange={e => setTargetUsername(e.target.value)} placeholder="Other player's username" disabled={Boolean(counterTrade)} /><button type="button" onClick={() => loadTargetInventory()} disabled={Boolean(counterTrade)}>Load Player</button></div><textarea className="trade-message-box" value={message} onChange={e => setMessage(e.target.value)} placeholder="Optional message..." maxLength={500} /><div className="grid two"><section className="card"><Inventory title="Your Inventory" items={visibleOwnItems} droppableId="own-inventory-drop" readOnly folderUsername={currentUser?.username || ''} onClickItem={addOfferItem} /></section><section className="card"><Inventory title={targetUsername ? `${targetUsername}'s Inventory` : 'Other Player Inventory'} items={visibleTargetItems} droppableId="their-inventory-drop" readOnly folderUsername={targetUsername} onClickItem={addRequestItem} /></section></div><div className="grid two"><DropZone id="offer-drop" title="Your Offer" items={offerItems} icAmount={offerIc} onDoubleClickItem={removeOfferItem} onAddIc={setOfferIc} onRemoveIc={() => setOfferIc('')} /><DropZone id="request-drop" title="Requested Items" items={requestedItems} icAmount={requestIc} onDoubleClickItem={removeRequestItem} onAddIc={setRequestIc} onRemoveIc={() => setRequestIc('')} /></div><div className="inline-controls"><button onClick={submitOffer}>{counterTrade ? 'Send Counter Offer' : 'Send Trade Offer'}</button><button className="ghost" onClick={onClose}>Cancel</button></div></section><DragOverlay dropAnimation={null}>{activeDragItem ? <div className="item-card drag-overlay"><img src={activeDragItem.image} alt={activeDragItem.title} /><span>{activeDragItem.title}</span>{activeDragItem.price && <strong className="item-price">{activeDragItem.price}</strong>}</div> : null}</DragOverlay></DndContext>;
+  return <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}><section className="card trade-offer-panel" data-trade-context="true"><div className="panel-title-row"><div><h2>{counterTrade ? 'Counter Offer' : 'Offline Trade Offer'}</h2><p className="muted">Drag items into the trade, or double-click an item to add/remove it. Add IC separately.</p></div><button className="ghost" onClick={onClose}>Close</button></div>{error && <p className="error">{error}</p>}<div className="inline-controls"><input value={targetUsername} onChange={e => setTargetUsername(e.target.value)} placeholder="Other player's username" disabled={Boolean(counterTrade)} /><button type="button" onClick={() => loadTargetInventory()} disabled={Boolean(counterTrade)}>Load Player</button></div><textarea className="trade-message-box" value={message} onChange={e => setMessage(e.target.value)} placeholder="Optional message..." maxLength={500} /><div className="grid two"><InventoryDrop id="own-inventory-drop" title="Your Inventory" items={visibleOwnItems} dragPrefix="own" emptyText="No available items." onDoubleClickItem={addOfferItem} /><InventoryDrop id="their-inventory-drop" title={targetUsername ? `${targetUsername}'s Inventory` : 'Other Player Inventory'} items={visibleTargetItems} dragPrefix="their" emptyText="Load a player to see items." onDoubleClickItem={addRequestItem} /></div><div className="grid two"><DropZone id="offer-drop" title="Your Offer" items={offerItems} icAmount={offerIc} onDoubleClickItem={removeOfferItem} onAddIc={setOfferIc} onRemoveIc={() => setOfferIc('')} /><DropZone id="request-drop" title="Requested Items" items={requestedItems} icAmount={requestIc} onDoubleClickItem={removeRequestItem} onAddIc={setRequestIc} onRemoveIc={() => setRequestIc('')} /></div><div className="inline-controls"><button onClick={submitOffer}>{counterTrade ? 'Send Counter Offer' : 'Send Trade Offer'}</button><button className="ghost" onClick={onClose}>Cancel</button></div></section><DragOverlay dropAnimation={null}>{activeDragItem ? <div className="item-card drag-overlay" data-no-item-popup="true"><img src={activeDragItem.image} alt={activeDragItem.title} /><span>{activeDragItem.title}</span>{activeDragItem.price && <strong className="item-price">{activeDragItem.price}</strong>}</div> : null}</DragOverlay></DndContext>;
 }
