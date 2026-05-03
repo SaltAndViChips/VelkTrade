@@ -14,6 +14,10 @@ function itemTitle(card) {
 function closestTradeInventoryPanel(card) {
   let node = card;
   while (node && node !== document.body) {
+    // The rewritten offline trade panel handles its own click/double-click/drag logic.
+    // Do not synthesize clicks there or it can invert add/remove behavior.
+    if (node.classList?.contains('trade-offer-panel')) return null;
+
     const label = text(node.querySelector?.('h2,h3,strong')?.textContent).toLowerCase();
     const className = text(node.className).toLowerCase();
     const isTradeSurface = className.includes('trade') || className.includes('offer') || /offline trade|counter offer|your inventory|other player inventory/.test(label);
@@ -34,6 +38,7 @@ function installTradeClickHotfix() {
     if (event.__velktradeSyntheticTradeClick) return;
     const card = event.target?.closest?.('.vt-unified-item-card,.item-card');
     if (!card || card.closest('.vt-item-popout,.vt-item-popout-backdrop')) return;
+    if (card.closest('.trade-offer-panel')) return;
     if (card.classList.contains('inventory-folder-card') || card.classList.contains('vt-folder-card')) return;
     const panel = closestTradeInventoryPanel(card);
     if (!panel) return;
