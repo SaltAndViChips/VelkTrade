@@ -1,5 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Notifications from './Notifications';
+
+const LOCAL_NOTIFICATIONS_KEY = 'velktrade:sidebar-activity-notifications:v1';
+const MAX_LOCAL_NOTIFICATIONS = 80;
 
 function getProfileUrl(username) {
   const base = import.meta.env.BASE_URL || '/';
@@ -20,6 +23,47 @@ function statusLabel(player) {
   if (player?.status === 'bazaar') return 'Browsing the Bazaar';
   if (player?.status === 'away') return 'Away';
   return 'Online';
+}
+
+function readLocalNotifications() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(LOCAL_NOTIFICATIONS_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed.slice(0, MAX_LOCAL_NOTIFICATIONS) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalNotifications(notifications) {
+  try {
+    window.localStorage.setItem(LOCAL_NOTIFICATIONS_KEY, JSON.stringify(notifications.slice(0, MAX_LOCAL_NOTIFICATIONS)));
+  } catch {}
+}
+
+function activityToNotification(activity) {
+  const type = activity?.kind === 'auction' ? 'auction_activity'
+    : activity?.kind === 'bazaar' ? 'verified_bazaar_activity'
+    : activity?.kind === 'invite' ? 'room_invite'
+    : activity?.kind === 'trade' ? 'offline_trade'
+    : activity?.type || 'activity';
+
+  return {
+    id: activity?.key || `activity-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    type,
+    title: activity?.title || 'VelkTrade activity',
+    message: activity?.message || activity?.body || 'New activity.',
+    createdAt: activity?.createdAt || new Date().toISOString(),
+    read: false,
+    seen: false,
+    payload: activity?.payload || {},
+    localOnly: true
+  };
+}
+
+function mergeLocalNotification(current, notification) {
+  if (!notification?.id) return current;
+  if (current.some(item => String(item.id) === String(notification.id))) return current;
+  return [notification, ...current].slice(0, MAX_LOCAL_NOTIFICATIONS);
 }
 
 export default function PresenceNotificationsDropdown({
@@ -43,6 +87,42 @@ export default function PresenceNotificationsDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState('online');
+  const [localNotifications, setLocalNotifications] = useState(() => readLocalNotifications());
+
+  useEffect(() => {
+    function handleActivity(event) {
+      const next = activityToNotification(event.detail || {});
+      setLocalNotifications(current => {
+        const merged = mergeLocalNotification(current, next);
+        writeLocalNotifications(merged);
+        return merged;
+      });
+    }
+
+    function handleStorage(event) {
+      if (event.key === LOCAL_NOTIFICATIONS_KEY) setLocalNotifications(readLocalNotifications());
+    }
+
+    window.addEventListener('velktrade:activity-notification', handleActivity);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('velktrade:activity-notification', handleActivity);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  const combinedNotifications = useMemo(() => {
+    const map = new Map();
+    for (const notification of [...localNotifications, ...(Array.isArray(notifications) ? notifications : [])]) {
+      const id = notification?.id || notification?.notificationId || `${notification?.type || 'notification'}-${notification?.createdAt || ''}`;
+      if (!id || map.has(String(id))) continue;
+      map.set(String(id), notification);
+    }
+    return Array.from(map.values());
+  }, [localNotifications, notifications]);
+
+  const localUnreadCount = useMemo(() => localNotifications.filter(notification => !notification.read && !notification.seen).length, [localNotifications]);
+  const totalUnseenCount = Number(unseenCount || 0) + localUnreadCount;
 
   const sortedUsers = useMemo(() => {
     return (Array.isArray(onlineUsers) ? onlineUsers : [])
@@ -65,11 +145,38 @@ export default function PresenceNotificationsDropdown({
     setOpen(false);
   }
 
+  function markRead(id) {
+    const wasLocal = localNotifications.some(notification => String(notification.id) === String(id));
+    if (wasLocal) {
+      setLocalNotifications(current => {
+        const next = current.map(notification => String(notification.id) === String(id) ? { ...notification, read: true, seen: true } : notification);
+        writeLocalNotifications(next);
+        return next;
+      });
+      return;
+    }
+    onMarkRead(id);
+  }
+
+  function markAllRead() {
+    setLocalNotifications(current => {
+      const next = current.map(notification => ({ ...notification, read: true, seen: true }));
+      writeLocalNotifications(next);
+      return next;
+    });
+    onMarkAllRead();
+  }
+
+  function refreshNotifications() {
+    setLocalNotifications(readLocalNotifications());
+    onRefreshNotifications();
+  }
+
   return (
     <div className="presence-dropdown">
       <button type="button" className="presence-toggle" onClick={() => setOpen(value => !value)} title="Online players and notifications" aria-label="Online players and notifications">
         ≡
-        {Number(unseenCount) > 0 && <span>{unseenCount}</span>}
+        {Number(totalUnseenCount) > 0 && <span>{totalUnseenCount}</span>}
       </button>
 
       {open && (
@@ -77,7 +184,7 @@ export default function PresenceNotificationsDropdown({
           <div className="presence-tabs">
             <button type="button" className={tab === 'online' ? 'active' : ''} onClick={() => setTab('online')}>Online</button>
             <button type="button" className={tab === 'notifications' ? 'active' : ''} onClick={() => setTab('notifications')}>
-              Notifications {Number(unseenCount) > 0 && <span className="mini-count">{unseenCount}</span>}
+              Notifications {Number(totalUnseenCount) > 0 && <span className="mini-count">{totalUnseenCount}</span>}
             </button>
           </div>
 
@@ -129,12 +236,12 @@ export default function PresenceNotificationsDropdown({
             <div className="presence-notifications-tab">
               <Notifications
                 compact
-                notifications={Array.isArray(notifications) ? notifications : []}
+                notifications={combinedNotifications}
                 preferences={preferences || {}}
                 tradeStatuses={tradeStatuses || {}}
-                onRefresh={onRefreshNotifications}
-                onMarkRead={onMarkRead}
-                onMarkAllRead={onMarkAllRead}
+                onRefresh={refreshNotifications}
+                onMarkRead={markRead}
+                onMarkAllRead={markAllRead}
                 onSavePreferences={onSavePreferences}
                 onCheckTrade={onCheckTrade}
                 onAcceptRoomInvite={onAcceptRoomInvite}
