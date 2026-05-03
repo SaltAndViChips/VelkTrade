@@ -9,18 +9,20 @@ export const FOLDER_ICON_PRESETS = [
 ];
 
 const FOLDER_COLOR_PRESETS = [
-  { label: 'Gold', value: '#ffdc93' },
-  { label: 'Velk Green', value: '#00fa9a' },
-  { label: 'Arcane Purple', value: '#c200fa' },
-  { label: 'Royal Violet', value: '#8e71ff' },
-  { label: 'Crystal Blue', value: '#5ddcff' },
-  { label: 'Crimson', value: '#ff5d77' },
-  { label: 'Sunfire', value: '#ffd166' },
-  { label: 'Frost', value: '#f4f4f5' },
+  { label: 'Salt Green', value: '#00fa9a' },
+  { label: 'Red', value: '#ff3030' },
+  { label: 'Orange', value: '#ff8c1a' },
+  { label: 'Yellow', value: '#ffe600' },
+  { label: 'Green', value: '#39ff14' },
+  { label: 'Blue', value: '#1e90ff' },
+  { label: 'Purple', value: '#b026ff' },
+  { label: 'Pink', value: '#ff4fd8' },
+  { label: 'Cyan', value: '#00e5ff' },
+  { label: 'White', value: '#f4f4f5' },
   { label: 'Custom hex…', value: 'custom' }
 ];
 
-function cleanHex(value, fallback = '#ffdc93') {
+function cleanHex(value, fallback = '#00fa9a') {
   const clean = String(value || '').trim();
   if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(clean)) return clean;
   return fallback;
@@ -39,9 +41,9 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
   const [folders, setFolders] = useState([]);
   const [folderName, setFolderName] = useState('');
   const [folderIcon, setFolderIcon] = useState('📁');
-  const [folderColor, setFolderColor] = useState('#ffdc93');
-  const [folderColorMode, setFolderColorMode] = useState('#ffdc93');
-  const [customFolderColor, setCustomFolderColor] = useState('#ffdc93');
+  const [folderColor, setFolderColor] = useState('#00fa9a');
+  const [folderColorMode, setFolderColorMode] = useState('#00fa9a');
+  const [customFolderColor, setCustomFolderColor] = useState('#00fa9a');
   const [folderId, setFolderId] = useState('');
   const [bulkPrice, setBulkPrice] = useState('');
   const [cleanup, setCleanup] = useState(null);
@@ -61,7 +63,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
   }
 
   function syncColorControls(color) {
-    const clean = cleanHex(color);
+    const clean = cleanHex(color || '#00fa9a');
     const preset = FOLDER_COLOR_PRESETS.find(entry => entry.value.toLowerCase?.() === clean.toLowerCase());
     setFolderColor(clean);
     setCustomFolderColor(clean);
@@ -76,7 +78,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
       if (!folderId && next[0]?.id) {
         setFolderId(String(next[0].id));
         setFolderIcon(next[0].icon || '📁');
-        syncColorControls(next[0].color || '#ffdc93');
+        syncColorControls(next[0].color || '#00fa9a');
       }
     } catch (error) {
       velkToast(error.message || 'Could not load folders.', 'error');
@@ -197,7 +199,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
               <input value={folderName} onChange={event => setFolderName(event.target.value)} placeholder="New folder name" />
               <button type="button" disabled={busy || !folderName.trim()} onClick={createFolder}>Create</button>
             </div>
-            <div className="inline-controls"><select value={folderId} onChange={event => { setFolderId(event.target.value); const next = folders.find(folder => String(folder.id) === event.target.value); if (next?.icon) setFolderIcon(next.icon); if (next?.color) syncColorControls(next.color); }}><option value="">Choose folder</option>{folders.map(folder => <option key={folder.id} value={folder.id}>{folder.icon || '📁'} {folder.name} ({folder.itemCount || 0})</option>)}</select><button type="button" disabled={busy || !folderId || !selectedIds.length} onClick={assignFolder}>Add Selected</button></div>
+            <div className="inline-controls"><select value={folderId} onChange={event => { setFolderId(event.target.value); const next = folders.find(folder => String(folder.id) === event.target.value); if (next?.icon) setFolderIcon(next.icon); syncColorControls(next?.color || '#00fa9a'); }}><option value="">Choose folder</option>{folders.map(folder => <option key={folder.id} value={folder.id}>{folder.icon || '📁'} {folder.name} ({folder.itemCount || 0})</option>)}</select><button type="button" disabled={busy || !folderId || !selectedIds.length} onClick={assignFolder}>Add Selected</button></div>
             <div className="inline-controls"><button type="button" className="ghost" disabled={busy || !folderId} onClick={updateSelectedFolderStyle}>Apply Icon/Color To Folder</button></div>
           </div>
           <div className="inventory-tool-card">
