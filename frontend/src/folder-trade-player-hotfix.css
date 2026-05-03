@@ -1,25 +1,42 @@
 /* VelkTrade folder/trade/player-menu hotfixes */
 
 /* Keep the online player panel pinned to the right side of the viewport. */
-.unified-player-menu {
+body .unified-player-menu,
+html body .unified-player-menu,
+#root .unified-player-menu,
+#root > * .unified-player-menu {
   position: fixed !important;
   top: 18px !important;
   right: 18px !important;
   left: auto !important;
   bottom: auto !important;
-  z-index: 90000 !important;
+  z-index: 2147483000 !important;
+  transform: none !important;
+  margin: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+  pointer-events: auto !important;
 }
 
-.unified-player-trigger {
+body .unified-player-trigger,
+#root .unified-player-trigger {
   position: relative !important;
   z-index: 2 !important;
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  min-height: 42px !important;
+  display: grid !important;
+  place-items: center !important;
 }
 
-.unified-player-panel {
+body .unified-player-panel,
+#root .unified-player-panel {
   position: absolute !important;
   top: calc(100% + 10px) !important;
   right: 0 !important;
   left: auto !important;
+  bottom: auto !important;
   width: min(440px, calc(100vw - 24px)) !important;
   max-height: min(720px, calc(100vh - 84px)) !important;
   overflow: auto !important;
@@ -28,55 +45,65 @@
 }
 
 @media (max-width: 640px) {
-  .unified-player-menu {
+  body .unified-player-menu,
+  #root .unified-player-menu {
     top: 10px !important;
     right: 10px !important;
+    left: auto !important;
   }
-  .unified-player-panel {
+  body .unified-player-panel,
+  #root .unified-player-panel {
     width: calc(100vw - 20px) !important;
   }
 }
 
-/* Opened folders should not stack their contents vertically. */
-.inventory-folder-items,
-.inventory-folder-items > .inventory-folder-item-grid,
-.inventory-folder-items .vt-unified-mosaic-grid {
-  width: 100% !important;
-  max-width: none !important;
-  min-width: 0 !important;
-}
-
+/* Opened folders should render as a full-width row containing the normal item-card mosaic. */
 .inventory-folder-items {
   grid-column: 1 / -1 !important;
   display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  clear: both !important;
 }
 
 .inventory-folder-item-grid,
 .inventory-folder-items > .inventory-folder-item-grid,
-.inventory-folder-items .vt-unified-mosaic-grid {
+.inventory-folder-items .vt-unified-mosaic-grid,
+.inventory-folder-items.item-grid,
+.inventory-folder-items.inventory-grid {
   display: grid !important;
   grid-template-columns: repeat(auto-fill, 300px) !important;
   justify-content: start !important;
   align-items: start !important;
   gap: 14px !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin: 0 !important;
 }
 
 .inventory-folder-item-grid > .vt-unified-item-card,
-.inventory-folder-items .vt-unified-item-card {
+.inventory-folder-items .vt-unified-item-card,
+.inventory-folder-items .item-card {
   width: 300px !important;
   max-width: 300px !important;
   min-width: 300px !important;
   flex: 0 0 300px !important;
+  grid-column: auto !important;
 }
 
 @media (min-width: 1600px) {
   .inventory-folder-item-grid,
   .inventory-folder-items > .inventory-folder-item-grid,
-  .inventory-folder-items .vt-unified-mosaic-grid {
+  .inventory-folder-items .vt-unified-mosaic-grid,
+  .inventory-folder-items.item-grid,
+  .inventory-folder-items.inventory-grid {
     grid-template-columns: repeat(auto-fill, 285px) !important;
   }
   .inventory-folder-item-grid > .vt-unified-item-card,
-  .inventory-folder-items .vt-unified-item-card {
+  .inventory-folder-items .vt-unified-item-card,
+  .inventory-folder-items .item-card {
     width: 285px !important;
     max-width: 285px !important;
     min-width: 285px !important;
@@ -87,11 +114,14 @@
 @media (max-width: 760px) {
   .inventory-folder-item-grid,
   .inventory-folder-items > .inventory-folder-item-grid,
-  .inventory-folder-items .vt-unified-mosaic-grid {
+  .inventory-folder-items .vt-unified-mosaic-grid,
+  .inventory-folder-items.item-grid,
+  .inventory-folder-items.inventory-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
   .inventory-folder-item-grid > .vt-unified-item-card,
-  .inventory-folder-items .vt-unified-item-card {
+  .inventory-folder-items .vt-unified-item-card,
+  .inventory-folder-items .item-card {
     width: auto !important;
     max-width: none !important;
     min-width: 0 !important;
@@ -101,6 +131,7 @@
 
 /* Make the folder icon solid and readable above any cover images. */
 .inventory-folder-main-icon {
+  position: relative !important;
   z-index: 10 !important;
   opacity: 1 !important;
   background: #08060e !important;
@@ -110,8 +141,8 @@
 
 .inventory-folder-stack img {
   z-index: 1 !important;
-  opacity: 0.16 !important;
-  filter: saturate(0.75) brightness(0.72) !important;
+  opacity: 0.14 !important;
+  filter: saturate(0.75) brightness(0.68) !important;
 }
 
 .inventory-folder-card .item-title,
@@ -128,4 +159,30 @@
 .inventory-folder-card.vt-hover-price-title .item-title,
 .vt-folder-card.vt-hover-price-title .item-title {
   color: var(--folder-color, #ffdc93) !important;
+}
+
+.folder-color-select {
+  min-width: 150px !important;
+  max-width: 190px !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(142, 113, 255, 0.36) !important;
+  background: rgba(8, 6, 14, 0.92) !important;
+  color: #f2efff !important;
+}
+
+.folder-hex-input {
+  min-width: 112px !important;
+  max-width: 130px !important;
+  text-transform: uppercase !important;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace !important;
+}
+
+.folder-color-preview {
+  display: inline-block !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  border-radius: 999px !important;
+  border: 2px solid rgba(255,255,255,.32) !important;
+  box-shadow: 0 0 18px rgba(0,0,0,.36) !important;
 }
