@@ -11,12 +11,7 @@ function vtText(value, fallback = '') {
     if (typeof value.name === 'string') return value.name;
     if (typeof value.username === 'string') return value.username;
     if (typeof value.message === 'string') return value.message;
-    try {
-      const json = JSON.stringify(value);
-      return json && json !== '{}' ? json : fallback;
-    } catch {
-      return fallback;
-    }
+    try { const json = JSON.stringify(value); return json && json !== '{}' ? json : fallback; } catch { return fallback; }
   }
   return fallback;
 }
@@ -51,6 +46,13 @@ function stableItemKey(item, prefix = 'item') {
   return `${prefix}-${item.id || item.itemId || item.image || vtText(item.title, 'untitled')}`;
 }
 
+function stopSelectEvent(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  event.nativeEvent?.stopImmediatePropagation?.();
+  event.stopImmediatePropagation?.();
+}
+
 function ItemTile({ item, readOnly = false, selectable = false, selected = false, onToggleSelected, onClickItem, onDoubleClickItem, revealTick = 0 }) {
   const [hovered, setHovered] = useState(false);
   const title = vtText(item.title || item.name, 'Item');
@@ -59,6 +61,7 @@ function ItemTile({ item, readOnly = false, selectable = false, selected = false
   const shownTitle = hovered && price ? price : title;
 
   function openItem(event) {
+    if (event.target?.closest?.('.bulk-select-pill')) return stopSelectEvent(event);
     if (selectable) return;
     if (!onClickItem) return;
     event.preventDefault();
@@ -67,6 +70,7 @@ function ItemTile({ item, readOnly = false, selectable = false, selected = false
   }
 
   function doubleClick(event) {
+    if (event.target?.closest?.('.bulk-select-pill')) return stopSelectEvent(event);
     if (selectable) return;
     if (!onDoubleClickItem) return;
     event.preventDefault();
@@ -75,9 +79,12 @@ function ItemTile({ item, readOnly = false, selectable = false, selected = false
   }
 
   function selectItem(event) {
-    event.preventDefault();
-    event.stopPropagation();
+    stopSelectEvent(event);
     onToggleSelected?.(item.id);
+  }
+
+  function suppressSelectPopup(event) {
+    stopSelectEvent(event);
   }
 
   return (
@@ -101,7 +108,7 @@ function ItemTile({ item, readOnly = false, selectable = false, selected = false
       onClick={openItem}
       onDoubleClick={doubleClick}
     >
-      {selectable && <button type="button" className="bulk-select-pill" onPointerDown={selectItem} onMouseDown={selectItem} onClick={selectItem}>{selected ? '✓ Selected' : 'Select'}</button>}
+      {selectable && <button type="button" className="bulk-select-pill" onPointerDown={selectItem} onPointerUp={suppressSelectPopup} onMouseDown={selectItem} onMouseUp={suppressSelectPopup} onClick={selectItem}>{selected ? '✓ Selected' : 'Select'}</button>}
       <div className="inventory-mosaic-image-frame">
         {image ? <img src={image} alt={title} draggable="false" /> : <div className="inventory-mosaic-placeholder">?</div>}
       </div>
@@ -110,12 +117,23 @@ function ItemTile({ item, readOnly = false, selectable = false, selected = false
   );
 }
 
-function FolderTile({ folder, count, open, onToggle }) {
+function FolderTile({ folder, count, open, selectable = false, selected = false, onToggle, onSelectFolder }) {
   const icon = vtText(folder.icon, '📁');
   const color = safeCssColor(folder.color);
   const name = vtText(folder.name, 'Folder');
+
+  function selectFolder(event) {
+    stopSelectEvent(event);
+    onSelectFolder?.(folder.id);
+  }
+
+  function suppressSelectPopup(event) {
+    stopSelectEvent(event);
+  }
+
   return (
-    <article className={`inventory-folder-card vt-folder-card inventory-mosaic-folder ${open ? 'open' : ''}`} data-folder-id={folder.id} data-title={name} style={{ '--folder-color': color }}>
+    <article className={`inventory-folder-card vt-folder-card inventory-mosaic-folder ${open ? 'open' : ''} ${selected ? 'bulk-selected' : ''}`} data-folder-id={folder.id} data-title={name} data-no-item-popup="true" style={{ '--folder-color': color }}>
+      {selectable && <button type="button" className="bulk-select-pill folder-select-pill" onPointerDown={selectFolder} onPointerUp={suppressSelectPopup} onMouseDown={selectFolder} onMouseUp={suppressSelectPopup} onClick={selectFolder}>{selected ? '✓ Selected' : 'Select'}</button>}
       <button type="button" className="inventory-folder-cover" onClick={onToggle} aria-expanded={open}>
         <div className="inventory-folder-stack"><span className="inventory-folder-main-icon">{icon}</span></div>
         <strong className="item-title inventory-mosaic-title">{name}</strong>
@@ -191,20 +209,11 @@ export default function Inventory({
     let added = 0;
     const failed = [];
     for (const url of parsedBulkUrls) {
-      try {
-        await onAddImgurItem(url);
-        added += 1;
-      } catch (error) {
-        failed.push(`${url} (${error.message || 'failed'})`);
-      }
+      try { await onAddImgurItem(url); added += 1; } catch (error) { failed.push(`${url} (${error.message || 'failed'})`); }
     }
     setBulkBusy(false);
-    if (failed.length === 0) {
-      setBulkText('');
-      setBulkStatus(`Added ${added} item${added === 1 ? '' : 's'}.`);
-    } else {
-      setBulkStatus(`Added ${added}. Failed ${failed.length}: ${failed.join(', ')}`);
-    }
+    if (failed.length === 0) { setBulkText(''); setBulkStatus(`Added ${added} item${added === 1 ? '' : 's'}.`); }
+    else setBulkStatus(`Added ${added}. Failed ${failed.length}: ${failed.join(', ')}`);
   }
 
   function toggleSelected(id) {
@@ -232,6 +241,24 @@ export default function Inventory({
   }, [folderViews, openFolderIds]);
 
   const flatItems = shouldLoadFolders ? items.filter(item => !folderItemIds.has(Number(item.id)) || openFolderItemIds.has(Number(item.id))) : items;
+
+  function toggleFolderSelected(folderId) {
+    const entry = folderViews.find(folderView => String(folderView.folder.id) === String(folderId));
+    if (!entry) return;
+    const ids = entry.items.map(item => item.id).filter(Boolean);
+    if (!ids.length) return;
+    setSelectedIds(current => {
+      const allSelected = ids.every(id => current.includes(id));
+      if (allSelected) return current.filter(id => !ids.includes(id));
+      return Array.from(new Set([...current, ...ids]));
+    });
+  }
+
+  function folderSelected(folderId) {
+    const entry = folderViews.find(folderView => String(folderView.folder.id) === String(folderId));
+    if (!entry?.items?.length) return false;
+    return entry.items.map(item => item.id).filter(Boolean).every(id => selectedIds.includes(id));
+  }
 
   const mosaicEntries = useMemo(() => {
     const entries = [];
@@ -273,7 +300,7 @@ export default function Inventory({
       <div className="inventory-mosaic-grid item-grid inventory-grid vt-unified-mosaic-grid">
         {mosaicEntries.length === 0 && <p className="muted">No items here.</p>}
         {mosaicEntries.map((entry, index) => entry.type === 'folder' ? (
-          <FolderTile key={entry.key} folder={entry.folder} count={entry.count} open={entry.open} onToggle={() => toggleFolder(entry.folder.id)} />
+          <FolderTile key={entry.key} folder={entry.folder} count={entry.count} open={entry.open} selectable={selectionEnabled} selected={folderSelected(entry.folder.id)} onToggle={() => toggleFolder(entry.folder.id)} onSelectFolder={toggleFolderSelected} />
         ) : (
           <ItemTile
             key={entry.key}
