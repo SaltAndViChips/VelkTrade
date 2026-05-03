@@ -1,0 +1,125 @@
+/* Admin Economy Dashboard + Test View polish. */
+
+.velktrade-admin-extra-tab {
+  border: 1px solid rgba(142, 113, 255, .45) !important;
+  background: rgba(16, 13, 28, .78) !important;
+  color: #f4f0ff !important;
+  box-shadow: 0 0 18px rgba(124, 76, 255, .14), inset 0 0 18px rgba(124, 76, 255, .04) !important;
+}
+
+.velktrade-admin-extra-tab:hover,
+.velktrade-admin-extra-tab:focus-visible {
+  border-color: rgba(178, 155, 255, .82) !important;
+  background: rgba(28, 22, 48, .9) !important;
+  box-shadow: 0 0 22px rgba(142, 113, 255, .34), 0 0 42px rgba(124, 76, 255, .18), inset 0 0 20px rgba(142, 113, 255, .08) !important;
+}
+
+.velktrade-admin-economy-panel {
+  margin-top: 18px !important;
+  border: 1px solid rgba(142, 113, 255, .26) !important;
+  background:
+    radial-gradient(circle at top left, rgba(124, 76, 255, .12), transparent 32%),
+    rgba(8, 6, 14, .56) !important;
+}
+
+.economy-stat-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+  gap: 10px !important;
+  margin: 14px 0 !important;
+}
+
+.economy-stat-grid span {
+  display: grid !important;
+  gap: 3px !important;
+  padding: 13px !important;
+  border-radius: 15px !important;
+  border: 1px solid rgba(255, 255, 255, .08) !important;
+  background: rgba(255, 255, 255, .045) !important;
+}
+
+.economy-stat-grid strong {
+  color: #00fa9a !important;
+  font-size: 20px !important;
+  font-weight: 950 !important;
+}
+
+.economy-stat-grid em {
+  color: rgba(244, 240, 255, .62) !important;
+  font-size: 12px !important;
+  font-style: normal !important;
+  font-weight: 800 !important;
+}
+
+.economy-columns {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.economy-columns section,
+.test-view-controls {
+  display: grid !important;
+  gap: 9px !important;
+  align-content: start !important;
+  padding: 13px !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(255, 255, 255, .08) !important;
+  background: rgba(255, 255, 255, .045) !important;
+}
+
+.economy-columns h3 {
+  margin: 0 !important;
+  color: #ffdc93 !important;
+  font-size: 15px !important;
+}
+
+.economy-columns article {
+  display: grid !important;
+  gap: 2px !important;
+  padding: 9px !important;
+  border-radius: 12px !important;
+  background: rgba(0, 0, 0, .18) !important;
+}
+
+.economy-columns article strong {
+  color: #f4f0ff !important;
+  overflow-wrap: anywhere !important;
+}
+
+.economy-columns article span {
+  color: rgba(244, 240, 255, .62) !important;
+  font-size: 12px !important;
+}
+
+.economy-columns article em {
+  color: #00fa9a !important;
+  font-style: normal !important;
+  font-weight: 900 !important;
+}
+
+.test-view-controls {
+  grid-template-columns: minmax(220px, 1fr) auto auto auto !important;
+  align-items: end !important;
+}
+
+.test-view-controls label {
+  display: grid !important;
+  gap: 5px !important;
+  color: rgba(244, 240, 255, .68) !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+}
+
+@media (max-width: 900px) {
+  .economy-columns,
+  .test-view-controls {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.notification-settings-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
+  gap: 8px 14px !important;
+}
