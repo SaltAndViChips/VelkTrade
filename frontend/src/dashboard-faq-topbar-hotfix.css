@@ -149,24 +149,28 @@
   margin-top: 16px !important;
 }
 
+/* Match existing top-bar Dashboard/Profile buttons instead of custom green pill styling. */
 .velktrade-topbar-inventory-button {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 6px !important;
-  min-height: 34px !important;
-  padding: 7px 12px !important;
-  border-radius: 999px !important;
-  border: 1px solid rgba(0, 250, 154, .42) !important;
-  background: rgba(0, 250, 154, .10) !important;
-  color: #00fa9a !important;
-  font-weight: 900 !important;
+  appearance: none !important;
+  font: inherit !important;
+  min-height: unset !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: inherit !important;
+  border: inherit !important;
+  background: inherit !important;
+  color: inherit !important;
+  box-shadow: inherit !important;
+  text-shadow: inherit !important;
+  font-weight: inherit !important;
   cursor: pointer !important;
 }
 
-.velktrade-topbar-inventory-button:hover {
-  background: rgba(0, 250, 154, .18) !important;
-  box-shadow: 0 0 16px rgba(0, 250, 154, .18) !important;
+.velktrade-topbar-inventory-button:hover,
+.velktrade-topbar-inventory-button:focus-visible {
+  background: inherit !important;
+  color: inherit !important;
+  box-shadow: inherit !important;
 }
 
 @media (max-width: 720px) {
