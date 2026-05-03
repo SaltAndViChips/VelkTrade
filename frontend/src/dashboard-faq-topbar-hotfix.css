@@ -1,0 +1,180 @@
+/* Dashboard FAQ modal + top-bar inventory button polish. */
+
+.dashboard-subtitle-with-help {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+}
+
+.dashboard-faq-help-button {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(0, 250, 154, .55) !important;
+  background: rgba(0, 250, 154, .12) !important;
+  color: #00fa9a !important;
+  font-size: 13px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  box-shadow: 0 0 16px rgba(0, 250, 154, .18) !important;
+}
+
+.dashboard-faq-help-button:hover {
+  background: rgba(0, 250, 154, .22) !important;
+  box-shadow: 0 0 22px rgba(0, 250, 154, .28) !important;
+}
+
+.dashboard-faq-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147482500 !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 18px !important;
+  background: rgba(0, 0, 0, .72) !important;
+  backdrop-filter: blur(7px) !important;
+}
+
+.dashboard-faq-modal {
+  width: min(980px, calc(100vw - 28px)) !important;
+  max-height: min(860px, calc(100vh - 28px)) !important;
+  overflow: auto !important;
+  position: relative !important;
+  padding: 22px !important;
+  border-radius: 24px !important;
+  border: 1px solid rgba(0, 250, 154, .28) !important;
+  background:
+    radial-gradient(circle at top left, rgba(0, 250, 154, .12), transparent 34%),
+    radial-gradient(circle at bottom right, rgba(194, 0, 250, .12), transparent 34%),
+    rgba(8, 6, 14, .97) !important;
+  color: #f4f0ff !important;
+  box-shadow: 0 24px 90px rgba(0, 0, 0, .66), 0 0 32px rgba(0, 250, 154, .12) !important;
+}
+
+.dashboard-faq-close {
+  position: absolute !important;
+  top: 14px !important;
+  right: 14px !important;
+  width: 34px !important;
+  height: 34px !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 255, 255, .14) !important;
+  background: rgba(255, 255, 255, .06) !important;
+  color: #f4f0ff !important;
+  font-size: 22px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+.dashboard-faq-header {
+  display: grid !important;
+  grid-template-columns: auto 1fr !important;
+  gap: 14px !important;
+  align-items: center !important;
+  margin-bottom: 18px !important;
+  padding-right: 42px !important;
+}
+
+.dashboard-faq-icon {
+  width: 52px !important;
+  height: 52px !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 18px !important;
+  background: rgba(0, 250, 154, .13) !important;
+  border: 1px solid rgba(0, 250, 154, .35) !important;
+  color: #00fa9a !important;
+  font-size: 28px !important;
+  font-weight: 950 !important;
+}
+
+.dashboard-faq-header h2 {
+  margin: 0 !important;
+  color: #ffffff !important;
+  font-size: clamp(24px, 4vw, 34px) !important;
+}
+
+.dashboard-faq-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.dashboard-faq-grid article,
+.dashboard-faq-verify-box {
+  border: 1px solid rgba(255, 255, 255, .09) !important;
+  border-radius: 16px !important;
+  background: rgba(255, 255, 255, .045) !important;
+  padding: 14px !important;
+}
+
+.dashboard-faq-grid h3,
+.dashboard-faq-verify-box strong {
+  display: block !important;
+  margin: 0 0 7px !important;
+  color: #00fa9a !important;
+  font-size: 15px !important;
+  font-weight: 950 !important;
+}
+
+.dashboard-faq-grid p,
+.dashboard-faq-verify-box p {
+  margin: 0 !important;
+  color: rgba(244, 240, 255, .78) !important;
+  line-height: 1.45 !important;
+}
+
+.dashboard-faq-verify-box {
+  margin-top: 14px !important;
+  border-color: rgba(255, 220, 147, .28) !important;
+  background: rgba(255, 220, 147, .07) !important;
+}
+
+.dashboard-faq-verify-box strong {
+  color: #ffdc93 !important;
+}
+
+.dashboard-faq-actions {
+  display: flex !important;
+  justify-content: flex-end !important;
+  margin-top: 16px !important;
+}
+
+.velktrade-topbar-inventory-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  min-height: 34px !important;
+  padding: 7px 12px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(0, 250, 154, .42) !important;
+  background: rgba(0, 250, 154, .10) !important;
+  color: #00fa9a !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+.velktrade-topbar-inventory-button:hover {
+  background: rgba(0, 250, 154, .18) !important;
+  box-shadow: 0 0 16px rgba(0, 250, 154, .18) !important;
+}
+
+@media (max-width: 720px) {
+  .dashboard-faq-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dashboard-faq-modal {
+    padding: 18px !important;
+  }
+}
