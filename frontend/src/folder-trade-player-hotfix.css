@@ -129,25 +129,39 @@ body .unified-player-panel,
   }
 }
 
-/* Make the folder icon solid and readable above any cover images. */
+/* Match folder card image area to regular item cards and hide inner images entirely. */
+.inventory-folder-stack {
+  height: 300px !important;
+  max-height: 300px !important;
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--folder-color, #00fa9a), transparent 80%), rgba(0,0,0,.24) 62%) !important;
+}
+
+@media (min-width: 1600px) {
+  .inventory-folder-stack {
+    height: 285px !important;
+    max-height: 285px !important;
+  }
+}
+
+/* Make the folder icon solid and readable. */
 .inventory-folder-main-icon {
   position: relative !important;
   z-index: 10 !important;
   opacity: 1 !important;
   background: #08060e !important;
-  color: var(--folder-color, #ffdc93) !important;
-  border-color: color-mix(in srgb, var(--folder-color, #ffdc93), transparent 35%) !important;
+  color: var(--folder-color, #00fa9a) !important;
+  border-color: color-mix(in srgb, var(--folder-color, #00fa9a), transparent 35%) !important;
 }
 
 .inventory-folder-stack img {
-  z-index: 1 !important;
-  opacity: 0.14 !important;
-  filter: saturate(0.75) brightness(0.68) !important;
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
 }
 
 .inventory-folder-card .item-title,
 .inventory-folder-card strong.item-title {
-  color: var(--folder-color, #ffdc93) !important;
+  color: var(--folder-color, #00fa9a) !important;
 }
 
 /* Folder cards are containers, not item listings, so never show price/hover price behavior. */
@@ -158,7 +172,7 @@ body .unified-player-panel,
 
 .inventory-folder-card.vt-hover-price-title .item-title,
 .vt-folder-card.vt-hover-price-title .item-title {
-  color: var(--folder-color, #ffdc93) !important;
+  color: var(--folder-color, #00fa9a) !important;
 }
 
 .folder-color-select {
