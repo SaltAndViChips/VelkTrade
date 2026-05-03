@@ -129,17 +129,37 @@ body .unified-player-panel,
   }
 }
 
-/* Match folder card image area to regular item cards and hide inner images entirely. */
+/* Match folder card visual height to tall item screenshots and hide inner images entirely. */
+.inventory-folder-card,
+.vt-folder-card {
+  align-self: start !important;
+}
+
+.inventory-folder-cover {
+  height: auto !important;
+}
+
 .inventory-folder-stack {
-  height: 300px !important;
-  max-height: 300px !important;
+  width: 100% !important;
+  height: clamp(410px, 31vw, 485px) !important;
+  min-height: 410px !important;
+  max-height: 485px !important;
   background: radial-gradient(circle at center, color-mix(in srgb, var(--folder-color, #00fa9a), transparent 80%), rgba(0,0,0,.24) 62%) !important;
 }
 
 @media (min-width: 1600px) {
   .inventory-folder-stack {
-    height: 285px !important;
-    max-height: 285px !important;
+    height: clamp(400px, 27vw, 470px) !important;
+    min-height: 400px !important;
+    max-height: 470px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .inventory-folder-stack {
+    height: clamp(235px, 62vw, 360px) !important;
+    min-height: 235px !important;
+    max-height: 360px !important;
   }
 }
 
