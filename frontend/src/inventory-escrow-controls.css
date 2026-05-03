@@ -1,0 +1,63 @@
+/* Inventory escrow visibility + release controls. */
+
+.inventory-card-section .velktrade-in-escrow,
+.inventory-rewrite-shell .velktrade-in-escrow {
+  position: relative !important;
+  opacity: .82 !important;
+  filter: saturate(.8) brightness(.9) !important;
+  border-color: rgba(255, 220, 147, .56) !important;
+  box-shadow: 0 0 20px rgba(255, 190, 88, .12), inset 0 0 24px rgba(255, 190, 88, .05) !important;
+}
+
+.velktrade-escrow-badge {
+  position: absolute !important;
+  top: 9px !important;
+  left: 9px !important;
+  z-index: 8 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 5px 8px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 220, 147, .7) !important;
+  background: rgba(17, 10, 2, .86) !important;
+  color: #ffdc93 !important;
+  font-size: 11px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  text-shadow: 0 0 12px rgba(255, 190, 88, .28) !important;
+  pointer-events: none !important;
+}
+
+.velktrade-release-escrow-button {
+  position: absolute !important;
+  right: 9px !important;
+  bottom: 34px !important;
+  z-index: 9 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 28px !important;
+  padding: 5px 9px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 220, 147, .55) !important;
+  background: rgba(255, 220, 147, .11) !important;
+  color: #ffdc93 !important;
+  font-size: 11px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  box-shadow: 0 0 16px rgba(255, 190, 88, .18) !important;
+}
+
+.velktrade-release-escrow-button:hover,
+.velktrade-release-escrow-button:focus-visible {
+  background: rgba(255, 220, 147, .22) !important;
+  border-color: rgba(255, 220, 147, .86) !important;
+  box-shadow: 0 0 22px rgba(255, 190, 88, .26) !important;
+}
+
+.velktrade-release-escrow-button:disabled {
+  cursor: wait !important;
+  opacity: .7 !important;
+}
