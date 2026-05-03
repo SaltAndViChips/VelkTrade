@@ -1,4 +1,4 @@
-/* VelkTrade folder/trade/player-menu hotfixes */
+/* VelkTrade folder/trade/player-menu hotfixes + rewritten inventory mosaic. */
 
 /* Keep the online player panel pinned to the right side of the viewport. */
 body .unified-player-menu,
@@ -57,196 +57,237 @@ body .unified-player-panel,
   }
 }
 
-/* Opened folders should render as a full-width row containing the normal item-card mosaic. */
-.inventory-folder-items {
-  grid-column: 1 / -1 !important;
-  display: block !important;
-  width: 100% !important;
-  max-width: none !important;
-  min-width: 0 !important;
-  clear: both !important;
+/* Inventory rewrite: one flat mosaic, no nested opened-folder containers. */
+.inventory-rewrite-shell,
+.inventory-rewrite-shell * {
+  box-sizing: border-box !important;
 }
 
-.inventory-folder-item-grid,
-.inventory-folder-items > .inventory-folder-item-grid,
-.inventory-folder-items .vt-unified-mosaic-grid,
-.inventory-folder-items.item-grid,
-.inventory-folder-items.inventory-grid {
+.inventory-rewrite-shell .inventory-mosaic-grid,
+.inventory-rewrite-shell .inventory-grid,
+.inventory-rewrite-shell .item-grid,
+.inventory-mosaic-grid {
   display: grid !important;
   grid-template-columns: repeat(auto-fill, 300px) !important;
-  justify-content: start !important;
   align-items: start !important;
+  justify-content: start !important;
   gap: 14px !important;
   width: 100% !important;
   max-width: none !important;
   min-width: 0 !important;
+  padding: 0 !important;
   margin: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
-.inventory-folder-item-grid > .vt-unified-item-card,
-.inventory-folder-items .vt-unified-item-card,
-.inventory-folder-items .item-card {
+.inventory-rewrite-shell .inventory-mosaic-item,
+.inventory-rewrite-shell .inventory-mosaic-folder,
+.inventory-rewrite-shell .vt-unified-item-card,
+.inventory-rewrite-shell .vt-folder-card {
   width: 300px !important;
   max-width: 300px !important;
   min-width: 300px !important;
-  flex: 0 0 300px !important;
+  flex: none !important;
   grid-column: auto !important;
+  position: relative !important;
+  display: block !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+  animation: vtMosaicReveal .28s ease both !important;
+  animation-delay: var(--mosaic-delay, 0ms) !important;
+  cursor: pointer !important;
+  touch-action: manipulation !important;
+  user-select: none !important;
+  -webkit-user-drag: none !important;
 }
 
-@media (min-width: 1600px) {
-  .inventory-folder-item-grid,
-  .inventory-folder-items > .inventory-folder-item-grid,
-  .inventory-folder-items .vt-unified-mosaic-grid,
-  .inventory-folder-items.item-grid,
-  .inventory-folder-items.inventory-grid {
-    grid-template-columns: repeat(auto-fill, 285px) !important;
-  }
-  .inventory-folder-item-grid > .vt-unified-item-card,
-  .inventory-folder-items .vt-unified-item-card,
-  .inventory-folder-items .item-card {
-    width: 285px !important;
-    max-width: 285px !important;
-    min-width: 285px !important;
-    flex-basis: 285px !important;
-  }
+.inventory-rewrite-shell .inventory-mosaic-item[draggable="true"],
+.inventory-rewrite-shell .inventory-mosaic-item *,
+.inventory-rewrite-shell .inventory-mosaic-folder *,
+.inventory-rewrite-shell .vt-unified-item-card *,
+.inventory-rewrite-shell .vt-folder-card * {
+  -webkit-user-drag: none !important;
 }
 
-@media (max-width: 760px) {
-  .inventory-folder-item-grid,
-  .inventory-folder-items > .inventory-folder-item-grid,
-  .inventory-folder-items .vt-unified-mosaic-grid,
-  .inventory-folder-items.item-grid,
-  .inventory-folder-items.inventory-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-  .inventory-folder-item-grid > .vt-unified-item-card,
-  .inventory-folder-items .vt-unified-item-card,
-  .inventory-folder-items .item-card {
-    width: auto !important;
-    max-width: none !important;
-    min-width: 0 !important;
-    flex-basis: auto !important;
-  }
-}
-
-/* Match folder card visual height to tall item screenshots and hide inner images entirely. */
-.inventory-folder-card,
-.vt-folder-card {
-  align-self: start !important;
-}
-
-.inventory-folder-cover {
-  height: auto !important;
-}
-
-.inventory-folder-stack {
+.inventory-rewrite-shell .inventory-mosaic-image-frame,
+.inventory-rewrite-shell .inventory-folder-stack {
   width: 100% !important;
   height: clamp(410px, 31vw, 485px) !important;
   min-height: 410px !important;
   max-height: 485px !important;
-  background: radial-gradient(circle at center, color-mix(in srgb, var(--folder-color, #00fa9a), transparent 80%), rgba(0,0,0,.24) 62%) !important;
+  display: grid !important;
+  place-items: center !important;
+  overflow: hidden !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(142, 113, 255, 0.22) !important;
+  background: rgba(0, 0, 0, 0.24) !important;
+  box-shadow: none !important;
 }
 
-@media (min-width: 1600px) {
-  .inventory-folder-stack {
-    height: clamp(400px, 27vw, 470px) !important;
-    min-height: 400px !important;
-    max-height: 470px !important;
-  }
-}
-
-@media (max-width: 760px) {
-  .inventory-folder-stack {
-    height: clamp(235px, 62vw, 360px) !important;
-    min-height: 235px !important;
-    max-height: 360px !important;
-  }
-}
-
-/* Make the folder icon solid and readable. */
-.inventory-folder-main-icon {
-  position: relative !important;
-  z-index: 10 !important;
+.inventory-rewrite-shell .inventory-mosaic-image-frame img,
+.inventory-rewrite-shell .vt-unified-item-card img {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+  display: block !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: transparent !important;
   opacity: 1 !important;
-  background: #08060e !important;
-  color: var(--folder-color, #00fa9a) !important;
-  border-color: color-mix(in srgb, var(--folder-color, #00fa9a), transparent 35%) !important;
-}
-
-.inventory-folder-stack img {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-}
-
-.inventory-folder-card .item-title,
-.inventory-folder-card strong.item-title {
-  color: var(--folder-color, #00fa9a) !important;
-}
-
-/* Folder cards are containers, not item listings, so never show price/hover price behavior. */
-.inventory-folder-card[data-price],
-.vt-folder-card[data-price] {
-  cursor: pointer !important;
-}
-
-.inventory-folder-card.vt-hover-price-title .item-title,
-.vt-folder-card.vt-hover-price-title .item-title {
-  color: var(--folder-color, #00fa9a) !important;
-}
-
-/* Bulk selection should only exist while Inventory Tools are expanded. */
-.inventory-card-section:not(.bulk-selection-active) .bulk-select-pill {
-  display: none !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
-
-.inventory-card-section.bulk-selection-active .bulk-select-pill {
-  display: inline-flex !important;
   visibility: visible !important;
+  transform: none !important;
   pointer-events: auto !important;
 }
 
-/* Kill old oval price popups everywhere, especially inside opened folders. */
-.inventory-folder-items .vt-hover-price,
-.inventory-folder-items .vt-price-badge,
-.inventory-folder-items .item-price-badge,
-.inventory-folder-items .price-badge,
-.inventory-folder-items .hover-price,
-.inventory-folder-items .item-hover-price,
-.inventory-folder-items [class*="price-badge" i],
-.inventory-folder-items [class*="hover-price" i],
-.inventory-folder-items [class*="price-pill" i],
-.inventory-folder-items [class*="hover-preview" i],
-.inventory-folder-items [class*="full-preview" i],
+.inventory-rewrite-shell .inventory-mosaic-title,
+.inventory-rewrite-shell .item-title {
+  display: block !important;
+  width: 100% !important;
+  min-height: 1.2em !important;
+  margin: 7px 0 0 !important;
+  padding: 0 4px !important;
+  text-align: center !important;
+  line-height: 1.18 !important;
+  color: #f4f0ff !important;
+  font-weight: 800 !important;
+  overflow-wrap: anywhere !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.inventory-rewrite-shell .inventory-mosaic-item.vt-hover-price-title .item-title,
+.inventory-rewrite-shell .inventory-mosaic-item:hover .item-title {
+  color: #ffdc93 !important;
+  text-align: center !important;
+}
+
+.inventory-rewrite-shell .inventory-mosaic-folder .item-title,
+.inventory-rewrite-shell .inventory-folder-card .item-title,
+.inventory-rewrite-shell .inventory-folder-card strong.item-title {
+  color: var(--folder-color, #00fa9a) !important;
+  text-shadow: 0 0 14px color-mix(in srgb, var(--folder-color, #00fa9a), transparent 52%) !important;
+}
+
+.inventory-rewrite-shell .inventory-folder-cover {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+}
+
+.inventory-rewrite-shell .inventory-folder-stack {
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--folder-color, #00fa9a), transparent 78%), rgba(0, 0, 0, 0.28) 62%) !important;
+  border-color: color-mix(in srgb, var(--folder-color, #00fa9a), transparent 55%) !important;
+}
+
+.inventory-rewrite-shell .inventory-folder-main-icon {
+  position: relative !important;
+  z-index: 5 !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 122px !important;
+  height: 122px !important;
+  border-radius: 30px !important;
+  background: #08060e !important;
+  border: 1px solid color-mix(in srgb, var(--folder-color, #00fa9a), transparent 35%) !important;
+  color: var(--folder-color, #00fa9a) !important;
+  font-size: 58px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, .62), 0 0 26px color-mix(in srgb, var(--folder-color, #00fa9a), transparent 64%) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.inventory-rewrite-shell .inventory-folder-count {
+  display: block !important;
+  margin-top: 3px !important;
+  color: rgba(244, 240, 255, .62) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  text-align: center !important;
+}
+
+.inventory-rewrite-shell .bulk-select-pill {
+  display: inline-flex !important;
+  position: absolute !important;
+  top: 9px !important;
+  right: 9px !important;
+  z-index: 20 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 30px !important;
+  padding: 5px 10px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 220, 147, 0.65) !important;
+  background: rgba(8, 6, 14, 0.92) !important;
+  color: #ffdc93 !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .38) !important;
+}
+
+.inventory-rewrite-shell:not(.bulk-selection-active) .bulk-select-pill {
+  display: none !important;
+}
+
+.inventory-rewrite-shell .bulk-selected {
+  outline: 2px solid rgba(255, 220, 147, .95) !important;
+  outline-offset: 3px !important;
+}
+
+.inventory-mosaic-placeholder {
+  display: grid !important;
+  place-items: center !important;
+  width: 100% !important;
+  height: 100% !important;
+  color: rgba(244, 240, 255, .55) !important;
+  font-size: 54px !important;
+  font-weight: 900 !important;
+}
+
+/* Kill legacy oval hover price popups/previews. The rewrite uses title-swap only. */
 .vt-hover-price,
 .vt-price-badge,
 .item-price-badge,
 .price-badge,
 .hover-price,
 .item-hover-price,
+.bazaar-full-preview,
+.item-hover-preview,
+.vt-item-hover-preview,
 [class*="price-badge" i],
 [class*="hover-price" i],
-[class*="price-pill" i] {
+[class*="price-pill" i],
+[class*="hover-preview" i],
+[class*="full-preview" i] {
   display: none !important;
   visibility: hidden !important;
   opacity: 0 !important;
   pointer-events: none !important;
-}
-
-/* Hover price swap should only color the exact hovered item, never the entire folder row. */
-.inventory-folder-items.vt-hover-price-title .item-title,
-.inventory-folder-item-grid.vt-hover-price-title .item-title,
-.inventory-folder-items:hover .vt-unified-item-card:not(:hover) .item-title,
-.inventory-folder-item-grid:hover .vt-unified-item-card:not(:hover) .item-title {
-  color: inherit !important;
-}
-
-.inventory-folder-items .vt-unified-item-card:hover .item-title,
-.inventory-folder-item-grid .vt-unified-item-card:hover .item-title {
-  color: #ffdc93 !important;
-  text-align: center !important;
 }
 
 .folder-color-select {
@@ -271,6 +312,64 @@ body .unified-player-panel,
   height: 36px !important;
   min-width: 36px !important;
   border-radius: 999px !important;
-  border: 2px solid rgba(255,255,255,.32) !important;
-  box-shadow: 0 0 18px rgba(0,0,0,.36) !important;
+  border: 2px solid rgba(255, 255, 255, .32) !important;
+  box-shadow: 0 0 18px rgba(0, 0, 0, .36) !important;
+}
+
+@keyframes vtMosaicReveal {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (min-width: 1600px) {
+  .inventory-rewrite-shell .inventory-mosaic-grid,
+  .inventory-rewrite-shell .inventory-grid,
+  .inventory-rewrite-shell .item-grid,
+  .inventory-mosaic-grid {
+    grid-template-columns: repeat(auto-fill, 285px) !important;
+  }
+  .inventory-rewrite-shell .inventory-mosaic-item,
+  .inventory-rewrite-shell .inventory-mosaic-folder,
+  .inventory-rewrite-shell .vt-unified-item-card,
+  .inventory-rewrite-shell .vt-folder-card {
+    width: 285px !important;
+    max-width: 285px !important;
+    min-width: 285px !important;
+  }
+  .inventory-rewrite-shell .inventory-mosaic-image-frame,
+  .inventory-rewrite-shell .inventory-folder-stack {
+    height: clamp(400px, 27vw, 470px) !important;
+    min-height: 400px !important;
+    max-height: 470px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .inventory-rewrite-shell .inventory-mosaic-grid,
+  .inventory-rewrite-shell .inventory-grid,
+  .inventory-rewrite-shell .item-grid,
+  .inventory-mosaic-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+  .inventory-rewrite-shell .inventory-mosaic-item,
+  .inventory-rewrite-shell .inventory-mosaic-folder,
+  .inventory-rewrite-shell .vt-unified-item-card,
+  .inventory-rewrite-shell .vt-folder-card {
+    width: auto !important;
+    max-width: none !important;
+    min-width: 0 !important;
+  }
+  .inventory-rewrite-shell .inventory-mosaic-image-frame,
+  .inventory-rewrite-shell .inventory-folder-stack {
+    height: clamp(235px, 62vw, 360px) !important;
+    min-height: 235px !important;
+    max-height: 360px !important;
+  }
+  .inventory-rewrite-shell .inventory-folder-main-icon {
+    width: 86px !important;
+    height: 86px !important;
+    border-radius: 22px !important;
+    font-size: 40px !important;
+  }
 }
