@@ -24,32 +24,75 @@ function OnlineInventoryToggle() { return null; }
 function safeCssColor(value) { const color = vtText(value).trim(); return /^#[0-9a-f]{3,8}$/i.test(color) || /^rgba?\([\d\s.,%]+\)$/i.test(color) ? color : '#00fa9a'; }
 function defaultDragForDroppable(droppableId) { return ['inventory-drop', 'own-inventory-drop', 'their-inventory-drop'].includes(String(droppableId || '')); }
 
-function DraggableItem({ item, onDoubleClickItem, onClickItem, selectable = false, selected = false, onToggleSelected, enableDrag = false }) {
+function ItemCard({ item, readOnly = false, selected = false, selectable = false, onToggleSelected, onDoubleClickItem, onClickItem, dragRef, dragProps = {}, isDragging = false }) {
   const [hovered, setHovered] = useState(false);
   const title = vtText(item.title, 'Item');
   const image = vtText(item.image);
   const displayPrice = formatPriceDisplay(item.price);
   const visibleTitle = hovered && displayPrice ? displayPrice : title;
+
+  function handleDoubleClick(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    onDoubleClickItem?.(item.id, item);
+  }
+
+  function handleClick(event) {
+    if (!onClickItem) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onClickItem(item.id, item);
+  }
+
+  function handleSelection(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    onToggleSelected?.(item.id);
+  }
+
+  return (
+    <div
+      ref={dragRef}
+      className={`item-card vt-unified-item-card ${readOnly ? 'readonly' : ''} ${isDragging ? 'is-dragging' : ''} ${selected ? 'bulk-selected' : ''} ${hovered && displayPrice ? 'vt-hover-price-title' : ''}`}
+      data-item-id={item.id}
+      data-id={item.id}
+      data-title={title}
+      data-vt-original-title={title}
+      data-price={displayPrice}
+      data-vt-price={displayPrice}
+      data-vt-react-hover="true"
+      data-owner-id={item.userId || item.userid || item.ownerId || item.owner_id || ''}
+      data-owner-username={item.ownerUsername || item.owner_username || item.username || ''}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
+      onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
+      {...dragProps}
+    >
+      {selectable && <button type="button" className="bulk-select-pill" onPointerDown={handleSelection} onMouseDown={handleSelection} onClick={handleSelection}>{selected ? '✓ Selected' : 'Select'}</button>}
+      {image && <img src={image} alt={title} draggable="false" />}
+      <span className="item-title">{visibleTitle}</span>
+      {displayPrice && <span className="sr-only item-price">{displayPrice}</span>}
+    </div>
+  );
+}
+
+function DraggableItem(props) {
+  const { item, selectable = false, enableDrag = false } = props;
+  const disabled = !enableDrag || selectable;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `inventory-item-${item.id}`,
     data: { itemId: item.id, source: 'inventory' },
-    disabled: !enableDrag || selectable
+    disabled
   });
-  function handleDoubleClick(event) { event.preventDefault(); event.stopPropagation(); onDoubleClickItem?.(item.id, item); }
-  function handleClick(event) { if (!onClickItem) return; event.preventDefault(); event.stopPropagation(); onClickItem(item.id, item); }
-  function handleSelection(event) { event.preventDefault(); event.stopPropagation(); onToggleSelected?.(item.id); }
-  const dragProps = enableDrag && !selectable ? { ...attributes, ...listeners } : {};
-  return <div ref={setNodeRef} className={`item-card vt-unified-item-card ${enableDrag && isDragging ? 'is-dragging' : ''} ${selected ? 'bulk-selected' : ''} ${hovered && displayPrice ? 'vt-hover-price-title' : ''}`} data-item-id={item.id} data-id={item.id} data-title={title} data-vt-original-title={title} data-price={displayPrice} data-vt-price={displayPrice} data-owner-id={item.userId || item.userid || item.ownerId || item.owner_id || ''} data-owner-username={item.ownerUsername || item.owner_username || item.username || ''} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocus={() => setHovered(true)} onBlur={() => setHovered(false)} onClick={handleClick} onDoubleClick={handleDoubleClick} {...dragProps}>{selectable && <button type="button" className="bulk-select-pill" onPointerDown={handleSelection} onMouseDown={handleSelection} onClick={handleSelection}>{selected ? '✓ Selected' : 'Select'}</button>}{image && <img src={image} alt={title} draggable="false" />}<span className="item-title">{visibleTitle}</span>{displayPrice && <span className="sr-only item-price">{displayPrice}</span>}</div>;
+  const dragProps = disabled ? {} : { ...attributes, ...listeners };
+  return <ItemCard {...props} dragRef={setNodeRef} dragProps={dragProps} isDragging={!disabled && isDragging} />;
 }
 
-function ReadOnlyItem({ item, onClickItem }) {
-  const [hovered, setHovered] = useState(false);
-  const title = vtText(item.title, 'Item');
-  const image = vtText(item.image);
-  const displayPrice = formatPriceDisplay(item.price);
-  const visibleTitle = hovered && displayPrice ? displayPrice : title;
-  function handleClick(event) { if (!onClickItem) return; event.preventDefault(); event.stopPropagation(); onClickItem(item.id, item); }
-  return <div className={`item-card readonly vt-unified-item-card ${hovered && displayPrice ? 'vt-hover-price-title' : ''}`} data-item-id={item.id} data-id={item.id} data-title={title} data-vt-original-title={title} data-price={displayPrice} data-vt-price={displayPrice} data-owner-id={item.userId || item.userid || item.ownerId || item.owner_id || ''} data-owner-username={item.ownerUsername || item.owner_username || item.username || ''} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocus={() => setHovered(true)} onBlur={() => setHovered(false)} onClick={handleClick}>{image && <img src={image} alt={title} />}<span className="item-title">{visibleTitle}</span>{displayPrice && <span className="sr-only item-price">{displayPrice}</span>}</div>;
+function PlainItem(props) {
+  return <ItemCard {...props} />;
 }
 
 function InventoryFolder({ folder, folderItems, open, onToggle }) {
@@ -99,5 +142,7 @@ export default function Inventory({ title, items = [], droppableId, readOnly = f
   const openFolderItemIds = useMemo(() => new Set((folderViews.find(entry => String(entry.folder.id) === String(openFolderId))?.items || []).map(item => Number(item.id))), [folderViews, openFolderId]);
   const visibleItems = shouldLoadFolders ? items.filter(item => !folderItemIds.has(Number(item.id)) || openFolderItemIds.has(Number(item.id))) : items;
 
-  return <section className={`card inventory-card-section ${selectionEnabled ? 'bulk-selection-active' : ''}`}><div className="inventory-title-row"><h2>{vtText(title, 'Inventory')}</h2>{isMyInventory && <OnlineInventoryToggle />}</div>{!readOnly && onAddImgurItem && <><form className="inline-controls inventory-add-form" onSubmit={submitItem}><input value={imgurUrl} onChange={event => setImgurUrl(event.target.value)} placeholder="https://imgur.com/6hUs12E" /><button type="submit">Add Item</button><button type="button" className="ghost" onClick={() => setBulkOpen(open => !open)}>{bulkOpen ? '▼' : '▶'} Bulk Add</button></form>{bulkOpen && <form onSubmit={submitBulkItems}><textarea className="trade-message-box" value={bulkText} onChange={event => setBulkText(event.target.value)} placeholder="Paste multiple Imgur links here, separated by new lines, commas, or spaces." rows={5} /><div className="inline-controls"><button type="submit" disabled={bulkBusy || parsedBulkUrls.length === 0}>{bulkBusy ? 'Adding...' : `Add ${parsedBulkUrls.length} Item${parsedBulkUrls.length === 1 ? '' : 's'}`}</button><button type="button" className="ghost" onClick={() => setBulkText('')} disabled={bulkBusy}>Clear</button></div>{bulkStatus && <p className={bulkStatus.includes('Failed') ? 'error' : 'success'}>{bulkStatus}</p>}</form>}{isMyInventory && <InventoryToolsPanel items={items} selectedIds={selectedIds} setSelectedIds={setSelectedIds} open={toolsOpen} onOpenChange={setToolsOpen} onRefresh={refreshAfterTools} />}</>}{readOnly && onSearch && <div className="inline-controls"><input value={usernameValue || ''} onChange={event => onUsernameChange?.(event.target.value)} placeholder="Username" /><button type="button" onClick={onSearch}>View</button></div>}<div ref={setNodeRef} className={`item-grid inventory-grid vt-unified-mosaic-grid drop-zone ${isOver ? 'drop-zone-active' : ''}`}>{visibleItems.length === 0 && folderViews.length === 0 && <p className="muted">No items here.</p>}{folderViews.map(({ folder, items: folderItems }) => <InventoryFolder key={folder.id} folder={folder} folderItems={folderItems} open={String(openFolderId) === String(folder.id)} onToggle={() => setOpenFolderId(current => String(current) === String(folder.id) ? null : folder.id)} />)}{visibleItems.map(item => readOnly ? <ReadOnlyItem key={item.id || item.image || vtText(item.title)} item={item} onClickItem={onClickItem} /> : <DraggableItem key={item.id || item.image || vtText(item.title)} item={item} onDoubleClickItem={onDoubleClickItem} onClickItem={onClickItem} selectable={selectionEnabled} selected={selectedIds.includes(item.id)} onToggleSelected={toggleSelected} enableDrag={dragEnabled} />)}</div></section>;
+  const CardComponent = dragEnabled ? DraggableItem : PlainItem;
+
+  return <section className={`card inventory-card-section ${selectionEnabled ? 'bulk-selection-active' : ''}`}><div className="inventory-title-row"><h2>{vtText(title, 'Inventory')}</h2>{isMyInventory && <OnlineInventoryToggle />}</div>{!readOnly && onAddImgurItem && <><form className="inline-controls inventory-add-form" onSubmit={submitItem}><input value={imgurUrl} onChange={event => setImgurUrl(event.target.value)} placeholder="https://imgur.com/6hUs12E" /><button type="submit">Add Item</button><button type="button" className="ghost" onClick={() => setBulkOpen(open => !open)}>{bulkOpen ? '▼' : '▶'} Bulk Add</button></form>{bulkOpen && <form onSubmit={submitBulkItems}><textarea className="trade-message-box" value={bulkText} onChange={event => setBulkText(event.target.value)} placeholder="Paste multiple Imgur links here, separated by new lines, commas, or spaces." rows={5} /><div className="inline-controls"><button type="submit" disabled={bulkBusy || parsedBulkUrls.length === 0}>{bulkBusy ? 'Adding...' : `Add ${parsedBulkUrls.length} Item${parsedBulkUrls.length === 1 ? '' : 's'}`}</button><button type="button" className="ghost" onClick={() => setBulkText('')} disabled={bulkBusy}>Clear</button></div>{bulkStatus && <p className={bulkStatus.includes('Failed') ? 'error' : 'success'}>{bulkStatus}</p>}</form>}{isMyInventory && <InventoryToolsPanel items={items} selectedIds={selectedIds} setSelectedIds={setSelectedIds} open={toolsOpen} onOpenChange={setToolsOpen} onRefresh={refreshAfterTools} />}</>}{readOnly && onSearch && <div className="inline-controls"><input value={usernameValue || ''} onChange={event => onUsernameChange?.(event.target.value)} placeholder="Username" /><button type="button" onClick={onSearch}>View</button></div>}<div ref={setNodeRef} className={`item-grid inventory-grid vt-unified-mosaic-grid drop-zone ${isOver ? 'drop-zone-active' : ''}`}>{visibleItems.length === 0 && folderViews.length === 0 && <p className="muted">No items here.</p>}{folderViews.map(({ folder, items: folderItems }) => <InventoryFolder key={folder.id} folder={folder} folderItems={folderItems} open={String(openFolderId) === String(folder.id)} onToggle={() => setOpenFolderId(current => String(current) === String(folder.id) ? null : folder.id)} />)}{visibleItems.map(item => <CardComponent key={item.id || item.image || vtText(item.title)} item={item} readOnly={readOnly} onDoubleClickItem={onDoubleClickItem} onClickItem={onClickItem} selectable={selectionEnabled} selected={selectedIds.includes(item.id)} onToggleSelected={toggleSelected} enableDrag={dragEnabled} />)}</div></section>;
 }
