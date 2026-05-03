@@ -1,0 +1,363 @@
+/* Bazaar auction rewrite v2. This replaces the broken old auction popup/card layout. */
+
+/* Kill every legacy auction popup implementation. The React v2 modal uses auction-clean-* classes. */
+.auction-modal-backdrop,
+.auction-modal-backdrop *,
+.auction-modal,
+.auction-modal *,
+.auction-modal-grid,
+.auction-modal-info,
+.auction-modal-image,
+.auction-modal-close,
+.auction-bid-history,
+.auction-manager-box,
+#velktrade-simple-auction-bid-modal,
+#velktrade-simple-auction-bid-modal *,
+.auction-simple-backdrop,
+.auction-simple-backdrop *,
+.auction-simple-modal,
+.auction-simple-modal * {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  max-width: 0 !important;
+  max-height: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  position: fixed !important;
+  left: -999999px !important;
+  top: -999999px !important;
+  z-index: -1 !important;
+}
+
+.auction-board-panel,
+.auction-clean-modal .auction-clean-panel,
+.auction-create-v2 {
+  border: 1px solid rgba(142, 113, 255, .22) !important;
+  background: rgba(8, 6, 14, .48) !important;
+  border-radius: 18px !important;
+  padding: 14px !important;
+}
+
+.auction-create-v2 {
+  display: grid !important;
+  grid-template-columns: minmax(320px, 1fr) minmax(280px, 340px) !important;
+  gap: 16px !important;
+  margin-top: 12px !important;
+}
+
+.auction-create-fields {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+  align-items: end !important;
+}
+
+.auction-create-fields label,
+.auction-clean-bid-panel label,
+.auction-clean-owner-panel label {
+  display: grid !important;
+  gap: 5px !important;
+  color: rgba(244, 240, 255, .7) !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+}
+
+.auction-create-fields input,
+.auction-create-fields select,
+.auction-clean-bid-panel input,
+.auction-clean-owner-panel select {
+  min-height: 38px !important;
+}
+
+.auction-preview-v2 {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+.auction-clean-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 300px)) !important;
+  gap: 16px !important;
+  align-items: start !important;
+}
+
+.auction-clean-card {
+  display: grid !important;
+  gap: 10px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 300px !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(142, 113, 255, .28) !important;
+  background: rgba(8, 6, 14, .58) !important;
+  padding: 10px !important;
+  cursor: pointer !important;
+  overflow: hidden !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .24) !important;
+}
+
+.auction-clean-card:hover {
+  border-color: rgba(0, 250, 154, .42) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .32), 0 0 22px rgba(0, 250, 154, .08) !important;
+}
+
+.auction-clean-card.preview {
+  cursor: default !important;
+  max-width: 320px !important;
+}
+
+.auction-clean-image-frame {
+  display: grid !important;
+  place-items: center !important;
+  width: 100% !important;
+  height: 390px !important;
+  min-height: 390px !important;
+  max-height: 390px !important;
+  overflow: hidden !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(255, 255, 255, .08) !important;
+  background: rgba(0, 0, 0, .26) !important;
+}
+
+.auction-clean-image-frame img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+.auction-clean-body {
+  display: grid !important;
+  gap: 4px !important;
+  color: rgba(244, 240, 255, .74) !important;
+  font-size: 12px !important;
+  line-height: 1.25 !important;
+}
+
+.auction-clean-title {
+  display: block !important;
+  color: #f4f0ff !important;
+  font-size: 15px !important;
+  line-height: 1.2 !important;
+  font-weight: 950 !important;
+  overflow-wrap: anywhere !important;
+}
+
+.auction-clean-hidden-seller {
+  color: rgba(255, 220, 147, .78) !important;
+  font-weight: 800 !important;
+}
+
+.auction-clean-modal-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147482600 !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 18px !important;
+  background: rgba(0, 0, 0, .74) !important;
+  backdrop-filter: blur(7px) !important;
+}
+
+.auction-clean-modal {
+  width: min(1120px, calc(100vw - 28px)) !important;
+  max-height: min(880px, calc(100vh - 28px)) !important;
+  overflow: auto !important;
+  position: relative !important;
+  padding: 22px !important;
+  border-radius: 24px !important;
+  border: 1px solid rgba(142, 113, 255, .42) !important;
+  background:
+    radial-gradient(circle at top left, rgba(124, 76, 255, .18), transparent 34%),
+    radial-gradient(circle at bottom right, rgba(0, 250, 154, .10), transparent 34%),
+    rgba(8, 6, 14, .985) !important;
+  color: #f4f0ff !important;
+  box-shadow: 0 26px 100px rgba(0, 0, 0, .74), 0 0 38px rgba(124, 76, 255, .18) !important;
+}
+
+.auction-clean-close {
+  position: absolute !important;
+  top: 14px !important;
+  right: 14px !important;
+  width: 36px !important;
+  height: 36px !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 255, 255, .14) !important;
+  background: rgba(255, 255, 255, .07) !important;
+  color: #f4f0ff !important;
+  font-size: 24px !important;
+  font-weight: 950 !important;
+  cursor: pointer !important;
+}
+
+.auction-clean-modal-header {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 14px !important;
+  align-items: start !important;
+  padding-right: 46px !important;
+  margin-bottom: 16px !important;
+}
+
+.auction-clean-modal-header h2 {
+  margin: 0 0 6px !important;
+  color: #ffffff !important;
+  font-size: clamp(26px, 3.5vw, 38px) !important;
+  line-height: 1.08 !important;
+  word-break: normal !important;
+  overflow-wrap: anywhere !important;
+}
+
+.auction-clean-buyout-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+  padding: 7px 12px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 220, 147, .48) !important;
+  background: rgba(255, 220, 147, .11) !important;
+  color: #ffdc93 !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+}
+
+.auction-clean-modal-grid {
+  display: grid !important;
+  grid-template-columns: minmax(280px, 430px) minmax(360px, 1fr) !important;
+  gap: 18px !important;
+  align-items: start !important;
+}
+
+.auction-clean-modal-image {
+  display: grid !important;
+  place-items: center !important;
+  width: 100% !important;
+  height: min(570px, 64vh) !important;
+  min-height: 430px !important;
+  overflow: hidden !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(142, 113, 255, .24) !important;
+  background: rgba(0, 0, 0, .26) !important;
+}
+
+.auction-clean-modal-image img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+.auction-clean-modal-side {
+  display: grid !important;
+  gap: 14px !important;
+  min-width: 0 !important;
+}
+
+.auction-clean-panel h3 {
+  margin: 0 0 10px !important;
+  color: #00fa9a !important;
+  font-size: 16px !important;
+}
+
+.auction-clean-table-wrap {
+  width: 100% !important;
+  overflow: auto !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 255, 255, .075) !important;
+}
+
+.auction-clean-table-wrap table {
+  width: 100% !important;
+  min-width: 520px !important;
+  border-collapse: collapse !important;
+}
+
+.auction-clean-table-wrap th,
+.auction-clean-table-wrap td {
+  padding: 9px 10px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, .07) !important;
+  text-align: left !important;
+}
+
+.auction-clean-table-wrap th {
+  color: #ffdc93 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: .04em !important;
+}
+
+.auction-clean-bid-panel {
+  display: grid !important;
+  grid-template-columns: minmax(180px, 1fr) auto auto !important;
+  gap: 10px !important;
+  align-items: end !important;
+}
+
+.auction-clean-bid-panel small {
+  color: rgba(244, 240, 255, .58) !important;
+  line-height: 1.25 !important;
+}
+
+.auction-clean-owner-panel {
+  display: grid !important;
+  gap: 10px !important;
+}
+
+.auction-clean-delete {
+  justify-self: start !important;
+}
+
+@media (max-width: 900px) {
+  .auction-create-v2,
+  .auction-clean-modal-grid,
+  .auction-clean-bid-panel {
+    grid-template-columns: 1fr !important;
+  }
+
+  .auction-create-fields {
+    grid-template-columns: 1fr !important;
+  }
+
+  .auction-clean-modal-image {
+    min-height: 320px !important;
+    height: min(460px, 58vh) !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .auction-clean-modal-backdrop {
+    place-items: start center !important;
+    padding: 8px !important;
+  }
+
+  .auction-clean-modal {
+    width: calc(100vw - 16px) !important;
+    max-height: calc(100vh - 16px) !important;
+    padding: 14px !important;
+    border-radius: 18px !important;
+  }
+
+  .auction-clean-modal-header {
+    grid-template-columns: 1fr !important;
+    padding-right: 42px !important;
+  }
+
+  .auction-clean-buyout-pill {
+    justify-self: start !important;
+    white-space: normal !important;
+  }
+
+  .auction-clean-image-frame {
+    height: 330px !important;
+    min-height: 330px !important;
+    max-height: 330px !important;
+  }
+}
