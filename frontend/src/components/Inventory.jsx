@@ -106,7 +106,6 @@ function ItemTile({ item, readOnly = false, selectable = false, selected = false
         {image ? <img src={image} alt={title} draggable="false" /> : <div className="inventory-mosaic-placeholder">?</div>}
       </div>
       <span className="item-title inventory-mosaic-title">{shownTitle}</span>
-      {price && <span className="sr-only item-price">{price}</span>}
     </article>
   );
 }
