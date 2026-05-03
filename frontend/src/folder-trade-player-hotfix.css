@@ -1,4 +1,4 @@
-/* VelkTrade folder/trade/player-menu hotfixes + rewritten inventory mosaic. */
+/* VelkTrade folder/trade/player-menu hotfixes + rewritten inventory/bazaar mosaic. */
 
 /* Keep the online player panel pinned to the right side of the viewport. */
 body .unified-player-menu,
@@ -57,15 +57,20 @@ body .unified-player-panel,
   }
 }
 
-/* Inventory rewrite: one flat mosaic, no nested opened-folder containers. */
+/* Inventory/Bazaar rewrite: one flat mosaic, no nested opened-folder containers. */
 .inventory-rewrite-shell,
-.inventory-rewrite-shell * {
+.inventory-rewrite-shell *,
+.bazaar-rewrite-shell,
+.bazaar-rewrite-shell * {
   box-sizing: border-box !important;
 }
 
 .inventory-rewrite-shell .inventory-mosaic-grid,
 .inventory-rewrite-shell .inventory-grid,
 .inventory-rewrite-shell .item-grid,
+.bazaar-rewrite-shell .inventory-mosaic-grid,
+.bazaar-rewrite-shell .bazaar-grid,
+.bazaar-rewrite-shell .item-grid,
 .inventory-mosaic-grid {
   display: grid !important;
   grid-template-columns: repeat(auto-fill, 300px) !important;
@@ -86,7 +91,10 @@ body .unified-player-panel,
 .inventory-rewrite-shell .inventory-mosaic-item,
 .inventory-rewrite-shell .inventory-mosaic-folder,
 .inventory-rewrite-shell .vt-unified-item-card,
-.inventory-rewrite-shell .vt-folder-card {
+.inventory-rewrite-shell .vt-folder-card,
+.bazaar-rewrite-shell .inventory-mosaic-item,
+.bazaar-rewrite-shell .bazaar-mosaic-item,
+.bazaar-rewrite-shell .vt-unified-item-card {
   width: 300px !important;
   max-width: 300px !important;
   min-width: 300px !important;
@@ -116,12 +124,16 @@ body .unified-player-panel,
 .inventory-rewrite-shell .inventory-mosaic-item *,
 .inventory-rewrite-shell .inventory-mosaic-folder *,
 .inventory-rewrite-shell .vt-unified-item-card *,
-.inventory-rewrite-shell .vt-folder-card * {
+.inventory-rewrite-shell .vt-folder-card *,
+.bazaar-rewrite-shell .inventory-mosaic-item *,
+.bazaar-rewrite-shell .vt-unified-item-card * {
   -webkit-user-drag: none !important;
 }
 
 .inventory-rewrite-shell .inventory-mosaic-image-frame,
-.inventory-rewrite-shell .inventory-folder-stack {
+.inventory-rewrite-shell .inventory-folder-stack,
+.bazaar-rewrite-shell .inventory-mosaic-image-frame,
+.bazaar-rewrite-shell .bazaar-mosaic-image-frame {
   width: 100% !important;
   height: clamp(410px, 31vw, 485px) !important;
   min-height: 410px !important;
@@ -136,7 +148,9 @@ body .unified-player-panel,
 }
 
 .inventory-rewrite-shell .inventory-mosaic-image-frame img,
-.inventory-rewrite-shell .vt-unified-item-card img {
+.inventory-rewrite-shell .vt-unified-item-card img,
+.bazaar-rewrite-shell .inventory-mosaic-image-frame img,
+.bazaar-rewrite-shell .vt-unified-item-card img {
   width: 100% !important;
   height: 100% !important;
   max-width: 100% !important;
@@ -155,7 +169,9 @@ body .unified-player-panel,
 }
 
 .inventory-rewrite-shell .inventory-mosaic-title,
-.inventory-rewrite-shell .item-title {
+.inventory-rewrite-shell .item-title,
+.bazaar-rewrite-shell .inventory-mosaic-title,
+.bazaar-rewrite-shell .item-title {
   display: block !important;
   width: 100% !important;
   min-height: 1.2em !important;
@@ -171,7 +187,9 @@ body .unified-player-panel,
 }
 
 .inventory-rewrite-shell .inventory-mosaic-item.vt-hover-price-title .item-title,
-.inventory-rewrite-shell .inventory-mosaic-item:hover .item-title {
+.inventory-rewrite-shell .inventory-mosaic-item:hover .item-title,
+.bazaar-rewrite-shell .inventory-mosaic-item.vt-hover-price-title .item-title,
+.bazaar-rewrite-shell .inventory-mosaic-item:hover .item-title {
   color: #ffdc93 !important;
   text-align: center !important;
 }
@@ -269,6 +287,101 @@ body .unified-player-panel,
   font-weight: 900 !important;
 }
 
+.bazaar-clean-controls,
+.bazaar-clean-tools {
+  border: 1px solid rgba(142, 113, 255, .18) !important;
+  background: rgba(8, 6, 14, .46) !important;
+  border-radius: 18px !important;
+  padding: 14px !important;
+}
+
+.bazaar-control-header,
+.bazaar-save-grid,
+.bazaar-filter-grid,
+.bazaar-tool-columns.clean {
+  display: grid !important;
+  gap: 12px !important;
+}
+
+.bazaar-control-header {
+  grid-template-columns: 1fr auto !important;
+  align-items: center !important;
+  margin-bottom: 10px !important;
+}
+
+.bazaar-filter-grid {
+  grid-template-columns: minmax(260px, 2fr) repeat(3, minmax(120px, 1fr)) !important;
+}
+
+.bazaar-save-grid {
+  grid-template-columns: minmax(180px, 1fr) auto minmax(180px, 1fr) auto !important;
+  align-items: end !important;
+}
+
+.bazaar-filter-grid label,
+.bazaar-save-grid label {
+  display: grid !important;
+  gap: 5px !important;
+  color: rgba(244,240,255,.68) !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+.bazaar-tool-columns.clean {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  margin-top: 14px !important;
+}
+
+.bazaar-tool-card {
+  display: grid !important;
+  gap: 8px !important;
+  border: 1px solid rgba(255,255,255,.08) !important;
+  border-radius: 14px !important;
+  padding: 12px !important;
+  background: rgba(0,0,0,.18) !important;
+}
+
+.bazaar-tool-entry {
+  display: grid !important;
+  grid-template-columns: 1fr auto !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 8px !important;
+  border-radius: 12px !important;
+  background: rgba(255,255,255,.045) !important;
+}
+
+.bazaar-tool-main {
+  display: grid !important;
+  gap: 3px !important;
+  text-align: left !important;
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+  color: #f4f0ff !important;
+}
+
+.bazaar-tool-main span,
+.bazaar-mosaic-meta,
+.bazaar-owner-line,
+.bazaar-interest-line {
+  color: rgba(244,240,255,.66) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.bazaar-mosaic-meta {
+  display: grid !important;
+  gap: 3px !important;
+  margin-top: 5px !important;
+  text-align: center !important;
+}
+
+.bazaar-watch-pill {
+  justify-self: center !important;
+  margin-top: 2px !important;
+}
+
 /* Kill legacy oval hover price popups/previews. The rewrite uses title-swap only. */
 .vt-hover-price,
 .vt-price-badge,
@@ -325,22 +438,38 @@ body .unified-player-panel,
   .inventory-rewrite-shell .inventory-mosaic-grid,
   .inventory-rewrite-shell .inventory-grid,
   .inventory-rewrite-shell .item-grid,
+  .bazaar-rewrite-shell .inventory-mosaic-grid,
+  .bazaar-rewrite-shell .bazaar-grid,
+  .bazaar-rewrite-shell .item-grid,
   .inventory-mosaic-grid {
     grid-template-columns: repeat(auto-fill, 285px) !important;
   }
   .inventory-rewrite-shell .inventory-mosaic-item,
   .inventory-rewrite-shell .inventory-mosaic-folder,
   .inventory-rewrite-shell .vt-unified-item-card,
-  .inventory-rewrite-shell .vt-folder-card {
+  .inventory-rewrite-shell .vt-folder-card,
+  .bazaar-rewrite-shell .inventory-mosaic-item,
+  .bazaar-rewrite-shell .bazaar-mosaic-item,
+  .bazaar-rewrite-shell .vt-unified-item-card {
     width: 285px !important;
     max-width: 285px !important;
     min-width: 285px !important;
   }
   .inventory-rewrite-shell .inventory-mosaic-image-frame,
-  .inventory-rewrite-shell .inventory-folder-stack {
+  .inventory-rewrite-shell .inventory-folder-stack,
+  .bazaar-rewrite-shell .inventory-mosaic-image-frame,
+  .bazaar-rewrite-shell .bazaar-mosaic-image-frame {
     height: clamp(400px, 27vw, 470px) !important;
     min-height: 400px !important;
     max-height: 470px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .bazaar-filter-grid,
+  .bazaar-save-grid,
+  .bazaar-tool-columns.clean {
+    grid-template-columns: 1fr !important;
   }
 }
 
@@ -348,6 +477,9 @@ body .unified-player-panel,
   .inventory-rewrite-shell .inventory-mosaic-grid,
   .inventory-rewrite-shell .inventory-grid,
   .inventory-rewrite-shell .item-grid,
+  .bazaar-rewrite-shell .inventory-mosaic-grid,
+  .bazaar-rewrite-shell .bazaar-grid,
+  .bazaar-rewrite-shell .item-grid,
   .inventory-mosaic-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 8px !important;
@@ -355,13 +487,18 @@ body .unified-player-panel,
   .inventory-rewrite-shell .inventory-mosaic-item,
   .inventory-rewrite-shell .inventory-mosaic-folder,
   .inventory-rewrite-shell .vt-unified-item-card,
-  .inventory-rewrite-shell .vt-folder-card {
+  .inventory-rewrite-shell .vt-folder-card,
+  .bazaar-rewrite-shell .inventory-mosaic-item,
+  .bazaar-rewrite-shell .bazaar-mosaic-item,
+  .bazaar-rewrite-shell .vt-unified-item-card {
     width: auto !important;
     max-width: none !important;
     min-width: 0 !important;
   }
   .inventory-rewrite-shell .inventory-mosaic-image-frame,
-  .inventory-rewrite-shell .inventory-folder-stack {
+  .inventory-rewrite-shell .inventory-folder-stack,
+  .bazaar-rewrite-shell .inventory-mosaic-image-frame,
+  .bazaar-rewrite-shell .bazaar-mosaic-image-frame {
     height: clamp(235px, 62vw, 360px) !important;
     min-height: 235px !important;
     max-height: 360px !important;
