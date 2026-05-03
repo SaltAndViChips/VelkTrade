@@ -7,7 +7,6 @@ import './activity-notification-poller.js';
 import './persistent-auction-alerts.js';
 import './inventory-escrow-controls.js';
 import './bulk-select-event-guard.js';
-import './admin-economy-testview.js';
 import App from './App.jsx';
 import AppErrorBoundary from './components/AppErrorBoundary.jsx';
 import './styles.css';
