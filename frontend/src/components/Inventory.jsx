@@ -23,34 +23,28 @@ function formatPriceDisplay(price) { const clean = vtText(price).trim(); if (!cl
 function OnlineInventoryToggle() { return null; }
 function safeCssColor(value) { const color = vtText(value).trim(); return /^#[0-9a-f]{3,8}$/i.test(color) || /^rgba?\([\d\s.,%]+\)$/i.test(color) ? color : '#00fa9a'; }
 
-function SelectShell({ enabled, selected, onToggleSelected, children }) {
-  if (!enabled) return children;
-  function select(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    onToggleSelected?.();
-  }
-  return <div className={`bulk-card-shell ${selected ? 'bulk-selected' : ''}`}>{children}<button type="button" className="bulk-select-pill" onPointerDown={select} onMouseDown={select} onClick={select}>{selected ? '✓ Selected' : 'Select'}</button></div>;
-}
-
 function DraggableItem({ item, onDoubleClickItem, onClickItem, selectable = false, selected = false, onToggleSelected }) {
+  const [hovered, setHovered] = useState(false);
   const title = vtText(item.title, 'Item');
   const image = vtText(item.image);
   const displayPrice = formatPriceDisplay(item.price);
+  const visibleTitle = hovered && displayPrice ? displayPrice : title;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `inventory-item-${item.id}`, data: { itemId: item.id, source: 'inventory' } });
   function handleDoubleClick(event) { event.preventDefault(); event.stopPropagation(); onDoubleClickItem?.(item.id, item); }
   function handleClick(event) { if (!onClickItem) return; event.preventDefault(); event.stopPropagation(); onClickItem(item.id, item); }
+  function handleSelection(event) { event.preventDefault(); event.stopPropagation(); onToggleSelected?.(item.id); }
   const dragProps = selectable ? {} : { ...attributes, ...listeners };
-  const card = <div ref={setNodeRef} className={`item-card vt-unified-item-card ${isDragging ? 'is-dragging' : ''}`} data-item-id={item.id} data-id={item.id} data-title={title} data-price={displayPrice} data-owner-id={item.userId || item.userid || item.ownerId || item.owner_id || ''} data-owner-username={item.ownerUsername || item.owner_username || item.username || ''} onClick={handleClick} onDoubleClick={handleDoubleClick} {...dragProps}>{image && <img src={image} alt={title} draggable="false" />}<span className="item-title">{title}</span>{displayPrice && <span className="sr-only item-price">{displayPrice}</span>}</div>;
-  return <SelectShell enabled={selectable} selected={selected} onToggleSelected={() => onToggleSelected?.(item.id)}>{card}</SelectShell>;
+  return <div ref={setNodeRef} className={`item-card vt-unified-item-card ${isDragging ? 'is-dragging' : ''} ${selected ? 'bulk-selected' : ''} ${hovered && displayPrice ? 'vt-hover-price-title' : ''}`} data-item-id={item.id} data-id={item.id} data-title={title} data-vt-original-title={title} data-price={displayPrice} data-vt-price={displayPrice} data-owner-id={item.userId || item.userid || item.ownerId || item.owner_id || ''} data-owner-username={item.ownerUsername || item.owner_username || item.username || ''} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocus={() => setHovered(true)} onBlur={() => setHovered(false)} onClick={handleClick} onDoubleClick={handleDoubleClick} {...dragProps}>{selectable && <button type="button" className="bulk-select-pill" onPointerDown={handleSelection} onMouseDown={handleSelection} onClick={handleSelection}>{selected ? '✓ Selected' : 'Select'}</button>}{image && <img src={image} alt={title} draggable="false" />}<span className="item-title">{visibleTitle}</span>{displayPrice && <span className="sr-only item-price">{displayPrice}</span>}</div>;
 }
 
 function ReadOnlyItem({ item, onClickItem }) {
+  const [hovered, setHovered] = useState(false);
   const title = vtText(item.title, 'Item');
   const image = vtText(item.image);
   const displayPrice = formatPriceDisplay(item.price);
+  const visibleTitle = hovered && displayPrice ? displayPrice : title;
   function handleClick(event) { if (!onClickItem) return; event.preventDefault(); event.stopPropagation(); onClickItem(item.id, item); }
-  return <div className="item-card readonly vt-unified-item-card" data-item-id={item.id} data-id={item.id} data-title={title} data-price={displayPrice} data-owner-id={item.userId || item.userid || item.ownerId || item.owner_id || ''} data-owner-username={item.ownerUsername || item.owner_username || item.username || ''} onClick={handleClick}>{image && <img src={image} alt={title} />}<span className="item-title">{title}</span>{displayPrice && <span className="sr-only item-price">{displayPrice}</span>}</div>;
+  return <div className={`item-card readonly vt-unified-item-card ${hovered && displayPrice ? 'vt-hover-price-title' : ''}`} data-item-id={item.id} data-id={item.id} data-title={title} data-vt-original-title={title} data-price={displayPrice} data-vt-price={displayPrice} data-owner-id={item.userId || item.userid || item.ownerId || item.owner_id || ''} data-owner-username={item.ownerUsername || item.owner_username || item.username || ''} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocus={() => setHovered(true)} onBlur={() => setHovered(false)} onClick={handleClick}>{image && <img src={image} alt={title} />}<span className="item-title">{visibleTitle}</span>{displayPrice && <span className="sr-only item-price">{displayPrice}</span>}</div>;
 }
 
 function InventoryFolder({ folder, folderItems, open, onToggle }) {
