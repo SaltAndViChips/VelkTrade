@@ -22,12 +22,7 @@ function vtText(value, fallback = '') {
     if (typeof value.title === 'string') return value.title;
     if (typeof value.name === 'string') return value.name;
     if (typeof value.username === 'string') return value.username;
-    try {
-      const json = JSON.stringify(value);
-      return json && json !== '{}' ? json : fallback;
-    } catch {
-      return fallback;
-    }
+    try { const json = JSON.stringify(value); return json && json !== '{}' ? json : fallback; } catch { return fallback; }
   }
   return fallback;
 }
@@ -43,14 +38,10 @@ function itemPrice(item) {
   return amount ? `${amount} IC` : vtText(item.price, '');
 }
 
-function safeArray(value) {
-  return Array.isArray(value) ? value : [];
-}
-
-function currentFilters({ search, sort, verified, min, max, minInterest }) {
-  return { search, sort, verified, min, max, minInterest };
-}
-
+function safeArray(value) { return Array.isArray(value) ? value : []; }
+function isVerifiedUser(user) { return Boolean(user?.isVerified || user?.is_verified || user?.verified || user?.isTrusted || user?.is_trusted || user?.isAdmin || user?.is_admin); }
+function numericInput(value) { return String(value || '').replace(/[^\d]/g, ''); }
+function currentFilters({ search, sort, verified, min, max, minInterest }) { return { search, sort, verified, min, max, minInterest }; }
 function filterSummary(filters = {}) {
   const parts = [];
   if (filters.search) parts.push(`Search: ${filters.search}`);
@@ -61,6 +52,17 @@ function filterSummary(filters = {}) {
   if (filters.minInterest) parts.push(`${filters.minInterest}+ interested`);
   return parts.length ? parts.join(' · ') : 'No extra filters';
 }
+function timeLeft(value) {
+  const end = new Date(value).getTime();
+  if (!Number.isFinite(end)) return 'Unknown end';
+  const ms = end - Date.now();
+  if (ms <= 0) return 'Ended';
+  const hours = Math.floor(ms / 36e5);
+  const minutes = Math.floor((ms % 36e5) / 6e4);
+  if (hours >= 24) return `${Math.floor(hours / 24)}d ${hours % 24}h left`;
+  if (hours > 0) return `${hours}h ${minutes}m left`;
+  return `${minutes}m left`;
+}
 
 function BazaarMosaicItem({ item, currentUser }) {
   const [hovered, setHovered] = useState(false);
@@ -69,43 +71,54 @@ function BazaarMosaicItem({ item, currentUser }) {
   const price = itemPrice(item);
   const shownTitle = hovered && price ? price : title;
   const verifiedInterestCount = Number(item.interestCount || 0);
+  return <article className={`inventory-mosaic-item bazaar-mosaic-item item-card vt-unified-item-card ${hovered && price ? 'vt-hover-price-title' : ''}`} data-item-id={item.id || ''} data-id={item.id || ''} data-title={title} data-vt-original-title={title} data-price={price} data-vt-price={price} data-vt-react-hover="true" data-vt-hover-swap-bound="true" data-owner-id={item.ownerId || item.owner_id || item.userId || item.userid || ''} data-owner-username={item.ownerUsername || ''} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocus={() => setHovered(true)} onBlur={() => setHovered(false)}>
+    <div className="inventory-mosaic-image-frame bazaar-mosaic-image-frame">{image ? <img src={image} alt={title} draggable="false" /> : <div className="inventory-mosaic-placeholder">?</div>}</div>
+    <span className="item-title inventory-mosaic-title">{shownTitle}</span>
+    <div className="bazaar-mosaic-meta" aria-label="Bazaar listing details">
+      {currentUser?.isAdmin && item.ownerUsername && <span className="bazaar-owner-line">Owner: <strong>{item.ownerUsername}</strong>{item.ownerVerified && <span className="verified-badge mini" title="Verified user">✓</span>}</span>}
+      {item.ownerVerified && !currentUser?.isAdmin && <span className="bazaar-owner-line"><span className="verified-badge mini" title="Verified user">✓</span> Verified seller</span>}
+      <span className="bazaar-interest-line">{verifiedInterestCount} verified interested</span>
+      {item.viewerInterested && <span className="status-pill bazaar-watch-pill">you are interested</span>}
+    </div>
+  </article>;
+}
 
-  return (
-    <article
-      className={`inventory-mosaic-item bazaar-mosaic-item item-card vt-unified-item-card ${hovered && price ? 'vt-hover-price-title' : ''}`}
-      data-item-id={item.id || ''}
-      data-id={item.id || ''}
-      data-title={title}
-      data-vt-original-title={title}
-      data-price={price}
-      data-vt-price={price}
-      data-vt-react-hover="true"
-      data-vt-hover-swap-bound="true"
-      data-owner-id={item.ownerId || item.owner_id || item.userId || item.userid || ''}
-      data-owner-username={item.ownerUsername || ''}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onFocus={() => setHovered(true)}
-      onBlur={() => setHovered(false)}
-    >
-      <div className="inventory-mosaic-image-frame bazaar-mosaic-image-frame">
-        {image ? <img src={image} alt={title} draggable="false" /> : <div className="inventory-mosaic-placeholder">?</div>}
-      </div>
-      <span className="item-title inventory-mosaic-title">{shownTitle}</span>
-      <div className="bazaar-mosaic-meta" aria-label="Bazaar listing details">
-        {currentUser?.isAdmin && item.ownerUsername && (
-          <span className="bazaar-owner-line">Owner: <strong>{item.ownerUsername}</strong>{item.ownerVerified && <span className="verified-badge mini" title="Verified user">✓</span>}</span>
-        )}
-        {item.ownerVerified && !currentUser?.isAdmin && <span className="bazaar-owner-line"><span className="verified-badge mini" title="Verified user">✓</span> Verified seller</span>}
-        <span className="bazaar-interest-line">{verifiedInterestCount} verified interested</span>
-        {item.viewerInterested && <span className="status-pill bazaar-watch-pill">you are interested</span>}
-      </div>
-    </article>
-  );
+function AuctionMosaicItem({ auction, currentUser, onBid, onBuyout }) {
+  const [hovered, setHovered] = useState(false);
+  const [bid, setBid] = useState('');
+  const title = vtText(auction.title, 'Auction Item');
+  const image = vtText(auction.image);
+  const currentBid = Number(auction.currentBid || auction.winningBid || auction.startingBid || 0);
+  const buyout = Number(auction.buyoutPrice || 0);
+  const price = hovered ? `${formatNumber(currentBid)} IC bid` : title;
+  const minBid = currentBid + 1;
+  const canAct = isVerifiedUser(currentUser) && !auction.viewerIsSeller && auction.status === 'active';
+  return <article className={`inventory-mosaic-item bazaar-mosaic-item bazaar-auction-item item-card vt-unified-item-card ${hovered ? 'vt-hover-price-title' : ''}`} data-item-id={auction.itemId || ''} data-id={auction.itemId || ''} data-title={title} data-vt-original-title={title} data-price={`${formatNumber(currentBid)} IC`} data-vt-price={`${formatNumber(currentBid)} IC`} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+    <div className="inventory-mosaic-image-frame bazaar-mosaic-image-frame">{image ? <img src={image} alt={title} draggable="false" /> : <div className="inventory-mosaic-placeholder">?</div>}</div>
+    <span className="item-title inventory-mosaic-title">{price}</span>
+    <div className="bazaar-mosaic-meta auction-meta">
+      <span><strong>Current:</strong> {formatNumber(currentBid)} IC</span>
+      <span><strong>Buyout:</strong> {buyout ? `${formatNumber(buyout)} IC` : 'None'}</span>
+      <span><strong>Bids:</strong> {auction.bidCount || 0} · {timeLeft(auction.endsAt)}</span>
+      {auction.sellerUsername && <span>Seller: <strong>{auction.sellerUsername}</strong>{auction.sellerVerified && <span className="verified-badge mini">✓</span>}</span>}
+      {auction.viewerIsWinner && <span className="status-pill bazaar-watch-pill">you are winning</span>}
+    </div>
+    {canAct && <div className="auction-action-row" onClick={event => event.stopPropagation()}>
+      <input value={bid} onChange={event => setBid(numericInput(event.target.value))} placeholder={`Min ${formatNumber(minBid)}`} inputMode="numeric" />
+      <button type="button" onClick={() => onBid(auction, bid || minBid)}>Bid</button>
+      {buyout > 0 && <button type="button" className="ghost" onClick={() => onBuyout(auction)}>Buyout</button>}
+    </div>}
+    {!isVerifiedUser(currentUser) && <p className="muted auction-verified-note">Verified users only.</p>}
+  </article>;
 }
 
 export default function Bazaar({ currentUser }) {
+  const [activeTab, setActiveTab] = useState('listings');
   const [items, setItems] = useState([]);
+  const [auctions, setAuctions] = useState([]);
+  const [auctionStatus, setAuctionStatus] = useState('active');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [auctionForm, setAuctionForm] = useState({ itemId: '', startingBid: '', buyoutPrice: '', durationHours: '24' });
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('newest');
   const [verified, setVerified] = useState('all');
@@ -118,6 +131,7 @@ export default function Bazaar({ currentUser }) {
   const [watchKeyword, setWatchKeyword] = useState('');
   const [toolsOpen, setToolsOpen] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [auctionLoading, setAuctionLoading] = useState(false);
   const [error, setError] = useState('');
 
   const queryString = useMemo(() => {
@@ -132,174 +146,52 @@ export default function Bazaar({ currentUser }) {
   }, [search, sort, verified, min, max, minInterest]);
 
   async function loadBazaar() {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await api(`/api/bazaar${queryString ? `?${queryString}` : ''}`);
-      setItems(data.items || []);
-    } catch (err) {
-      setError(err.message || 'Could not load Bazaar.');
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true); setError('');
+    try { const data = await api(`/api/bazaar${queryString ? `?${queryString}` : ''}`); setItems(data.items || []); }
+    catch (err) { setError(err.message || 'Could not load Bazaar.'); }
+    finally { setLoading(false); }
   }
-
+  async function loadAuctions() {
+    setAuctionLoading(true);
+    try { const data = await api(`/api/bazaar/auctions?status=${encodeURIComponent(auctionStatus)}`); setAuctions(data.auctions || []); }
+    catch (err) { velkToast(err.message || 'Could not load auctions.', 'error'); }
+    finally { setAuctionLoading(false); }
+  }
   async function loadFilterTools() {
     try {
-      const [filtersData, watchData] = await Promise.allSettled([
-        api('/api/bazaar/saved-filters'),
-        api('/api/bazaar/watchlist')
-      ]);
+      const [filtersData, watchData] = await Promise.allSettled([api('/api/bazaar/saved-filters'), api('/api/bazaar/watchlist')]);
       if (filtersData.status === 'fulfilled') setSavedFilters(safeArray(filtersData.value.filters || filtersData.value.savedFilters));
       if (watchData.status === 'fulfilled') setWatchlist(safeArray(watchData.value.watchlist || watchData.value.watches));
     } catch {}
   }
-
   useEffect(() => { loadFilterTools(); }, []);
+  useEffect(() => { const timer = window.setTimeout(loadBazaar, 180); return () => window.clearTimeout(timer); }, [queryString]);
+  useEffect(() => { if (activeTab === 'auctions') loadAuctions(); }, [activeTab, auctionStatus]);
 
-  useEffect(() => {
-    const timer = window.setTimeout(loadBazaar, 180);
-    return () => window.clearTimeout(timer);
-  }, [queryString]);
+  function resetFilters() { setSearch(''); setSort('newest'); setVerified('all'); setMin(''); setMax(''); setMinInterest(''); }
+  function applySavedFilter(filter) { const next = filter.filters || {}; setSearch(vtText(next.search)); setSort(vtText(next.sort, 'newest')); setVerified(vtText(next.verified, 'all')); setMin(vtText(next.min)); setMax(vtText(next.max)); setMinInterest(vtText(next.minInterest)); velkToast(`Applied filter: ${filter.name}`, 'success'); }
+  async function saveCurrentFilter() { const name = filterName.trim() || window.prompt('Saved filter name:', search || 'Bazaar Filter'); if (!name) return; try { await api('/api/bazaar/saved-filters', { method: 'POST', body: JSON.stringify({ name, filters: currentFilters({ search, sort, verified, min, max, minInterest }) }) }); setFilterName(''); await loadFilterTools(); velkToast('Bazaar filter saved.', 'success'); } catch (err) { velkToast(err.message || 'Could not save Bazaar filter.', 'error'); } }
+  async function deleteSavedFilter(id) { try { await api(`/api/bazaar/saved-filters/${encodeURIComponent(id)}`, { method: 'DELETE' }); await loadFilterTools(); velkToast('Saved filter deleted.', 'success'); } catch (err) { velkToast(err.message || 'Could not delete saved filter.', 'error'); } }
+  async function addWatch() { const keyword = watchKeyword.trim() || search.trim(); if (!keyword) return velkToast('Enter a keyword or search first.', 'warning'); try { await api('/api/bazaar/watchlist', { method: 'POST', body: JSON.stringify({ keyword, minPrice: min, maxPrice: max, verifiedOnly: verified === 'verified' }) }); setWatchKeyword(''); await loadFilterTools(); velkToast('Watchlist entry added.', 'success'); } catch (err) { velkToast(err.message || 'Could not add watchlist entry.', 'error'); } }
+  async function deleteWatch(id) { try { await api(`/api/bazaar/watchlist/${encodeURIComponent(id)}`, { method: 'DELETE' }); await loadFilterTools(); velkToast('Watchlist entry removed.', 'success'); } catch (err) { velkToast(err.message || 'Could not remove watchlist entry.', 'error'); } }
+  async function createAuction(event) { event.preventDefault(); if (!isVerifiedUser(currentUser)) return velkToast('Verified users only.', 'warning'); try { await api('/api/bazaar/auctions', { method: 'POST', body: JSON.stringify(auctionForm) }); setAuctionForm({ itemId: '', startingBid: '', buyoutPrice: '', durationHours: '24' }); setCreateOpen(false); await loadAuctions(); velkToast('Auction created.', 'success'); } catch (err) { velkToast(err.message || 'Could not create auction.', 'error'); } }
+  async function placeBid(auction, amount) { try { await api(`/api/bazaar/auctions/${auction.id}/bid`, { method: 'POST', body: JSON.stringify({ amount }) }); await loadAuctions(); velkToast('Bid placed.', 'success'); } catch (err) { velkToast(err.message || 'Could not place bid.', 'error'); } }
+  async function buyoutAuction(auction) { if (!window.confirm(`Buy out ${auction.title} for ${formatNumber(auction.buyoutPrice)} IC?`)) return; try { await api(`/api/bazaar/auctions/${auction.id}/buyout`, { method: 'POST' }); await loadAuctions(); velkToast('Auction bought out.', 'success'); } catch (err) { velkToast(err.message || 'Could not buy out auction.', 'error'); } }
 
-  function resetFilters() {
-    setSearch('');
-    setSort('newest');
-    setVerified('all');
-    setMin('');
-    setMax('');
-    setMinInterest('');
-  }
+  return <section className="card bazaar-page bazaar-rewrite-shell inventory-rewrite-shell">
+    <div className="panel-title-row"><div><h2>Bazaar</h2><p className="muted">Listings and verified-user auctions with buyout support.</p></div><button type="button" onClick={activeTab === 'auctions' ? loadAuctions : loadBazaar}>Refresh</button></div>
+    {error && <p className="error">{error}</p>}
+    <div className="segmented-control compact bazaar-main-tabs"><button type="button" className={activeTab === 'listings' ? 'active' : ''} onClick={() => setActiveTab('listings')}>Listings</button><button type="button" className={activeTab === 'auctions' ? 'active' : ''} onClick={() => setActiveTab('auctions')}>Auctions</button></div>
 
-  function applySavedFilter(filter) {
-    const next = filter.filters || {};
-    setSearch(vtText(next.search));
-    setSort(vtText(next.sort, 'newest'));
-    setVerified(vtText(next.verified, 'all'));
-    setMin(vtText(next.min));
-    setMax(vtText(next.max));
-    setMinInterest(vtText(next.minInterest));
-    velkToast(`Applied filter: ${filter.name}`, 'success');
-  }
+    {activeTab === 'listings' && <>
+      <section className="tidy-tab-panel bazaar-controls bazaar-clean-controls"><div className="bazaar-control-header"><strong>Search & Filters</strong><button type="button" className="ghost" onClick={resetFilters}>Reset</button></div><div className="bazaar-filter-grid"><label><span>Search</span><input value={search} onChange={event => setSearch(event.target.value)} placeholder={currentUser?.isAdmin ? 'Item, IC price, or owner...' : 'Item or IC price...'} /></label><label><span>Min IC</span><input value={min} onChange={event => setMin(numericInput(event.target.value))} placeholder="0" inputMode="numeric" /></label><label><span>Max IC</span><input value={max} onChange={event => setMax(numericInput(event.target.value))} placeholder="Any" inputMode="numeric" /></label><label><span>Min Interest</span><input value={minInterest} onChange={event => setMinInterest(numericInput(event.target.value))} placeholder="0" inputMode="numeric" /></label></div><div className="bazaar-filter-row"><div className="segmented-control compact bazaar-sort-tabs">{SORTS.map(option => <button type="button" key={option.key} className={sort === option.key ? 'active' : ''} onClick={() => setSort(option.key)}>{option.label}</button>)}</div><div className="segmented-control compact bazaar-verified-tabs">{VERIFIED_FILTERS.map(option => <button type="button" key={option.key} className={verified === option.key ? 'active' : ''} onClick={() => setVerified(option.key)}>{option.label}</button>)}</div></div></section>
+      <section className="tidy-tab-panel bazaar-tools-panel bazaar-clean-tools"><div className="panel-title-row compact"><div><h3>Saved Filters & Watchlist</h3><p className="muted">Save this search, or watch for future listings.</p></div><button type="button" className="ghost" onClick={() => setToolsOpen(value => !value)}>{toolsOpen ? 'Hide' : 'Show'}</button></div>{toolsOpen && <><div className="bazaar-save-grid"><label><span>Filter name</span><input value={filterName} onChange={event => setFilterName(event.target.value)} placeholder="Ex: Cheap cosmics" /></label><button type="button" onClick={saveCurrentFilter}>Save Filter</button><label><span>Watch keyword</span><input value={watchKeyword} onChange={event => setWatchKeyword(event.target.value)} placeholder="Uses current price/verified filters" /></label><button type="button" className="ghost" onClick={addWatch}>Add Watch</button></div><div className="bazaar-tool-columns clean"><div className="bazaar-tool-card"><strong>Saved Filters</strong>{savedFilters.length === 0 && <p className="muted">No saved filters yet.</p>}{savedFilters.map(filter => <div className="bazaar-tool-entry" key={filter.id}><button type="button" className="bazaar-tool-main" onClick={() => applySavedFilter(filter)}><strong>{filter.name}</strong><span>{filterSummary(filter.filters)}</span></button><button type="button" className="danger mini" onClick={() => deleteSavedFilter(filter.id)}>×</button></div>)}</div><div className="bazaar-tool-card"><strong>Watchlist</strong>{watchlist.length === 0 && <p className="muted">No watched keywords yet.</p>}{watchlist.map(watch => <div className="bazaar-tool-entry" key={watch.id}><div className="bazaar-tool-main as-text"><strong>{watch.keyword}</strong><span>{watch.verifiedOnly ? 'Verified only' : 'All sellers'}{watch.minPrice ? ` · Min ${watch.minPrice} IC` : ''}{watch.maxPrice ? ` · Max ${watch.maxPrice} IC` : ''}</span></div><button type="button" className="danger mini" onClick={() => deleteWatch(watch.id)}>×</button></div>)}</div></div></>}</section>
+      <p className="muted tidy-count">{loading ? 'Loading Bazaar...' : `Showing ${items.length} listing${items.length === 1 ? '' : 's'}.`}</p>{items.length === 0 && !loading && <p className="muted tidy-empty">No valid IC listings found for recently active players.</p>}<div className="inventory-mosaic-grid bazaar-grid bazaar-mosaic-grid item-grid inventory-grid vt-unified-mosaic-grid">{items.map(item => <BazaarMosaicItem key={item.id || item.image || vtText(item.title)} item={item} currentUser={currentUser} />)}</div>
+    </>}
 
-  async function saveCurrentFilter() {
-    const name = filterName.trim() || window.prompt('Saved filter name:', search || 'Bazaar Filter');
-    if (!name) return;
-    try {
-      await api('/api/bazaar/saved-filters', {
-        method: 'POST',
-        body: JSON.stringify({ name, filters: currentFilters({ search, sort, verified, min, max, minInterest }) })
-      });
-      setFilterName('');
-      await loadFilterTools();
-      velkToast('Bazaar filter saved.', 'success');
-    } catch (err) {
-      velkToast(err.message || 'Could not save Bazaar filter.', 'error');
-    }
-  }
-
-  async function deleteSavedFilter(id) {
-    try {
-      await api(`/api/bazaar/saved-filters/${encodeURIComponent(id)}`, { method: 'DELETE' });
-      await loadFilterTools();
-      velkToast('Saved filter deleted.', 'success');
-    } catch (err) {
-      velkToast(err.message || 'Could not delete saved filter.', 'error');
-    }
-  }
-
-  async function addWatch() {
-    const keyword = watchKeyword.trim() || search.trim();
-    if (!keyword) {
-      velkToast('Enter a keyword or search first.', 'warning');
-      return;
-    }
-    try {
-      await api('/api/bazaar/watchlist', {
-        method: 'POST',
-        body: JSON.stringify({ keyword, minPrice: min, maxPrice: max, verifiedOnly: verified === 'verified' })
-      });
-      setWatchKeyword('');
-      await loadFilterTools();
-      velkToast('Watchlist entry added.', 'success');
-    } catch (err) {
-      velkToast(err.message || 'Could not add watchlist entry.', 'error');
-    }
-  }
-
-  async function deleteWatch(id) {
-    try {
-      await api(`/api/bazaar/watchlist/${encodeURIComponent(id)}`, { method: 'DELETE' });
-      await loadFilterTools();
-      velkToast('Watchlist entry removed.', 'success');
-    } catch (err) {
-      velkToast(err.message || 'Could not remove watchlist entry.', 'error');
-    }
-  }
-
-  return (
-    <section className="card bazaar-page bazaar-rewrite-shell inventory-rewrite-shell">
-      <div className="panel-title-row">
-        <div>
-          <h2>Bazaar</h2>
-          <p className="muted">Valid IC listings from players active within the last 7 days.</p>
-        </div>
-        <button type="button" onClick={loadBazaar}>Refresh</button>
-      </div>
-
-      {error && <p className="error">{error}</p>}
-
-      <section className="tidy-tab-panel bazaar-controls bazaar-clean-controls">
-        <div className="bazaar-control-header">
-          <strong>Search & Filters</strong>
-          <button type="button" className="ghost" onClick={resetFilters}>Reset</button>
-        </div>
-        <div className="bazaar-filter-grid">
-          <label><span>Search</span><input value={search} onChange={event => setSearch(event.target.value)} placeholder={currentUser?.isAdmin ? 'Item, IC price, or owner...' : 'Item or IC price...'} /></label>
-          <label><span>Min IC</span><input value={min} onChange={event => setMin(event.target.value.replace(/[^\d.]/g, ''))} placeholder="0" inputMode="decimal" /></label>
-          <label><span>Max IC</span><input value={max} onChange={event => setMax(event.target.value.replace(/[^\d.]/g, ''))} placeholder="Any" inputMode="decimal" /></label>
-          <label><span>Min Interest</span><input value={minInterest} onChange={event => setMinInterest(event.target.value.replace(/[^\d]/g, ''))} placeholder="0" inputMode="numeric" /></label>
-        </div>
-        <div className="bazaar-filter-row">
-          <div className="segmented-control compact bazaar-sort-tabs">
-            {SORTS.map(option => <button type="button" key={option.key} className={sort === option.key ? 'active' : ''} onClick={() => setSort(option.key)}>{option.label}</button>)}
-          </div>
-          <div className="segmented-control compact bazaar-verified-tabs">
-            {VERIFIED_FILTERS.map(option => <button type="button" key={option.key} className={verified === option.key ? 'active' : ''} onClick={() => setVerified(option.key)}>{option.label}</button>)}
-          </div>
-        </div>
-      </section>
-
-      <section className="tidy-tab-panel bazaar-tools-panel bazaar-clean-tools">
-        <div className="panel-title-row compact"><div><h3>Saved Filters & Watchlist</h3><p className="muted">Save this search, or watch for future listings.</p></div><button type="button" className="ghost" onClick={() => setToolsOpen(value => !value)}>{toolsOpen ? 'Hide' : 'Show'}</button></div>
-        {toolsOpen && <>
-          <div className="bazaar-save-grid">
-            <label><span>Filter name</span><input value={filterName} onChange={event => setFilterName(event.target.value)} placeholder="Ex: Cheap cosmics" /></label>
-            <button type="button" onClick={saveCurrentFilter}>Save Filter</button>
-            <label><span>Watch keyword</span><input value={watchKeyword} onChange={event => setWatchKeyword(event.target.value)} placeholder="Uses current price/verified filters" /></label>
-            <button type="button" className="ghost" onClick={addWatch}>Add Watch</button>
-          </div>
-          <div className="bazaar-tool-columns clean">
-            <div className="bazaar-tool-card">
-              <strong>Saved Filters</strong>
-              {savedFilters.length === 0 && <p className="muted">No saved filters yet.</p>}
-              {savedFilters.map(filter => <div className="bazaar-tool-entry" key={filter.id}><button type="button" className="bazaar-tool-main" onClick={() => applySavedFilter(filter)}><strong>{filter.name}</strong><span>{filterSummary(filter.filters)}</span></button><button type="button" className="danger mini" onClick={() => deleteSavedFilter(filter.id)}>×</button></div>)}
-            </div>
-            <div className="bazaar-tool-card">
-              <strong>Watchlist</strong>
-              {watchlist.length === 0 && <p className="muted">No watched keywords yet.</p>}
-              {watchlist.map(watch => <div className="bazaar-tool-entry" key={watch.id}><div className="bazaar-tool-main as-text"><strong>{watch.keyword}</strong><span>{watch.verifiedOnly ? 'Verified only' : 'All sellers'}{watch.minPrice ? ` · Min ${watch.minPrice} IC` : ''}{watch.maxPrice ? ` · Max ${watch.maxPrice} IC` : ''}</span></div><button type="button" className="danger mini" onClick={() => deleteWatch(watch.id)}>×</button></div>)}
-            </div>
-          </div>
-        </>}
-      </section>
-
-      <p className="muted tidy-count">{loading ? 'Loading Bazaar...' : `Showing ${items.length} listing${items.length === 1 ? '' : 's'}.`}</p>
-      {items.length === 0 && !loading && <p className="muted tidy-empty">No valid IC listings found for recently active players.</p>}
-
-      <div className="inventory-mosaic-grid bazaar-grid bazaar-mosaic-grid item-grid inventory-grid vt-unified-mosaic-grid">
-        {items.map(item => <BazaarMosaicItem key={item.id || item.image || vtText(item.title)} item={item} currentUser={currentUser} />)}
-      </div>
-    </section>
-  );
+    {activeTab === 'auctions' && <>
+      <section className="tidy-tab-panel bazaar-clean-tools"><div className="panel-title-row compact"><div><h3>Auction Board</h3><p className="muted">Verified users can create auctions, bid, or buy out instantly.</p></div><div className="segmented-control compact"><button type="button" className={auctionStatus === 'active' ? 'active' : ''} onClick={() => setAuctionStatus('active')}>Active</button><button type="button" className={auctionStatus === 'all' ? 'active' : ''} onClick={() => setAuctionStatus('all')}>All</button></div></div>{isVerifiedUser(currentUser) ? <><button type="button" className="ghost" onClick={() => setCreateOpen(value => !value)}>{createOpen ? 'Hide Create Auction' : 'Create Auction'}</button>{createOpen && <form className="auction-create-form" onSubmit={createAuction}><label><span>Item ID</span><input value={auctionForm.itemId} onChange={event => setAuctionForm(current => ({ ...current, itemId: numericInput(event.target.value) }))} placeholder="Inventory item ID" required /></label><label><span>Starting bid</span><input value={auctionForm.startingBid} onChange={event => setAuctionForm(current => ({ ...current, startingBid: numericInput(event.target.value) }))} placeholder="100000" required /></label><label><span>Buyout price</span><input value={auctionForm.buyoutPrice} onChange={event => setAuctionForm(current => ({ ...current, buyoutPrice: numericInput(event.target.value) }))} placeholder="Optional" /></label><label><span>Hours</span><input value={auctionForm.durationHours} onChange={event => setAuctionForm(current => ({ ...current, durationHours: numericInput(event.target.value) }))} placeholder="24" /></label><button type="submit">Start Auction</button></form>}</> : <p className="muted">Only verified users can create auctions or bid.</p>}</section>
+      <p className="muted tidy-count">{auctionLoading ? 'Loading auctions...' : `Showing ${auctions.length} auction${auctions.length === 1 ? '' : 's'}.`}</p>{auctions.length === 0 && !auctionLoading && <p className="muted tidy-empty">No auctions found.</p>}<div className="inventory-mosaic-grid bazaar-grid bazaar-mosaic-grid item-grid inventory-grid vt-unified-mosaic-grid">{auctions.map(auction => <AuctionMosaicItem key={auction.id} auction={auction} currentUser={currentUser} onBid={placeBid} onBuyout={buyoutAuction} />)}</div>
+    </>}
+  </section>;
 }
