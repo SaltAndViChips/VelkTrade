@@ -1,8 +1,6 @@
 import { API_URL, getToken } from './api';
 
 const MODAL_ID = 'velktrade-simple-auction-bid-modal';
-const FAQ_OBSERVER_FLAG = '__VELKTRADE_FAQ_ADMIN_REMOVER__';
-const CREATE_FORM_PATCH_FLAG = '__VELKTRADE_AUCTION_CREATE_FORM_PATCH__';
 
 function txt(value, fallback = '') {
   if (value === undefined || value === null) return fallback;
@@ -35,10 +33,21 @@ function labelFor(auction) {
   return auction?.hasBids || Number(auction?.bidCount || 0) > 0 ? 'Current bid' : 'Starting bid';
 }
 
-function minimumNextBid(auction) {
+function fixedIncrement(auction) {
+  const increment = Number(auction?.minIncrement ?? auction?.min_increment ?? 0);
+  return Number.isFinite(increment) && increment > 0 ? increment : 0;
+}
+
+function minimumAllowedBid(auction) {
   const current = Number(auction?.currentBid || auction?.winningBid || auction?.startingBid || 0);
-  const increment = Number(auction?.minIncrement || auction?.min_increment || 0);
-  if (Number.isFinite(increment) && increment > 0) return current + increment;
+  const increment = fixedIncrement(auction);
+  return current + (increment > 0 ? increment : 1);
+}
+
+function suggestedBid(auction) {
+  const current = Number(auction?.currentBid || auction?.winningBid || auction?.startingBid || 0);
+  const increment = fixedIncrement(auction);
+  if (increment > 0) return current + increment;
   return Math.max(current + 1, Math.ceil(current * 1.1));
 }
 
@@ -137,7 +146,9 @@ function ownerControls(auction, bids) {
 
 function renderModal(auction, bids) {
   closeModal();
-  const minimum = minimumNextBid(auction);
+  const minimum = minimumAllowedBid(auction);
+  const suggested = suggestedBid(auction);
+  const increment = fixedIncrement(auction);
   const buyout = Number(auction.buyoutPrice || 0);
   const current = Number(auction.currentBid || auction.winningBid || auction.startingBid || 0);
   const canBid = auction.status === 'active' && !auction.viewerIsSeller;
@@ -152,7 +163,7 @@ function renderModal(auction, bids) {
       <header class="auction-simple-header">
         <div>
           <h2>${txt(auction.title || 'Auction Item')}</h2>
-          <p class="muted">${labelFor(auction)}: <strong>${money(current)}</strong>${auction.minIncrement ? ` · Increment: ${money(auction.minIncrement)}` : ' · No fixed increment, next bid defaults to +10%'}</p>
+          <p class="muted">${labelFor(auction)}: <strong>${money(current)}</strong>${increment > 0 ? ` · Fixed increment: ${money(increment)}` : ' · No fixed increment'}</p>
         </div>
         ${buyout > 0 ? `<span class="auction-simple-buyout-pill">Buyout ${money(buyout)}</span>` : ''}
       </header>
@@ -172,7 +183,8 @@ function renderModal(auction, bids) {
             <section class="auction-simple-actions">
               <label>
                 <span>Your bid</span>
-                <input id="auction-simple-bid-input" value="${minimum}" inputmode="numeric" />
+                <input id="auction-simple-bid-input" value="${suggested}" placeholder="${suggested}" inputmode="numeric" />
+                <small>${increment > 0 ? `Minimum allowed: ${money(minimum)}` : `Minimum allowed: ${money(minimum)}. The +10% value is only a suggestion.`}</small>
               </label>
               <button type="button" id="auction-simple-place-bid">Place bid</button>
               ${buyout > 0 ? `<button type="button" id="auction-simple-buyout" class="ghost">Offer buyout</button>` : ''}
@@ -195,7 +207,7 @@ function renderModal(auction, bids) {
   root.querySelector('.auction-simple-close')?.addEventListener('click', closeModal);
   root.querySelector('#auction-simple-bid-input')?.addEventListener('input', event => { event.target.value = cleanNumber(event.target.value); });
   root.querySelector('#auction-simple-place-bid')?.addEventListener('click', async () => {
-    const amount = cleanNumber(root.querySelector('#auction-simple-bid-input')?.value || minimum);
+    const amount = cleanNumber(root.querySelector('#auction-simple-bid-input')?.value || suggested);
     try {
       await api(`/api/bazaar/auctions/${encodeURIComponent(auction.id)}/bid`, { method: 'POST', body: JSON.stringify({ amount }) });
       toast('Bid placed.', 'success');
@@ -274,7 +286,7 @@ function patchAuctionCreateForm(root = document) {
     const input = label.querySelector('input');
     if (!input || input.dataset.vtOptionalIncrementPatched === 'true') return;
     input.dataset.vtOptionalIncrementPatched = 'true';
-    input.placeholder = 'Optional: blank = +10%';
+    input.placeholder = 'Optional fixed amount, e.g. 500000';
     if (input.value === '1') {
       input.value = '';
       input.dispatchEvent(new Event('input', { bubbles: true }));
