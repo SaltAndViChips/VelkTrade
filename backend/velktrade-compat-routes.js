@@ -322,6 +322,31 @@ function installVelkTradeCompatRoutes({ app, authMiddleware, pool, query, run, g
     }
   }
 
+  async function listAuctionItems(req, res) {
+    try {
+      if (!(await isVerifiedUser(req))) return res.status(403).json({ error: 'Verified users only' });
+      await ensureAuctionTables();
+      await ensureColumns();
+      const userId = currentUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Not authenticated' });
+      const rows = await many(`
+        SELECT i.id, i.title, i.image, i.price
+        FROM items i
+        WHERE i.userid = $1
+          AND COALESCE(i.trade_pending, FALSE) = FALSE
+          AND NOT EXISTS (
+            SELECT 1 FROM bazaar_auctions a
+            WHERE a.item_id = i.id AND a.status = 'active'
+          )
+        ORDER BY i.title ASC, i.id DESC
+      `, [userId]);
+      res.json({ ok: true, items: rows.map(row => ({ id: row.id, title: row.title, image: row.image, price: row.price || '' })) });
+    } catch (error) {
+      console.error('list auction items failed:', error);
+      res.status(500).json({ error: error.message || 'Failed to load auctionable items' });
+    }
+  }
+
   async function listAuctions(req, res) {
     try {
       await ensureAuctionTables();
@@ -450,6 +475,8 @@ function installVelkTradeCompatRoutes({ app, authMiddleware, pool, query, run, g
   app.post('/api/items/:itemId/interest', auth, addInterest);
   app.delete('/api/items/:itemId/interest', auth, removeInterest);
 
+  app.get('/api/bazaar/auction-items', auth, listAuctionItems);
+  app.get('/api/bazaar/auctions/items', auth, listAuctionItems);
   app.get('/api/bazaar/auctions', auth, listAuctions);
   app.post('/api/bazaar/auctions', auth, createAuction);
   app.post('/api/bazaar/auctions/:auctionId/bid', auth, placeBid);
