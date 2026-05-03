@@ -1,0 +1,106 @@
+/* Persistent auction alert stack. */
+
+#velktrade-persistent-auction-alerts {
+  position: fixed !important;
+  right: 18px !important;
+  bottom: 18px !important;
+  z-index: 2147482100 !important;
+  display: grid !important;
+  gap: 9px !important;
+  width: min(360px, calc(100vw - 28px)) !important;
+  pointer-events: auto !important;
+}
+
+.persistent-auction-alerts-header,
+.persistent-auction-alert {
+  border: 1px solid rgba(142, 113, 255, .38) !important;
+  background:
+    radial-gradient(circle at top left, rgba(124, 76, 255, .16), transparent 36%),
+    rgba(9, 7, 16, .96) !important;
+  color: #f4f0ff !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .35), 0 0 24px rgba(124, 76, 255, .18) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+.persistent-auction-alerts-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  padding: 9px 11px !important;
+  border-radius: 14px !important;
+}
+
+.persistent-auction-alerts-header strong {
+  color: #ffdc93 !important;
+  font-size: 13px !important;
+  font-weight: 950 !important;
+}
+
+.persistent-auction-alerts-header button,
+.persistent-auction-alert-close {
+  border: 1px solid rgba(255, 255, 255, .12) !important;
+  background: rgba(255, 255, 255, .06) !important;
+  color: rgba(244, 240, 255, .86) !important;
+  border-radius: 999px !important;
+  cursor: pointer !important;
+}
+
+.persistent-auction-alerts-header button {
+  padding: 5px 9px !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+}
+
+.persistent-auction-alerts-list {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+.persistent-auction-alert {
+  position: relative !important;
+  padding: 12px 34px 12px 12px !important;
+  border-radius: 16px !important;
+}
+
+.persistent-auction-alert strong {
+  display: block !important;
+  margin-bottom: 4px !important;
+  color: #00fa9a !important;
+  font-size: 13px !important;
+  font-weight: 950 !important;
+}
+
+.persistent-auction-alert p {
+  margin: 0 0 6px !important;
+  color: rgba(244, 240, 255, .8) !important;
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+}
+
+.persistent-auction-alert small {
+  color: rgba(244, 240, 255, .52) !important;
+  font-size: 11px !important;
+}
+
+.persistent-auction-alert-close {
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  width: 22px !important;
+  height: 22px !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  font-size: 16px !important;
+  font-weight: 950 !important;
+}
+
+@media (max-width: 620px) {
+  #velktrade-persistent-auction-alerts {
+    left: 12px !important;
+    right: 12px !important;
+    bottom: 12px !important;
+    width: auto !important;
+  }
+}
