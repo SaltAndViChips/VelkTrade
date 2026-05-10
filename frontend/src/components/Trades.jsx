@@ -159,8 +159,8 @@ function BuyRequestsTab({ requests = [], currentUser, onRefresh }) {
   }
 
   return (
-    <section className="tidy-tab-panel">
-      <div className="tidy-toolbar">
+    <section className="tidy-tab-panel buy-offer-inbox-redesign">
+      <div className="tidy-toolbar buy-offer-toolbar">
         <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search buy offers by item, user, IC price..." />
         <div className="segmented-control compact"><button className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>All</button><button className={scope === 'on-my-items' ? 'active' : ''} onClick={() => setScope('on-my-items')}>Inbox</button><button className={scope === 'made-by-me' ? 'active' : ''} onClick={() => setScope('made-by-me')}>Sent</button></div>
         <button onClick={onRefresh}>Refresh</button>
@@ -168,23 +168,34 @@ function BuyRequestsTab({ requests = [], currentUser, onRefresh }) {
       {error && <p className="error">{error}</p>}
       <p className="muted tidy-count">Showing {filtered.length} of {normalizedRequests.length} buy offers.</p>
       {filtered.length === 0 && <p className="muted tidy-empty">No buy offers match this filter/search.</p>}
-      <div className="tidy-list">
+      <div className="buy-offer-list-redesign">
         {filtered.map((request, index) => {
           const displayPrice = formatPriceDisplay(request.itemPrice);
           const offeredIc = formatPriceDisplay(request.offeredIc || request.itemPrice);
           const title = vtText(request.itemTitle, 'Item');
           const image = vtText(request.itemImage);
           const isOnMyItem = Number(request.ownerId) === Number(currentUser.id);
+          const isMadeByMe = Number(request.requesterId) === Number(currentUser.id);
           const status = vtText(request.status, 'pending');
           const actionable = isOnMyItem && ['pending', 'countered'].includes(status);
           return (
-            <article className="tidy-trade-card" key={request.id || index}>
-              <div className="tidy-card-header"><div><strong>Buy Offer #{vtText(request.id, index + 1)}</strong><small>{vtText(request.createdAt)}</small></div><span className={`status-pill status-${status}`}>{status}</span></div>
-              <div className="tidy-buy-request-body">
-                <div className="mini-trade-grid trade-items-grid vt-unified-mosaic-grid"><div className="mini-trade-item vt-unified-item-card" data-item-id={request.itemId || ''} data-id={request.itemId || ''} data-title={title} data-price={displayPrice} data-owner-id={request.ownerId || ''} data-owner-username={request.ownerUsername || ''}>{image && <img src={image} alt={title} />}<span className="item-title">{title}</span>{displayPrice && <span className="sr-only item-price">{displayPrice}</span>}</div></div>
-                <div className="tidy-meta-grid"><span><strong>Offer</strong>{offeredIc || 'No IC amount'}</span><span><strong>Requester</strong>{vtText(request.requesterUsername)}</span><span><strong>Owner</strong>{vtText(request.ownerUsername)}</span>{request.message && <span><strong>Message</strong>{vtText(request.message)}</span>}</div>
+            <article className="buy-offer-card-redesign" key={request.id || index}>
+              <header className="buy-offer-card-header">
+                <div><strong>Buy Offer #{vtText(request.id, index + 1)}</strong><small>{vtText(request.createdAt) || 'No timestamp'}</small></div>
+                <span className={`status-pill status-${status}`}>{status}</span>
+              </header>
+              <div className="buy-offer-card-body">
+                <div className="buy-offer-item-preview vt-unified-item-card" data-item-id={request.itemId || ''} data-id={request.itemId || ''} data-title={title} data-price={displayPrice} data-owner-id={request.ownerId || ''} data-owner-username={request.ownerUsername || ''}>
+                  {image ? <img src={image} alt={title} /> : <div className="inventory-mosaic-placeholder">?</div>}
+                  <span className="item-title">{title}</span>
+                  {displayPrice && <span className="buy-offer-listing-price">Listed: {displayPrice}</span>}
+                </div>
+                <div className="buy-offer-details-panel">
+                  <div className="buy-offer-amount-card"><span>Offered IC</span><strong>{offeredIc || 'No IC amount'}</strong></div>
+                  <div className="buy-offer-meta-grid"><span><strong>Requester</strong>{vtText(request.requesterUsername, 'Unknown')}</span><span><strong>Owner</strong>{vtText(request.ownerUsername, 'Unknown')}</span><span><strong>Direction</strong>{isOnMyItem ? 'Inbox' : isMadeByMe ? 'Sent by you' : 'Visible'}</span>{request.message && <span className="buy-offer-message"><strong>Message</strong>{vtText(request.message)}</span>}</div>
+                  {actionable && <div className="tidy-card-actions buy-offer-actions"><button disabled={Boolean(busyId)} onClick={() => offerAction(request, 'accept')}>Accept</button><button disabled={Boolean(busyId)} className="ghost" onClick={() => offerAction(request, 'counter')}>Counter</button><button disabled={Boolean(busyId)} className="danger" onClick={() => offerAction(request, 'decline')}>Decline</button></div>}
+                </div>
               </div>
-              {actionable && <div className="tidy-card-actions"><button disabled={Boolean(busyId)} onClick={() => offerAction(request, 'accept')}>Accept</button><button disabled={Boolean(busyId)} className="ghost" onClick={() => offerAction(request, 'counter')}>Counter</button><button disabled={Boolean(busyId)} className="danger" onClick={() => offerAction(request, 'decline')}>Decline</button></div>}
             </article>
           );
         })}
@@ -210,6 +221,7 @@ export default function Trades({ trades = [], buyRequests = [], currentUser, foc
       const data = await api('/api/buy-offers/inbox');
       const rows = data.offers || data.buyOffers || data.buyRequests || data.requests || [];
       setLocalBuyRequests(safeArray(rows));
+      window.dispatchEvent(new CustomEvent('velktrade:trade-buy-offers-refreshed'));
     } catch (err) {
       const msg = vtText(err?.message, 'Could not load buy offer inbox.');
       setError(msg);
