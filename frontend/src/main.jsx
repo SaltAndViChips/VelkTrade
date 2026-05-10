@@ -4,6 +4,7 @@ import './auto-refresh-on-update.js';
 import './select-and-screen-persistence.js';
 import './topbar-inventory-button.js';
 import './activity-notification-poller.js';
+import './trade-buy-offer-alerts.js';
 import './persistent-auction-alerts.js';
 import './inventory-escrow-controls.js';
 import './bulk-select-event-guard.js';
@@ -20,6 +21,7 @@ import './persistent-auction-alerts.css';
 import './admin-economy-testview.css';
 import './admin-test-view-mode.css';
 import './folder-export-actions.css';
+import './trade-buy-offer-ui.css';
 import './trade-click-hotfix.js';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
