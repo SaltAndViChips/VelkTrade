@@ -1,0 +1,204 @@
+/* Buy offer inbox redesign + dashboard trade alert badge/glow. */
+
+.buy-offer-inbox-redesign {
+  overflow: visible !important;
+}
+
+.buy-offer-toolbar {
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.buy-offer-toolbar input {
+  min-width: min(520px, 100%) !important;
+}
+
+.buy-offer-list-redesign {
+  display: grid !important;
+  gap: 14px !important;
+}
+
+.buy-offer-card-redesign {
+  display: grid !important;
+  gap: 12px !important;
+  min-height: 0 !important;
+  padding: 14px !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(142, 113, 255, .28) !important;
+  background:
+    radial-gradient(circle at top left, rgba(124, 76, 255, .10), transparent 36%),
+    rgba(8, 6, 14, .48) !important;
+  overflow: visible !important;
+}
+
+.buy-offer-card-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+}
+
+.buy-offer-card-header div {
+  display: grid !important;
+  gap: 3px !important;
+}
+
+.buy-offer-card-header strong {
+  color: #f4f0ff !important;
+  font-size: 15px !important;
+}
+
+.buy-offer-card-header small {
+  color: rgba(244, 240, 255, .55) !important;
+}
+
+.buy-offer-card-body {
+  display: grid !important;
+  grid-template-columns: minmax(180px, 260px) minmax(280px, 1fr) !important;
+  gap: 14px !important;
+  align-items: stretch !important;
+}
+
+.buy-offer-item-preview {
+  display: grid !important;
+  grid-template-rows: minmax(230px, 330px) auto auto !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+  max-width: 260px !important;
+  padding: 8px !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(142, 113, 255, .25) !important;
+  background: rgba(0, 0, 0, .22) !important;
+  overflow: hidden !important;
+}
+
+.buy-offer-item-preview img {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 230px !important;
+  max-height: 330px !important;
+  object-fit: contain !important;
+  display: block !important;
+  border-radius: 10px !important;
+  background: #030307 !important;
+}
+
+.buy-offer-item-preview .item-title {
+  display: block !important;
+  min-height: 18px !important;
+  color: #f4f0ff !important;
+  text-align: center !important;
+  overflow-wrap: anywhere !important;
+}
+
+.buy-offer-listing-price {
+  display: block !important;
+  color: #ffdc93 !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+}
+
+.buy-offer-details-panel {
+  display: grid !important;
+  align-content: start !important;
+  gap: 12px !important;
+  min-width: 0 !important;
+}
+
+.buy-offer-amount-card {
+  display: grid !important;
+  gap: 4px !important;
+  padding: 14px !important;
+  border-radius: 15px !important;
+  border: 1px solid rgba(255, 220, 147, .28) !important;
+  background: rgba(255, 220, 147, .07) !important;
+}
+
+.buy-offer-amount-card span {
+  color: rgba(244, 240, 255, .62) !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+.buy-offer-amount-card strong {
+  color: #ffdc93 !important;
+  font-size: 24px !important;
+  font-weight: 950 !important;
+}
+
+.buy-offer-meta-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)) !important;
+  gap: 9px !important;
+}
+
+.buy-offer-meta-grid span {
+  display: grid !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+  padding: 10px !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 255, 255, .075) !important;
+  background: rgba(255, 255, 255, .035) !important;
+  color: rgba(244, 240, 255, .74) !important;
+  overflow-wrap: anywhere !important;
+}
+
+.buy-offer-meta-grid strong {
+  color: #00fa9a !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: .04em !important;
+}
+
+.buy-offer-message {
+  grid-column: 1 / -1 !important;
+}
+
+.buy-offer-actions {
+  margin-top: 2px !important;
+  justify-content: flex-start !important;
+}
+
+.dashboard-tile.trade-alert-glow,
+.dashboard-tile[data-open-trade-count]:not([data-open-trade-count="0"]) {
+  position: relative !important;
+  border-color: rgba(255, 220, 147, .58) !important;
+  box-shadow: 0 0 22px rgba(255, 220, 147, .18), 0 0 44px rgba(124, 76, 255, .18), inset 0 0 24px rgba(255, 220, 147, .05) !important;
+  animation: velktrade-trade-alert-pulse 2.4s ease-in-out infinite !important;
+}
+
+.dashboard-trade-count-badge {
+  position: absolute !important;
+  top: 8px !important;
+  right: 10px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 25px !important;
+  height: 25px !important;
+  padding: 0 8px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 220, 147, .65) !important;
+  background: rgba(255, 220, 147, .14) !important;
+  color: #ffdc93 !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+}
+
+@keyframes velktrade-trade-alert-pulse {
+  0%, 100% { box-shadow: 0 0 18px rgba(255, 220, 147, .14), 0 0 36px rgba(124, 76, 255, .14), inset 0 0 24px rgba(255, 220, 147, .04); }
+  50% { box-shadow: 0 0 28px rgba(255, 220, 147, .30), 0 0 56px rgba(124, 76, 255, .25), inset 0 0 28px rgba(255, 220, 147, .08); }
+}
+
+@media (max-width: 760px) {
+  .buy-offer-card-body {
+    grid-template-columns: 1fr !important;
+  }
+
+  .buy-offer-item-preview {
+    max-width: none !important;
+  }
+}
