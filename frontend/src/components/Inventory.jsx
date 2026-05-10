@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import InventoryToolsPanel from './InventoryToolsPanel.jsx';
+import { velkToast } from '../velktrade-feature-foundation.js';
 
 function vtText(value, fallback = '') {
   if (value === undefined || value === null) return fallback;
@@ -51,6 +52,180 @@ function stopSelectEvent(event) {
   event.stopPropagation();
   event.nativeEvent?.stopImmediatePropagation?.();
   event.stopImmediatePropagation?.();
+}
+
+function sanitizeFilename(value, fallback = 'folder') {
+  return vtText(value, fallback).replace(/[<>:"/\\|?*\x00-\x1f]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').slice(0, 80) || fallback;
+}
+
+function imageUrl(item) {
+  return vtText(item.image || item.imageUrl || item.src || item.url);
+}
+
+function imageTitle(item, index = 0) {
+  return sanitizeFilename(item.title || item.name || `item-${index + 1}`, `item-${index + 1}`);
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+function loadImageForCanvas(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error(`Could not load image: ${src}`));
+    image.src = src;
+  });
+}
+
+async function downloadFolderCollage(folder, items) {
+  const urls = items.map(imageUrl).filter(Boolean);
+  if (!urls.length) throw new Error('This folder has no images to export.');
+
+  const loaded = [];
+  for (const src of urls) {
+    try { loaded.push(await loadImageForCanvas(src)); } catch {}
+  }
+  if (!loaded.length) throw new Error('Could not load any folder images for the collage.');
+
+  const tile = 300;
+  const gap = 0;
+  const columns = Math.ceil(Math.sqrt(loaded.length));
+  const rows = Math.ceil(loaded.length / columns);
+  const canvas = document.createElement('canvas');
+  canvas.width = columns * tile + Math.max(0, columns - 1) * gap;
+  canvas.height = rows * tile + Math.max(0, rows - 1) * gap;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  loaded.forEach((img, index) => {
+    const col = index % columns;
+    const row = Math.floor(index / columns);
+    const x = col * (tile + gap);
+    const y = row * (tile + gap);
+    const scale = Math.min(tile / img.naturalWidth, tile / img.naturalHeight);
+    const width = img.naturalWidth * scale;
+    const height = img.naturalHeight * scale;
+    ctx.drawImage(img, x + (tile - width) / 2, y + (tile - height) / 2, width, height);
+  });
+
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  if (!blob) throw new Error('Could not create collage image.');
+  triggerDownload(blob, `${sanitizeFilename(folder.name, 'folder')}-collage.png`);
+}
+
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let i = 0; i < 256; i += 1) {
+    let c = i;
+    for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    table[i] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(bytes) {
+  let c = 0xffffffff;
+  for (let i = 0; i < bytes.length; i += 1) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function writeUint16(out, value) { out.push(value & 0xff, (value >>> 8) & 0xff); }
+function writeUint32(out, value) { out.push(value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff); }
+function bytesFromString(value) { return new TextEncoder().encode(value); }
+
+function makeZip(files) {
+  const local = [];
+  const central = [];
+  let offset = 0;
+
+  for (const file of files) {
+    const nameBytes = bytesFromString(file.name);
+    const data = file.data;
+    const crc = crc32(data);
+    const localHeader = [];
+    writeUint32(localHeader, 0x04034b50);
+    writeUint16(localHeader, 20);
+    writeUint16(localHeader, 0);
+    writeUint16(localHeader, 0);
+    writeUint16(localHeader, 0);
+    writeUint16(localHeader, 0);
+    writeUint32(localHeader, crc);
+    writeUint32(localHeader, data.length);
+    writeUint32(localHeader, data.length);
+    writeUint16(localHeader, nameBytes.length);
+    writeUint16(localHeader, 0);
+    local.push(new Uint8Array(localHeader), nameBytes, data);
+
+    const centralHeader = [];
+    writeUint32(centralHeader, 0x02014b50);
+    writeUint16(centralHeader, 20);
+    writeUint16(centralHeader, 20);
+    writeUint16(centralHeader, 0);
+    writeUint16(centralHeader, 0);
+    writeUint16(centralHeader, 0);
+    writeUint16(centralHeader, 0);
+    writeUint32(centralHeader, crc);
+    writeUint32(centralHeader, data.length);
+    writeUint32(centralHeader, data.length);
+    writeUint16(centralHeader, nameBytes.length);
+    writeUint16(centralHeader, 0);
+    writeUint16(centralHeader, 0);
+    writeUint16(centralHeader, 0);
+    writeUint16(centralHeader, 0);
+    writeUint32(centralHeader, 0);
+    writeUint32(centralHeader, offset);
+    central.push(new Uint8Array(centralHeader), nameBytes);
+    offset += localHeader.length + nameBytes.length + data.length;
+  }
+
+  const centralSize = central.reduce((sum, part) => sum + part.length, 0);
+  const end = [];
+  writeUint32(end, 0x06054b50);
+  writeUint16(end, 0);
+  writeUint16(end, 0);
+  writeUint16(end, files.length);
+  writeUint16(end, files.length);
+  writeUint32(end, centralSize);
+  writeUint32(end, offset);
+  writeUint16(end, 0);
+  return new Blob([...local, ...central, new Uint8Array(end)], { type: 'application/zip' });
+}
+
+function extensionFromUrl(url, contentType = '') {
+  if (/png/i.test(contentType)) return 'png';
+  if (/webp/i.test(contentType)) return 'webp';
+  if (/gif/i.test(contentType)) return 'gif';
+  const match = String(url).split('?')[0].match(/\.([a-z0-9]{2,5})$/i);
+  if (match) return match[1].toLowerCase() === 'jpeg' ? 'jpg' : match[1].toLowerCase();
+  return 'jpg';
+}
+
+async function downloadFolderZip(folder, items) {
+  const imageItems = items.map((item, index) => ({ item, index, url: imageUrl(item) })).filter(entry => entry.url);
+  if (!imageItems.length) throw new Error('This folder has no images to export.');
+  const files = [];
+  for (const entry of imageItems) {
+    try {
+      const response = await fetch(entry.url, { mode: 'cors' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const buffer = await response.arrayBuffer();
+      const ext = extensionFromUrl(entry.url, response.headers.get('content-type') || '');
+      files.push({ name: `${String(entry.index + 1).padStart(2, '0')}-${imageTitle(entry.item, entry.index)}.${ext}`, data: new Uint8Array(buffer) });
+    } catch {}
+  }
+  if (!files.length) throw new Error('Could not fetch any images for the zip.');
+  triggerDownload(makeZip(files), `${sanitizeFilename(folder.name, 'folder')}-images.zip`);
 }
 
 function ItemTile({ item, readOnly = false, selectable = false, selected = false, onToggleSelected, onClickItem, onDoubleClickItem, revealTick = 0 }) {
@@ -117,7 +292,8 @@ function ItemTile({ item, readOnly = false, selectable = false, selected = false
   );
 }
 
-function FolderTile({ folder, count, open, selectable = false, selected = false, onToggle, onSelectFolder }) {
+function FolderTile({ folder, items = [], count, open, selectable = false, selected = false, onToggle, onSelectFolder }) {
+  const [exportBusy, setExportBusy] = useState('');
   const icon = vtText(folder.icon, '📁');
   const color = safeCssColor(folder.color);
   const name = vtText(folder.name, 'Folder');
@@ -131,6 +307,21 @@ function FolderTile({ folder, count, open, selectable = false, selected = false,
     stopSelectEvent(event);
   }
 
+  async function exportFolder(event, mode) {
+    stopSelectEvent(event);
+    if (exportBusy) return;
+    setExportBusy(mode);
+    try {
+      if (mode === 'zip') await downloadFolderZip(folder, items);
+      else await downloadFolderCollage(folder, items);
+      velkToast(`${name} exported.`, 'success');
+    } catch (error) {
+      velkToast(error.message || `Could not export ${name}.`, 'error', 6500);
+    } finally {
+      setExportBusy('');
+    }
+  }
+
   return (
     <article className={`inventory-folder-card vt-folder-card inventory-mosaic-folder ${open ? 'open' : ''} ${selected ? 'bulk-selected' : ''}`} data-folder-id={folder.id} data-title={name} data-no-item-popup="true" style={{ '--folder-color': color }}>
       {selectable && <button type="button" className="bulk-select-pill folder-select-pill" onPointerDown={selectFolder} onPointerUp={suppressSelectPopup} onMouseDown={selectFolder} onMouseUp={suppressSelectPopup} onClick={selectFolder}>{selected ? '✓ Selected' : 'Select'}</button>}
@@ -139,6 +330,10 @@ function FolderTile({ folder, count, open, selectable = false, selected = false,
         <strong className="item-title inventory-mosaic-title">{name}</strong>
         <span className="inventory-folder-count">{count} item{count === 1 ? '' : 's'}</span>
       </button>
+      <div className="folder-export-actions" data-no-item-popup="true">
+        <button type="button" onPointerDown={suppressSelectPopup} onMouseDown={suppressSelectPopup} onClick={event => exportFolder(event, 'zip')} disabled={Boolean(exportBusy) || !items.length}>{exportBusy === 'zip' ? 'Zipping…' : 'ZIP'}</button>
+        <button type="button" onPointerDown={suppressSelectPopup} onMouseDown={suppressSelectPopup} onClick={event => exportFolder(event, 'collage')} disabled={Boolean(exportBusy) || !items.length}>{exportBusy === 'collage' ? 'Making…' : 'Collage'}</button>
+      </div>
     </article>
   );
 }
@@ -265,7 +460,7 @@ export default function Inventory({
     for (const entry of folderViews) {
       const folderId = entry.folder.id;
       const open = openFolderIds.map(String).includes(String(folderId));
-      entries.push({ type: 'folder', key: `folder-${folderId}`, folder: entry.folder, count: entry.items.length, open });
+      entries.push({ type: 'folder', key: `folder-${folderId}`, folder: entry.folder, items: entry.items, count: entry.items.length, open });
     }
     for (const item of flatItems) {
       const fromOpenFolder = openFolderItemIds.has(Number(item.id));
@@ -300,7 +495,7 @@ export default function Inventory({
       <div className="inventory-mosaic-grid item-grid inventory-grid vt-unified-mosaic-grid">
         {mosaicEntries.length === 0 && <p className="muted">No items here.</p>}
         {mosaicEntries.map((entry, index) => entry.type === 'folder' ? (
-          <FolderTile key={entry.key} folder={entry.folder} count={entry.count} open={entry.open} selectable={selectionEnabled} selected={folderSelected(entry.folder.id)} onToggle={() => toggleFolder(entry.folder.id)} onSelectFolder={toggleFolderSelected} />
+          <FolderTile key={entry.key} folder={entry.folder} items={entry.items} count={entry.count} open={entry.open} selectable={selectionEnabled} selected={folderSelected(entry.folder.id)} onToggle={() => toggleFolder(entry.folder.id)} onSelectFolder={toggleFolderSelected} />
         ) : (
           <ItemTile
             key={entry.key}
