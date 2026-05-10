@@ -1,0 +1,47 @@
+/* Folder export actions for inventory/profile folders. */
+
+.inventory-folder-card {
+  position: relative !important;
+}
+
+.folder-export-actions {
+  position: absolute !important;
+  left: 8px !important;
+  right: 8px !important;
+  bottom: 8px !important;
+  z-index: 12 !important;
+  display: flex !important;
+  gap: 6px !important;
+  justify-content: center !important;
+  pointer-events: auto !important;
+}
+
+.folder-export-actions button {
+  min-height: 25px !important;
+  padding: 4px 8px !important;
+  border-radius: 999px !important;
+  border: 1px solid color-mix(in srgb, var(--folder-color, #00fa9a) 65%, white 15%) !important;
+  background: rgba(5, 5, 10, .72) !important;
+  color: var(--folder-color, #00fa9a) !important;
+  font-size: 10px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--folder-color, #00fa9a) 22%, transparent) !important;
+  backdrop-filter: blur(5px) !important;
+}
+
+.folder-export-actions button:hover,
+.folder-export-actions button:focus-visible {
+  background: rgba(255, 255, 255, .08) !important;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--folder-color, #00fa9a) 32%, transparent) !important;
+}
+
+.folder-export-actions button:disabled {
+  opacity: .62 !important;
+  cursor: wait !important;
+}
+
+.inventory-folder-card .inventory-folder-cover {
+  padding-bottom: 42px !important;
+}
