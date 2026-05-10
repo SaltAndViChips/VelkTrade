@@ -19,6 +19,7 @@ import './inventory-escrow-controls.css';
 import './persistent-auction-alerts.css';
 import './admin-economy-testview.css';
 import './admin-test-view-mode.css';
+import './folder-export-actions.css';
 import './trade-click-hotfix.js';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
