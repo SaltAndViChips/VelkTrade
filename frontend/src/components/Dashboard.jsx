@@ -8,6 +8,7 @@ const RANGE_OPTIONS = [
 ];
 
 const DASHBOARD_FAQ_KEY = 'velktrade:dashboard-faq-seen:v1';
+const OPEN_TRADE_COUNT_KEY = 'velktrade:open-trade-buy-offer-count:v1';
 
 function shortDate(value, range) {
   const date = new Date(value);
@@ -425,10 +426,28 @@ export default function Dashboard({
   const [roomId, setRoomId] = useState('');
   const [profileUsername, setProfileUsername] = useState('');
   const [showFaq, setShowFaq] = useState(false);
+  const [openTradeCount, setOpenTradeCount] = useState(() => Number(window.localStorage.getItem(OPEN_TRADE_COUNT_KEY) || 0));
 
   useEffect(() => {
     const hasSeenFaq = window.localStorage.getItem(DASHBOARD_FAQ_KEY) === 'true';
     if (!hasSeenFaq) setShowFaq(true);
+  }, []);
+
+  useEffect(() => {
+    function updateCount(event) {
+      setOpenTradeCount(Number(event.detail?.count ?? window.localStorage.getItem(OPEN_TRADE_COUNT_KEY) ?? 0));
+    }
+    function storage(event) {
+      if (event.key === OPEN_TRADE_COUNT_KEY) setOpenTradeCount(Number(event.newValue || 0));
+    }
+    window.addEventListener('velktrade:open-trade-count-changed', updateCount);
+    window.addEventListener('storage', storage);
+    const timer = window.setInterval(() => setOpenTradeCount(Number(window.localStorage.getItem(OPEN_TRADE_COUNT_KEY) || 0)), 2500);
+    return () => {
+      window.removeEventListener('velktrade:open-trade-count-changed', updateCount);
+      window.removeEventListener('storage', storage);
+      window.clearInterval(timer);
+    };
   }, []);
 
   function closeFaq() {
@@ -477,8 +496,9 @@ export default function Dashboard({
           My Inventory
         </button>
 
-        <button className="dashboard-tile" onClick={() => onNavigate('trades')}>
+        <button className={`dashboard-tile ${openTradeCount > 0 ? 'trade-alert-glow' : ''}`} data-open-trade-count={openTradeCount} onClick={() => onNavigate('trades')}>
           Trades
+          {openTradeCount > 0 && <span className="dashboard-trade-count-badge">{openTradeCount}</span>}
         </button>
 
         <button className="dashboard-tile" onClick={() => onNavigate('bazaar')}>
