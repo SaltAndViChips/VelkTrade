@@ -16,3 +16,5 @@ echo "Deploying frontend to GitHub Pages..."
 npm run deploy
 
 echo "Done."
+
+read -p "Press Enter to exit..."
