@@ -41,14 +41,14 @@ function writeLocalNotifications(notifications) {
 }
 
 function activityToNotification(activity) {
-  const type = activity?.kind === 'auction' ? 'auction_activity'
+  const type = activity?.type || (activity?.kind === 'auction' ? 'auction_activity'
     : activity?.kind === 'bazaar' ? 'verified_bazaar_activity'
     : activity?.kind === 'invite' ? 'room_invite'
     : activity?.kind === 'trade' ? 'offline_trade'
-    : activity?.type || 'activity';
+    : 'activity');
 
   return {
-    id: activity?.key || `activity-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    id: activity?.key || activity?.id || `activity-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     type,
     title: activity?.title || 'VelkTrade activity',
     message: activity?.message || activity?.body || 'New activity.',
@@ -90,6 +90,10 @@ export default function PresenceNotificationsDropdown({
   const [localNotifications, setLocalNotifications] = useState(() => readLocalNotifications());
 
   useEffect(() => {
+    function reloadLocalNotifications() {
+      setLocalNotifications(readLocalNotifications());
+    }
+
     function handleActivity(event) {
       const next = activityToNotification(event.detail || {});
       setLocalNotifications(current => {
@@ -100,13 +104,15 @@ export default function PresenceNotificationsDropdown({
     }
 
     function handleStorage(event) {
-      if (event.key === LOCAL_NOTIFICATIONS_KEY) setLocalNotifications(readLocalNotifications());
+      if (event.key === LOCAL_NOTIFICATIONS_KEY) reloadLocalNotifications();
     }
 
     window.addEventListener('velktrade:activity-notification', handleActivity);
+    window.addEventListener('velktrade:activity-notification-sync', reloadLocalNotifications);
     window.addEventListener('storage', handleStorage);
     return () => {
       window.removeEventListener('velktrade:activity-notification', handleActivity);
+      window.removeEventListener('velktrade:activity-notification-sync', reloadLocalNotifications);
       window.removeEventListener('storage', handleStorage);
     };
   }, []);
@@ -130,10 +136,8 @@ export default function PresenceNotificationsDropdown({
       .sort((a, b) => {
         const adminDiff = Number(isAdminPlayer(b)) - Number(isAdminPlayer(a));
         if (adminDiff) return adminDiff;
-
         const verifiedDiff = Number(isVerifiedPlayer(b)) - Number(isVerifiedPlayer(a));
         if (verifiedDiff) return verifiedDiff;
-
         return String(a?.username || '').localeCompare(String(b?.username || ''));
       });
   }, [onlineUsers, currentUser]);
@@ -190,63 +194,23 @@ export default function PresenceNotificationsDropdown({
 
           {tab === 'online' && (
             <div className="presence-list">
-              <div className="presence-panel-title">
-                <strong>Online Players</strong>
-                <span>{sortedUsers.length}</span>
-              </div>
-
-              {pendingRoomInvite && (
-                <div className="presence-pending-invite">
-                  <span>Pending invite to <strong>{pendingRoomInvite.toUsername || 'player'}</strong></span>
-                  <button type="button" className="ghost" onClick={onCancelInvite}>Cancel Invite</button>
-                </div>
-              )}
-
+              <div className="presence-panel-title"><strong>Online Players</strong><span>{sortedUsers.length}</span></div>
+              {pendingRoomInvite && <div className="presence-pending-invite"><span>Pending invite to <strong>{pendingRoomInvite.toUsername || 'player'}</strong></span><button type="button" className="ghost" onClick={onCancelInvite}>Cancel Invite</button></div>}
               {!currentRoomId && <p className="muted presence-hint">Join or create a room to invite online players.</p>}
               {sortedUsers.length === 0 && <p className="muted tidy-empty">No other players online.</p>}
-
               {sortedUsers.map(player => {
                 const admin = isAdminPlayer(player);
                 const verified = isVerifiedPlayer(player);
                 const away = player?.status === 'away';
                 const inviteDisabled = !currentRoomId || Boolean(pendingRoomInvite);
-
-                return (
-                  <article className="presence-player-card" key={player.id || player.username}>
-                    <div className="presence-player-main">
-                      <span className={`online-dot ${away ? 'away' : ''}`} />
-                      <strong>{player.username}</strong>
-                      {admin ? <span className="admin-badge">Admin</span> : verified ? <span className="verified-badge mini" title="Verified user">✓</span> : null}
-                      <small>{statusLabel(player)}</small>
-                    </div>
-
-                    <div className="presence-player-actions">
-                      <button type="button" className="ghost" onClick={() => openProfile(player.username)}>Profile</button>
-                      <button type="button" disabled={inviteDisabled} onClick={() => onInvitePlayer(player.username)}>
-                        {pendingRoomInvite ? 'Invite Pending' : 'Invite'}
-                      </button>
-                    </div>
-                  </article>
-                );
+                return <article className="presence-player-card" key={player.id || player.username}><div className="presence-player-main"><span className={`online-dot ${away ? 'away' : ''}`} /><strong>{player.username}</strong>{admin ? <span className="admin-badge">Admin</span> : verified ? <span className="verified-badge mini" title="Verified user">✓</span> : null}<small>{statusLabel(player)}</small></div><div className="presence-player-actions"><button type="button" className="ghost" onClick={() => openProfile(player.username)}>Profile</button><button type="button" disabled={inviteDisabled} onClick={() => onInvitePlayer(player.username)}>{pendingRoomInvite ? 'Invite Pending' : 'Invite'}</button></div></article>;
               })}
             </div>
           )}
 
           {tab === 'notifications' && (
             <div className="presence-notifications-tab">
-              <Notifications
-                compact
-                notifications={combinedNotifications}
-                preferences={preferences || {}}
-                tradeStatuses={tradeStatuses || {}}
-                onRefresh={refreshNotifications}
-                onMarkRead={markRead}
-                onMarkAllRead={markAllRead}
-                onSavePreferences={onSavePreferences}
-                onCheckTrade={onCheckTrade}
-                onAcceptRoomInvite={onAcceptRoomInvite}
-                onDeclineRoomInvite={onDeclineRoomInvite}
-              />
+              <Notifications compact notifications={combinedNotifications} preferences={preferences || {}} tradeStatuses={tradeStatuses || {}} onRefresh={refreshNotifications} onMarkRead={markRead} onMarkAllRead={markAllRead} onSavePreferences={onSavePreferences} onCheckTrade={onCheckTrade} onAcceptRoomInvite={onAcceptRoomInvite} onDeclineRoomInvite={onDeclineRoomInvite} />
             </div>
           )}
         </section>
