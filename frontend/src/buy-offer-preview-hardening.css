@@ -1,0 +1,64 @@
+/* Hardening for Buy Offer Inbox previews and status visibility. */
+
+.buy-offer-item-preview {
+  min-height: 310px !important;
+  display: grid !important;
+  grid-template-rows: minmax(230px, 1fr) auto auto !important;
+  align-items: stretch !important;
+  overflow: visible !important;
+}
+
+.buy-offer-item-preview img {
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  width: 100% !important;
+  min-height: 230px !important;
+  object-fit: contain !important;
+  background: #030307 !important;
+}
+
+.buy-offer-missing-preview,
+.buy-offer-preview-fallback {
+  display: grid !important;
+  place-items: center !important;
+  align-content: center !important;
+  gap: 7px !important;
+  min-height: 230px !important;
+  width: 100% !important;
+  border-radius: 12px !important;
+  border: 1px dashed rgba(255, 220, 147, .42) !important;
+  background:
+    radial-gradient(circle at center, rgba(255, 220, 147, .12), transparent 48%),
+    rgba(0, 0, 0, .35) !important;
+  color: #ffdc93 !important;
+  text-align: center !important;
+}
+
+.buy-offer-missing-preview strong,
+.buy-offer-preview-fallback strong {
+  display: block !important;
+  color: #ffdc93 !important;
+  font-size: 15px !important;
+  font-weight: 950 !important;
+}
+
+.buy-offer-missing-preview span,
+.buy-offer-preview-fallback span {
+  display: block !important;
+  color: rgba(244, 240, 255, .68) !important;
+  font-size: 12px !important;
+  overflow-wrap: anywhere !important;
+}
+
+.status-pill.status-accepted {
+  border-color: rgba(0, 250, 154, .55) !important;
+  background: rgba(0, 250, 154, .12) !important;
+  color: #00fa9a !important;
+}
+
+.status-pill.status-declined {
+  border-color: rgba(255, 90, 120, .55) !important;
+  background: rgba(255, 90, 120, .12) !important;
+  color: #ff8fa4 !important;
+}
