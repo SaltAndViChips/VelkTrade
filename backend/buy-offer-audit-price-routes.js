@@ -37,7 +37,7 @@ function installBuyOfferAuditPriceRoutes({ app, authMiddleware }) {
   }
 
   function itemOwnerId(item) {
-    return item?.userId ?? item?.userid ?? item?.user_id ?? item?.ownerId ?? item?.owner_id ?? null;
+    return item?.userId ?? item?.userid ?? item?.ownerId ?? item?.owner_id ?? null;
   }
 
   function ownsItem(req, item) {
@@ -139,7 +139,7 @@ function installBuyOfferAuditPriceRoutes({ app, authMiddleware }) {
       SELECT br.*, br.item_id AS "itemId", br.requester_id AS "requesterId", br.owner_id AS "ownerId",
         requester.username AS "requesterUsername", owner.username AS "ownerUsername",
         i.title AS "itemTitle", i.image AS "itemImage", i.price AS "itemPrice",
-        COALESCE(i.userId, i.userid, i.user_id) AS "itemOwnerId"
+        COALESCE(i.userId, i.userid) AS "itemOwnerId"
       FROM buy_requests br
       JOIN items i ON i.id = br.item_id
       JOIN users requester ON requester.id = br.requester_id
