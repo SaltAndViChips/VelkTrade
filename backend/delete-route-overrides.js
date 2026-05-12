@@ -6,7 +6,7 @@
 */
 
 const express = require('express');
-const { get, run } = require('./db');
+const { get, all, run } = require('./db');
 const { authMiddleware } = require('./auth');
 
 function optionalInstaller(path, label) {
@@ -24,6 +24,7 @@ function optionalInstaller(path, label) {
 }
 
 const routeInstallers = [
+  ['public-bazaar-preview-routes', optionalInstaller('./public-bazaar-preview-routes', 'public-bazaar-preview-routes')],
   ['item-lock-routes', optionalInstaller('./item-lock-routes', 'item-lock-routes')],
   ['buy-offer-audit-price-routes', optionalInstaller('./buy-offer-audit-price-routes', 'buy-offer-audit-price-routes')],
   ['bazaar-watchlist-filter-routes', optionalInstaller('./bazaar-watchlist-filter-routes', 'bazaar-watchlist-filter-routes')],
@@ -161,7 +162,7 @@ function installFeatureRoutesOnce(app, originalUse) {
 
   for (const [label, installer] of routeInstallers) {
     try {
-      installer({ app, authMiddleware, run, get });
+      installer({ app, authMiddleware, run, get, all });
       console.log(`[VelkTrade preload] Installed ${label}.`);
     } catch (error) {
       console.error(`[VelkTrade preload] Failed while installing ${label}; skipped so backend can still start.`, error);
