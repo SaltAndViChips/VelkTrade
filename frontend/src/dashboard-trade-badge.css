@@ -1,0 +1,73 @@
+/* Dashboard Trades tile badge for open trade/buy-offer count. */
+
+.dashboard-trades-tile {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+  padding-right: 64px !important;
+  overflow: visible !important;
+}
+
+.dashboard-trades-tile .dashboard-tile-label {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-width: 0 !important;
+}
+
+.dashboard-trade-count-badge {
+  position: absolute !important;
+  top: 50% !important;
+  right: 18px !important;
+  transform: translateY(-50%) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 30px !important;
+  height: 30px !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 220, 147, .78) !important;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, .22), transparent 32%),
+    linear-gradient(135deg, rgba(255, 220, 147, .28), rgba(124, 77, 255, .32)) !important;
+  color: #ffdc93 !important;
+  font-size: 13px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  letter-spacing: .01em !important;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, .55) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 220, 147, .16),
+    0 0 18px rgba(255, 220, 147, .24),
+    0 0 28px rgba(124, 77, 255, .22) !important;
+  pointer-events: none !important;
+}
+
+.dashboard-trades-tile.trade-alert-glow {
+  border-color: rgba(255, 220, 147, .65) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .16),
+    0 8px 22px rgba(0, 0, 0, .34),
+    0 0 18px rgba(255, 220, 147, .14),
+    0 0 34px rgba(124, 77, 255, .22) !important;
+  animation: dashboard-trades-badge-pulse 2.6s ease-in-out infinite !important;
+}
+
+@keyframes dashboard-trades-badge-pulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .16),
+      0 8px 22px rgba(0, 0, 0, .34),
+      0 0 16px rgba(255, 220, 147, .12),
+      0 0 30px rgba(124, 77, 255, .18);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .18),
+      0 8px 24px rgba(0, 0, 0, .36),
+      0 0 24px rgba(255, 220, 147, .28),
+      0 0 44px rgba(124, 77, 255, .30);
+  }
+}
