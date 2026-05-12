@@ -24,6 +24,7 @@ import './admin-test-view-mode.css';
 import './folder-export-actions.css';
 import './trade-buy-offer-ui.css';
 import './buy-offer-preview-hardening.css';
+import './buy-offer-v2.css';
 import './trade-click-hotfix.js';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
