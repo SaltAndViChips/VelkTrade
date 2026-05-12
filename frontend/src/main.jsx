@@ -10,7 +10,6 @@ import './inventory-escrow-controls.js';
 import './bulk-select-event-guard.js';
 import './auction-first-bid-minimum-hotfix.js';
 import './admin-test-view-mode.js';
-import './buy-offer-preview-dom-guard.js';
 import App from './App.jsx';
 import AppErrorBoundary from './components/AppErrorBoundary.jsx';
 import './styles.css';
@@ -22,8 +21,6 @@ import './persistent-auction-alerts.css';
 import './admin-economy-testview.css';
 import './admin-test-view-mode.css';
 import './folder-export-actions.css';
-import './trade-buy-offer-ui.css';
-import './buy-offer-preview-hardening.css';
 import './buy-offer-v2.css';
 import './trade-click-hotfix.js';
 
