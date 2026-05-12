@@ -10,6 +10,7 @@ import './inventory-escrow-controls.js';
 import './bulk-select-event-guard.js';
 import './auction-first-bid-minimum-hotfix.js';
 import './admin-test-view-mode.js';
+import './public-bazaar-route.js';
 import App from './App.jsx';
 import AppErrorBoundary from './components/AppErrorBoundary.jsx';
 import './styles.css';
@@ -23,6 +24,7 @@ import './admin-test-view-mode.css';
 import './folder-export-actions.css';
 import './buy-offer-v2.css';
 import './dashboard-trade-badge.css';
+import './public-bazaar-route.css';
 import './trade-click-hotfix.js';
 
 ReactDOM.createRoot(document.getElementById('root')).render(

@@ -1,0 +1,188 @@
+/* Public Bazaar dedicated route and Discord-preview UI. */
+
+.public-bazaar-page {
+  min-height: 100vh;
+  padding: 28px;
+  background:
+    radial-gradient(circle at top left, rgba(124, 77, 255, .18), transparent 34%),
+    radial-gradient(circle at top right, rgba(0, 250, 154, .08), transparent 30%),
+    #07050c;
+  color: #f4f0ff;
+}
+
+.public-bazaar-hero,
+.public-bazaar-preview-card {
+  width: min(1180px, 100%);
+  margin: 0 auto 18px;
+  padding: 24px;
+  border-radius: 24px;
+  border: 1px solid rgba(124, 77, 255, .36);
+  background:
+    radial-gradient(circle at 8% 0%, rgba(124, 77, 255, .24), transparent 38%),
+    rgba(12, 8, 20, .88);
+  box-shadow: 0 0 48px rgba(124, 77, 255, .16);
+}
+
+.public-bazaar-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+}
+
+.public-bazaar-kicker {
+  margin: 0 0 8px;
+  color: #00fa9a;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.public-bazaar-hero h1 {
+  margin: 0;
+  font-size: clamp(32px, 5vw, 56px);
+  line-height: .95;
+}
+
+.public-bazaar-hero p,
+.public-bazaar-preview-title p {
+  color: rgba(244, 240, 255, .72);
+}
+
+.public-bazaar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.public-bazaar-actions a,
+.public-bazaar-actions button,
+.public-bazaar-login-action {
+  border: 1px solid rgba(142, 113, 255, .42);
+  border-radius: 14px;
+  padding: 11px 14px;
+  background: rgba(0, 0, 0, .24);
+  color: #fff;
+  font-weight: 900;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.public-bazaar-actions .public-bazaar-primary,
+.public-bazaar-login-action {
+  background: linear-gradient(135deg, #7c4dff, #a56cff);
+  box-shadow: 0 0 22px rgba(124, 77, 255, .25);
+}
+
+.public-bazaar-preview-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+
+.public-bazaar-preview-title h2 {
+  margin: 0;
+}
+
+.public-bazaar-preview-title code {
+  max-width: 420px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 220, 147, .26);
+  background: rgba(255, 220, 147, .08);
+  color: #ffdc93;
+  white-space: normal;
+  word-break: break-all;
+}
+
+.public-bazaar-mini-row,
+.public-bazaar-grid {
+  display: grid;
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  gap: 14px;
+}
+
+.public-bazaar-mini-row {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin-top: 16px;
+}
+
+.public-bazaar-grid {
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+}
+
+.public-bazaar-mini-row article,
+.public-bazaar-item {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(142, 113, 255, .30);
+  background: rgba(10, 7, 18, .78);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, .22);
+}
+
+.public-bazaar-mini-row img,
+.public-bazaar-image img,
+.public-bazaar-empty {
+  width: 100%;
+  height: 230px;
+  object-fit: contain;
+  border-radius: 14px;
+  background: #030307;
+}
+
+.public-bazaar-mini-row img {
+  height: 160px;
+}
+
+.public-bazaar-empty {
+  display: grid;
+  place-items: center;
+  color: #ffdc93;
+  font-size: 36px;
+  font-weight: 950;
+}
+
+.public-bazaar-item strong,
+.public-bazaar-mini-row strong {
+  color: #f4f0ff;
+  text-align: center;
+}
+
+.public-bazaar-item span,
+.public-bazaar-mini-row span {
+  color: #ffdc93;
+  font-weight: 950;
+  text-align: center;
+}
+
+.public-bazaar-item small {
+  color: rgba(244, 240, 255, .62);
+  text-align: center;
+}
+
+.public-bazaar-error,
+.public-bazaar-empty-state {
+  width: min(1180px, 100%);
+  margin: 0 auto 18px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 90, 120, .42);
+  background: rgba(255, 90, 120, .10);
+  color: #ff8fa4;
+}
+
+@media (max-width: 820px) {
+  .public-bazaar-hero,
+  .public-bazaar-preview-title {
+    flex-direction: column;
+  }
+  .public-bazaar-actions {
+    justify-content: flex-start;
+  }
+}
