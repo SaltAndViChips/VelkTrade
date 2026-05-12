@@ -1,0 +1,256 @@
+/* Buy Offer Inbox v2: explicit preview column, readable details, no collapsed cards. */
+
+.buy-offer-v2-shell {
+  display: grid !important;
+  gap: 14px !important;
+  overflow: visible !important;
+}
+
+.buy-offer-v2-toolbar {
+  display: grid !important;
+  grid-template-columns: minmax(260px, 1fr) auto auto !important;
+  gap: 10px !important;
+  align-items: center !important;
+  padding: 10px !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(142, 113, 255, .18) !important;
+  background: rgba(0, 0, 0, .16) !important;
+}
+
+.buy-offer-v2-filter-group {
+  display: inline-flex !important;
+  gap: 4px !important;
+  padding: 4px !important;
+  border-radius: 999px !important;
+  background: rgba(0, 0, 0, .24) !important;
+  border: 1px solid rgba(142, 113, 255, .22) !important;
+}
+
+.buy-offer-v2-filter-group button {
+  min-height: 30px !important;
+  padding: 6px 10px !important;
+  border-radius: 999px !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: rgba(244, 240, 255, .72) !important;
+}
+
+.buy-offer-v2-filter-group button.active {
+  background: linear-gradient(135deg, #7c4dff, #a56cff) !important;
+  color: #fff !important;
+  box-shadow: 0 0 18px rgba(124, 77, 255, .35) !important;
+}
+
+.buy-offer-v2-list {
+  display: grid !important;
+  gap: 16px !important;
+  overflow: visible !important;
+}
+
+.buy-offer-v2-card {
+  display: grid !important;
+  gap: 12px !important;
+  padding: 14px !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(142, 113, 255, .30) !important;
+  background:
+    radial-gradient(circle at top left, rgba(124, 76, 255, .13), transparent 34%),
+    rgba(8, 6, 14, .58) !important;
+  overflow: visible !important;
+}
+
+.buy-offer-v2-header {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+}
+
+.buy-offer-v2-header > div {
+  display: grid !important;
+  gap: 4px !important;
+}
+
+.buy-offer-v2-header strong {
+  color: #f4f0ff !important;
+  font-size: 15px !important;
+  font-weight: 950 !important;
+}
+
+.buy-offer-v2-header small {
+  color: rgba(244, 240, 255, .56) !important;
+  font-size: 12px !important;
+}
+
+.buy-offer-v2-content {
+  display: grid !important;
+  grid-template-columns: 260px minmax(280px, 1fr) !important;
+  gap: 16px !important;
+  align-items: stretch !important;
+  min-width: 0 !important;
+}
+
+.buy-offer-v2-preview {
+  display: grid !important;
+  grid-template-rows: 260px auto auto !important;
+  gap: 8px !important;
+  width: 260px !important;
+  min-width: 260px !important;
+  min-height: 340px !important;
+  padding: 9px !important;
+  border-radius: 15px !important;
+  border: 1px solid rgba(142, 113, 255, .28) !important;
+  background: rgba(0, 0, 0, .26) !important;
+  overflow: hidden !important;
+}
+
+.buy-offer-v2-image-box {
+  position: relative !important;
+  display: grid !important;
+  place-items: center !important;
+  min-height: 260px !important;
+  width: 100% !important;
+  border-radius: 12px !important;
+  background: #030307 !important;
+  overflow: hidden !important;
+}
+
+.buy-offer-v2-image-box img {
+  position: relative !important;
+  z-index: 2 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  background: #030307 !important;
+}
+
+.buy-offer-v2-fallback {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 1 !important;
+  display: grid !important;
+  place-items: center !important;
+  align-content: center !important;
+  gap: 8px !important;
+  padding: 18px !important;
+  border: 1px dashed rgba(255, 220, 147, .42) !important;
+  border-radius: 12px !important;
+  background:
+    radial-gradient(circle at center, rgba(255, 220, 147, .12), transparent 48%),
+    rgba(0, 0, 0, .34) !important;
+  color: #ffdc93 !important;
+  text-align: center !important;
+}
+
+.buy-offer-v2-image-box.image-failed .buy-offer-v2-fallback,
+.buy-offer-v2-image-box:not(:has(img)) .buy-offer-v2-fallback {
+  z-index: 3 !important;
+}
+
+.buy-offer-v2-fallback strong {
+  color: #ffdc93 !important;
+  font-size: 15px !important;
+  font-weight: 950 !important;
+}
+
+.buy-offer-v2-fallback span,
+.buy-offer-v2-fallback small {
+  color: rgba(244, 240, 255, .68) !important;
+  font-size: 12px !important;
+}
+
+.buy-offer-v2-item-title {
+  display: block !important;
+  color: #f4f0ff !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+  overflow-wrap: anywhere !important;
+}
+
+.buy-offer-v2-listed-price {
+  display: block !important;
+  color: #ffdc93 !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+}
+
+.buy-offer-v2-details {
+  display: grid !important;
+  align-content: start !important;
+  gap: 12px !important;
+  min-width: 0 !important;
+}
+
+.buy-offer-v2-offer-box {
+  display: grid !important;
+  gap: 5px !important;
+  padding: 15px !important;
+  border-radius: 15px !important;
+  border: 1px solid rgba(255, 220, 147, .34) !important;
+  background: rgba(255, 220, 147, .08) !important;
+}
+
+.buy-offer-v2-offer-box span {
+  color: rgba(244, 240, 255, .62) !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+}
+
+.buy-offer-v2-offer-box strong {
+  color: #ffdc93 !important;
+  font-size: 26px !important;
+  font-weight: 950 !important;
+}
+
+.buy-offer-v2-meta-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important;
+  gap: 9px !important;
+}
+
+.buy-offer-v2-meta-grid span {
+  display: grid !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+  padding: 10px !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 255, 255, .075) !important;
+  background: rgba(255, 255, 255, .035) !important;
+  color: rgba(244, 240, 255, .74) !important;
+  overflow-wrap: anywhere !important;
+}
+
+.buy-offer-v2-meta-grid strong {
+  color: #00fa9a !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: .04em !important;
+}
+
+.buy-offer-v2-message {
+  grid-column: 1 / -1 !important;
+}
+
+.buy-offer-v2-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  justify-content: flex-start !important;
+}
+
+@media (max-width: 820px) {
+  .buy-offer-v2-toolbar,
+  .buy-offer-v2-content {
+    grid-template-columns: 1fr !important;
+  }
+
+  .buy-offer-v2-preview {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
