@@ -10,6 +10,7 @@ import './inventory-escrow-controls.js';
 import './bulk-select-event-guard.js';
 import './auction-first-bid-minimum-hotfix.js';
 import './admin-test-view-mode.js';
+import './buy-offer-preview-dom-guard.js';
 import App from './App.jsx';
 import AppErrorBoundary from './components/AppErrorBoundary.jsx';
 import './styles.css';
