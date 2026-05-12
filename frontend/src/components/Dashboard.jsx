@@ -475,6 +475,8 @@ export default function Dashboard({
     window.location.href = `${window.location.origin}${cleanBase}/user/${encodeURIComponent(cleanUsername)}`;
   }
 
+  const safeOpenTradeCount = Math.max(0, Number(openTradeCount) || 0);
+
   return (
     <section className="dashboard-layout">
       {showFaq && <DashboardFaqModal onClose={closeFaq} />}
@@ -496,9 +498,18 @@ export default function Dashboard({
           My Inventory
         </button>
 
-        <button className={`dashboard-tile ${openTradeCount > 0 ? 'trade-alert-glow' : ''}`} data-open-trade-count={openTradeCount} onClick={() => onNavigate('trades')}>
-          Trades
-          {openTradeCount > 0 && <span className="dashboard-trade-count-badge">{openTradeCount}</span>}
+        <button
+          className={`dashboard-tile dashboard-trades-tile ${safeOpenTradeCount > 0 ? 'trade-alert-glow' : ''}`}
+          data-open-trade-count={safeOpenTradeCount}
+          onClick={() => onNavigate('trades')}
+          aria-label={safeOpenTradeCount > 0 ? `Trades, ${safeOpenTradeCount} open trade or buy offer${safeOpenTradeCount === 1 ? '' : 's'}` : 'Trades'}
+        >
+          <span className="dashboard-tile-label">Trades</span>
+          {safeOpenTradeCount > 0 && (
+            <span className="dashboard-trade-count-badge" title={`${safeOpenTradeCount} open trade/buy offer${safeOpenTradeCount === 1 ? '' : 's'}`}>
+              {safeOpenTradeCount}
+            </span>
+          )}
         </button>
 
         <button className="dashboard-tile" onClick={() => onNavigate('bazaar')}>
