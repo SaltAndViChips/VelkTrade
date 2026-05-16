@@ -65,9 +65,38 @@
 .folder-animation-preview[data-animation="none"] .preview-card.two { transform: translateX(48px) rotate(0) !important; }
 .folder-animation-preview[data-animation="none"] .preview-card.three { transform: translateX(96px) rotate(5deg) !important; }
 
+.folder-loading-inline {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: max-content !important;
+  max-width: 100% !important;
+  margin: 10px 0 14px !important;
+  padding: 10px 14px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(0, 250, 154, .28) !important;
+  background: rgba(0, 250, 154, .075) !important;
+  color: rgba(244, 240, 255, .88) !important;
+  box-shadow: 0 0 22px rgba(0, 250, 154, .10) !important;
+}
+
+.folder-loading-inline strong {
+  font-size: 13px !important;
+  font-weight: 900 !important;
+}
+
+.folder-loading-spinner {
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 999px !important;
+  border: 3px solid rgba(244, 240, 255, .16) !important;
+  border-top-color: #00fa9a !important;
+  animation: folder-loading-spin .75s linear infinite !important;
+}
+
 /*
   Hard reset the older generic folder-revealed-item animation from inventory-modern-popout.css.
-  Without this reset, the original popout shorthand wins before the JS animation class is applied.
+  JS then replays the selected per-folder animation inline so it cannot be beaten by older !important shorthands.
 */
 .inventory-rewrite-shell .folder-revealed-item,
 .profile-page .folder-revealed-item,
@@ -231,10 +260,15 @@
   54%, 76% { opacity: 1; transform: translateY(0) translateX(80px) scale(1); }
 }
 
+@keyframes folder-loading-spin {
+  to { transform: rotate(360deg); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .folder-animation-preview .preview-card,
   .folder-revealed-item,
-  .folder-anim-bounce.inventory-mosaic-folder.folder-is-open .inventory-folder-stack {
+  .folder-anim-bounce.inventory-mosaic-folder.folder-is-open .inventory-folder-stack,
+  .folder-loading-spinner {
     animation: none !important;
   }
 }
