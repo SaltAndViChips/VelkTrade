@@ -11,6 +11,7 @@ import './bulk-select-event-guard.js';
 import './auction-first-bid-minimum-hotfix.js';
 import './admin-test-view-mode.js';
 import './public-bazaar-route.js';
+import './folder-animations-clean.js';
 import App from './App.jsx';
 import AppErrorBoundary from './components/AppErrorBoundary.jsx';
 import './styles.css';
