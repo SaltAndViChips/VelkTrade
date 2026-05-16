@@ -23,13 +23,22 @@ const FOLDER_COLOR_PRESETS = [
 ];
 
 const FOLDER_ANIMATION_PRESETS = [
-  { label: 'Popout', value: 'popout' },
-  { label: 'Fan Spread', value: 'fan' },
-  { label: 'Cascade', value: 'cascade' },
-  { label: 'Portal', value: 'portal' },
-  { label: 'Bounce', value: 'bounce' },
+  { label: 'Grow Into Place', value: 'grow' },
+  { label: 'Sweep Across', value: 'sweep' },
+  { label: 'Slide In', value: 'slide' },
+  { label: 'Fade In', value: 'fade' },
+  { label: 'Deal Out', value: 'deal' },
   { label: 'No Animation', value: 'none' }
 ];
+
+const LEGACY_ANIMATION_MAP = new Map([
+  ['popout', 'grow'], ['burst', 'grow'], ['cascade', 'grow'], ['rise', 'grow'], ['bounce', 'grow'], ['snap', 'grow'], ['zoom', 'grow'], ['flip', 'grow'], ['flipbook', 'grow'],
+  ['fan', 'deal'], ['deal', 'deal'],
+  ['portal', 'fade'], ['warp', 'fade'],
+  ['drift', 'slide'],
+  ['orbit', 'sweep'], ['spiral', 'sweep'], ['scatter', 'sweep'], ['shuffle', 'sweep'],
+  ['none', 'none']
+]);
 
 function cleanHex(value, fallback = '#00fa9a') {
   const clean = String(value || '').trim();
@@ -38,8 +47,9 @@ function cleanHex(value, fallback = '#00fa9a') {
 }
 
 function cleanAnimation(value) {
-  const clean = String(value || 'popout').trim().toLowerCase();
-  return FOLDER_ANIMATION_PRESETS.some(entry => entry.value === clean) ? clean : 'popout';
+  const clean = String(value || 'grow').trim().toLowerCase();
+  if (FOLDER_ANIMATION_PRESETS.some(entry => entry.value === clean)) return clean;
+  return LEGACY_ANIMATION_MAP.get(clean) || 'grow';
 }
 
 function formatPrice(value) {
@@ -75,7 +85,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
   const [folderColor, setFolderColor] = useState('#00fa9a');
   const [folderColorMode, setFolderColorMode] = useState('#00fa9a');
   const [customFolderColor, setCustomFolderColor] = useState('#00fa9a');
-  const [folderAnimation, setFolderAnimation] = useState('popout');
+  const [folderAnimation, setFolderAnimation] = useState('grow');
   const [folderId, setFolderId] = useState('');
   const [bulkPrice, setBulkPrice] = useState('');
   const [cleanup, setCleanup] = useState(null);
@@ -84,6 +94,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
   const normalizedFolderColor = useMemo(() => cleanHex(folderColor), [folderColor]);
   const normalizedFolderAnimation = useMemo(() => cleanAnimation(folderAnimation), [folderAnimation]);
   const selectedFolder = useMemo(() => folders.find(folder => String(folder.id) === String(folderId)) || null, [folders, folderId]);
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
   function setColorFromValue(value) {
     if (value === 'custom') {
@@ -285,7 +296,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
               {folders.map(folder => {
                 const selected = String(folder.id) === String(folderId);
                 const color = cleanHex(folder.color || '#00fa9a');
-                const animationLabel = FOLDER_ANIMATION_PRESETS.find(entry => entry.value === cleanAnimation(folder.animation))?.label || 'Popout';
+                const animationLabel = FOLDER_ANIMATION_PRESETS.find(entry => entry.value === cleanAnimation(folder.animation))?.label || 'Grow Into Place';
                 return <button type="button" key={folder.id} className={`folder-modern-row ${selected ? 'active' : ''}`} style={{ '--folder-color': color }} onClick={() => syncFolderControls(folder)}>
                   <span className="folder-modern-icon">{folder.icon || '📁'}</span>
                   <span className="folder-modern-main"><strong>{folder.name}</strong><small>{folder.itemCount || 0} item{Number(folder.itemCount || 0) === 1 ? '' : 's'} · {animationLabel}</small></span>
