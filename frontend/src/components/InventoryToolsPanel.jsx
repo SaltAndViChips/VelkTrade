@@ -22,10 +22,24 @@ const FOLDER_COLOR_PRESETS = [
   { label: 'Custom hex…', value: 'custom' }
 ];
 
+const FOLDER_ANIMATION_PRESETS = [
+  { label: 'Popout', value: 'popout' },
+  { label: 'Fan Spread', value: 'fan' },
+  { label: 'Cascade', value: 'cascade' },
+  { label: 'Portal', value: 'portal' },
+  { label: 'Bounce', value: 'bounce' },
+  { label: 'No Animation', value: 'none' }
+];
+
 function cleanHex(value, fallback = '#00fa9a') {
   const clean = String(value || '').trim();
   if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(clean)) return clean;
   return fallback;
+}
+
+function cleanAnimation(value) {
+  const clean = String(value || 'popout').trim().toLowerCase();
+  return FOLDER_ANIMATION_PRESETS.some(entry => entry.value === clean) ? clean : 'popout';
 }
 
 function formatPrice(value) {
@@ -61,12 +75,14 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
   const [folderColor, setFolderColor] = useState('#00fa9a');
   const [folderColorMode, setFolderColorMode] = useState('#00fa9a');
   const [customFolderColor, setCustomFolderColor] = useState('#00fa9a');
+  const [folderAnimation, setFolderAnimation] = useState('popout');
   const [folderId, setFolderId] = useState('');
   const [bulkPrice, setBulkPrice] = useState('');
   const [cleanup, setCleanup] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const normalizedFolderColor = useMemo(() => cleanHex(folderColor), [folderColor]);
+  const normalizedFolderAnimation = useMemo(() => cleanAnimation(folderAnimation), [folderAnimation]);
   const selectedFolder = useMemo(() => folders.find(folder => String(folder.id) === String(folderId)) || null, [folders, folderId]);
 
   function setColorFromValue(value) {
@@ -92,6 +108,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
     if (!folder) return;
     setFolderId(String(folder.id));
     setFolderIcon(folder.icon || '📁');
+    setFolderAnimation(cleanAnimation(folder.animation));
     syncColorControls(folder.color || '#00fa9a');
   }
 
@@ -124,7 +141,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
     if (!name) return;
     setBusy(true);
     try {
-      const data = await api('/api/item-folders', { method: 'POST', body: JSON.stringify({ name, icon: folderIcon, color: normalizedFolderColor }) });
+      const data = await api('/api/item-folders', { method: 'POST', body: JSON.stringify({ name, icon: folderIcon, color: normalizedFolderColor, animation: normalizedFolderAnimation }) });
       setFolderName('');
       await loadFolders();
       if (data.folder?.id) setFolderId(String(data.folder.id));
@@ -141,7 +158,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
     if (!folderId) return;
     setBusy(true);
     try {
-      await api(`/api/item-folders/${encodeURIComponent(folderId)}`, { method: 'PATCH', body: JSON.stringify({ icon: folderIcon, color: normalizedFolderColor }) });
+      await api(`/api/item-folders/${encodeURIComponent(folderId)}`, { method: 'PATCH', body: JSON.stringify({ icon: folderIcon, color: normalizedFolderColor, animation: normalizedFolderAnimation }) });
       await loadFolders();
       broadcastFolderChange();
       velkToast('Folder style updated.', 'success');
@@ -268,9 +285,10 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
               {folders.map(folder => {
                 const selected = String(folder.id) === String(folderId);
                 const color = cleanHex(folder.color || '#00fa9a');
+                const animationLabel = FOLDER_ANIMATION_PRESETS.find(entry => entry.value === cleanAnimation(folder.animation))?.label || 'Popout';
                 return <button type="button" key={folder.id} className={`folder-modern-row ${selected ? 'active' : ''}`} style={{ '--folder-color': color }} onClick={() => syncFolderControls(folder)}>
                   <span className="folder-modern-icon">{folder.icon || '📁'}</span>
-                  <span className="folder-modern-main"><strong>{folder.name}</strong><small>{folder.itemCount || 0} item{Number(folder.itemCount || 0) === 1 ? '' : 's'}</small></span>
+                  <span className="folder-modern-main"><strong>{folder.name}</strong><small>{folder.itemCount || 0} item{Number(folder.itemCount || 0) === 1 ? '' : 's'} · {animationLabel}</small></span>
                   <span className="folder-modern-swatch" />
                 </button>;
               })}
@@ -282,12 +300,19 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
               <strong>Create / Style Folder</strong>
               <span>{selectedFolderLabel(selectedFolder)}</span>
             </div>
-            <div className="folder-editor-grid">
+            <div className="folder-editor-grid folder-editor-grid-animations">
               <label><span>Icon</span><select className="folder-icon-select" value={folderIcon} disabled={busy} onChange={event => setFolderIcon(event.target.value)}>{FOLDER_ICON_PRESETS.map(icon => <option key={icon} value={icon}>{icon}</option>)}</select></label>
               <label><span>Color</span><select className="folder-color-select" value={folderColorMode} disabled={busy} onChange={event => setColorFromValue(event.target.value)}>{FOLDER_COLOR_PRESETS.map(entry => <option key={entry.value} value={entry.value}>{entry.label}</option>)}</select></label>
+              <label><span>Open animation</span><select className="folder-animation-select" value={folderAnimation} disabled={busy} onChange={event => setFolderAnimation(event.target.value)}>{FOLDER_ANIMATION_PRESETS.map(entry => <option key={entry.value} value={entry.value}>{entry.label}</option>)}</select></label>
               {folderColorMode === 'custom' && <label><span>Hex</span><input className="folder-hex-input" value={customFolderColor} disabled={busy} onChange={event => { setCustomFolderColor(event.target.value); setFolderColor(cleanHex(event.target.value)); }} placeholder="#00fa9a" maxLength={7} /></label>}
               <span className="folder-color-preview modern" style={{ backgroundColor: normalizedFolderColor }} />
               <label className="folder-name-field"><span>New folder name</span><input value={folderName} onChange={event => setFolderName(event.target.value)} placeholder="Example: Planetaries" /></label>
+            </div>
+            <div className="folder-animation-preview" data-animation={normalizedFolderAnimation} style={{ '--folder-color': normalizedFolderColor }}>
+              <span className="preview-folder-icon">{folderIcon}</span>
+              <span className="preview-card one" />
+              <span className="preview-card two" />
+              <span className="preview-card three" />
             </div>
             <div className="folder-action-row">
               <button type="button" disabled={busy || !folderName.trim()} onClick={createFolder}>Create Folder</button>
