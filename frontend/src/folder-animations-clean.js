@@ -2,39 +2,39 @@ import { api } from './api';
 
 /*
   Clean folder animation controller.
-  - No legacy animation imports.
-  - Loader only appears for the first folder load per inventory shell.
-  - Animation classes are applied from folder.animation directly.
-  - Save requests are patched so the expanded animation selector can save new values
-    even while older React state code still normalizes unknown options.
+  Uses only simple, reliable animations and separates opened folders into their own rows.
 */
 
 const OPTIONS = [
-  ['burst', 'Burst'],
+  ['grow', 'Grow Into Place'],
+  ['sweep', 'Sweep Across'],
+  ['slide', 'Slide In'],
+  ['fade', 'Fade In'],
   ['deal', 'Deal Out'],
-  ['rise', 'Rise Up'],
-  ['warp', 'Warp'],
-  ['snap', 'Snap'],
-  ['drift', 'Drift'],
-  ['flipbook', 'Flipbook'],
-  ['bloom', 'Bloom'],
-  ['orbit', 'Orbit'],
-  ['scatter', 'Scatter'],
   ['none', 'No Animation']
 ];
 
 const VALID = new Set(OPTIONS.map(([value]) => value));
 const LEGACY_MAP = new Map([
-  ['popout', 'burst'],
+  ['popout', 'grow'],
+  ['burst', 'grow'],
   ['fan', 'deal'],
-  ['cascade', 'rise'],
-  ['portal', 'warp'],
-  ['bounce', 'snap'],
-  ['slide', 'drift'],
-  ['flip', 'flipbook'],
-  ['zoom', 'bloom'],
-  ['spiral', 'orbit'],
-  ['shuffle', 'scatter'],
+  ['deal', 'deal'],
+  ['cascade', 'grow'],
+  ['rise', 'grow'],
+  ['portal', 'fade'],
+  ['warp', 'fade'],
+  ['bounce', 'grow'],
+  ['snap', 'grow'],
+  ['drift', 'slide'],
+  ['flipbook', 'grow'],
+  ['flip', 'grow'],
+  ['bloom', 'grow'],
+  ['orbit', 'sweep'],
+  ['spiral', 'sweep'],
+  ['scatter', 'sweep'],
+  ['shuffle', 'sweep'],
+  ['zoom', 'grow'],
   ['none', 'none']
 ]);
 
@@ -45,9 +45,9 @@ let selectedAnimationOverride = '';
 let refreshing = false;
 
 function normalizeAnimation(value) {
-  const raw = String(value || 'burst').trim().toLowerCase();
+  const raw = String(value || 'grow').trim().toLowerCase();
   if (VALID.has(raw)) return raw;
-  return LEGACY_MAP.get(raw) || 'burst';
+  return LEGACY_MAP.get(raw) || 'grow';
 }
 
 function usernameFromPath() {
@@ -111,7 +111,7 @@ async function loadFolderMap() {
 
 function nextCard(element) {
   let node = element?.nextElementSibling;
-  while (node && !node.matches?.('.inventory-mosaic-folder,.inventory-mosaic-item,.vt-folder-card,.vt-unified-item-card')) {
+  while (node && !node.matches?.('.inventory-mosaic-folder,.inventory-mosaic-item,.vt-folder-card,.vt-unified-item-card,.open-folder-row')) {
     node = node.nextElementSibling;
   }
   return node;
@@ -134,49 +134,100 @@ function applyAnimationClass(node, animation, index) {
   node.style.removeProperty('animation');
 }
 
+function unwrapOpenRows(grid) {
+  grid.querySelectorAll(':scope > .open-folder-row').forEach(row => {
+    while (row.firstChild) grid.insertBefore(row.firstChild, row);
+    row.remove();
+  });
+}
+
+function groupOpenFolders() {
+  document.querySelectorAll('.inventory-mosaic-grid,.inventory-grid,.item-grid').forEach(grid => {
+    unwrapOpenRows(grid);
+    const cards = Array.from(grid.children);
+    for (const folderCard of cards) {
+      if (!folderCard.matches?.('.inventory-mosaic-folder[data-folder-id],.vt-folder-card[data-folder-id]')) continue;
+      if (folderCard.dataset.folderOpen !== 'true' && !folderCard.classList.contains('folder-is-open')) continue;
+      const folderId = String(folderCard.dataset.folderId || '');
+      const animation = normalizeAnimation(folderMap.get(folderId) || folderCard.dataset.folderAnimation || 'grow');
+      const row = document.createElement('section');
+      row.className = 'open-folder-row';
+      row.dataset.folderId = folderId;
+      row.dataset.folderAnimation = animation;
+      row.style.setProperty('--folder-color', folderCard.style.getPropertyValue('--folder-color') || '#00fa9a');
+      grid.insertBefore(row, folderCard);
+      row.appendChild(folderCard);
+
+      let node = row.nextElementSibling;
+      while (node && !node.matches?.('.inventory-mosaic-folder,.vt-folder-card')) {
+        const next = node.nextElementSibling;
+        if (node.matches?.('.folder-revealed-item,[data-from-open-folder="true"]')) row.appendChild(node);
+        node = next;
+      }
+    }
+  });
+}
+
 function applyAnimations(forceReplay = false) {
+  groupOpenFolders();
   const folderCards = Array.from(document.querySelectorAll('.inventory-mosaic-folder[data-folder-id],.vt-folder-card[data-folder-id]'));
   for (const folderCard of folderCards) {
     const folderId = String(folderCard.dataset.folderId || '');
-    const animation = normalizeAnimation(folderMap.get(folderId) || folderCard.dataset.folderAnimation || 'burst');
+    const animation = normalizeAnimation(folderMap.get(folderId) || folderCard.dataset.folderAnimation || 'grow');
     clearAnimationClasses(folderCard);
     folderCard.classList.add(`folder-animation-${animation}`);
     folderCard.dataset.folderAnimation = animation;
 
-    let index = 0;
-    let node = nextCard(folderCard);
-    while (node && !node.matches?.('.inventory-mosaic-folder,.vt-folder-card')) {
-      if (node.matches?.('.folder-revealed-item,[data-from-open-folder="true"]')) {
-        const runKey = `${folderId}:${animation}:${node.dataset.itemId || node.dataset.id || index}`;
-        if (forceReplay || node.dataset.folderCleanRunKey !== runKey) {
-          node.dataset.folderCleanRunKey = runKey;
-          applyAnimationClass(node, animation, index);
-        } else {
-          clearAnimationClasses(node);
-          node.classList.add(`folder-animation-${animation}`);
-        }
-        index += 1;
-      }
-      node = nextCard(node);
+    const row = folderCard.closest('.open-folder-row');
+    if (row) {
+      row.dataset.folderAnimation = animation;
+      row.classList.remove(...Array.from(row.classList).filter(cls => cls.startsWith('folder-animation-')));
+      row.classList.add(`folder-animation-${animation}`);
     }
+
+    let index = 0;
+    const container = row || folderCard.parentElement;
+    const children = row ? Array.from(row.children).slice(1) : [];
+    const targets = row ? children : (() => {
+      const found = [];
+      let node = nextCard(folderCard);
+      while (node && !node.matches?.('.inventory-mosaic-folder,.vt-folder-card,.open-folder-row')) {
+        if (node.matches?.('.folder-revealed-item,[data-from-open-folder="true"]')) found.push(node);
+        node = nextCard(node);
+      }
+      return found;
+    })();
+
+    targets.forEach(node => {
+      const runKey = `${folderId}:${animation}:${node.dataset.itemId || node.dataset.id || index}`;
+      if (forceReplay || node.dataset.folderCleanRunKey !== runKey) {
+        node.dataset.folderCleanRunKey = runKey;
+        applyAnimationClass(node, animation, index);
+      } else {
+        clearAnimationClasses(node);
+        node.classList.add(`folder-animation-${animation}`);
+      }
+      index += 1;
+    });
   }
 }
 
 function expandAnimationSelects() {
   document.querySelectorAll('select.folder-animation-select').forEach(select => {
+    select.innerHTML = '';
     for (const [value, label] of OPTIONS) {
-      if (!select.querySelector(`option[value="${value}"]`)) {
-        const option = document.createElement('option');
-        option.value = value;
-        option.textContent = label;
-        select.appendChild(option);
-      }
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      select.appendChild(option);
     }
-    select.addEventListener('change', () => {
+    const current = normalizeAnimation(selectedAnimationOverride || select.value || 'grow');
+    select.value = current;
+    select.onchange = () => {
       selectedAnimationOverride = normalizeAnimation(select.value);
       const preview = document.querySelector('.folder-animation-preview');
       if (preview) preview.dataset.animation = selectedAnimationOverride;
-    }, { passive: true });
+    };
   });
 }
 
@@ -188,23 +239,13 @@ function patchFetchForAnimationSaves() {
     try {
       const url = typeof input === 'string' ? input : input?.url || '';
       const method = String(init?.method || 'GET').toUpperCase();
-      if (/\/api\/(item-folders|inventory\/folders)\//.test(url) && ['POST', 'PUT', 'PATCH'].includes(method) && init?.body) {
+      const isFolderWrite = /\/api\/(item-folders|inventory\/folders)(\/\d+)?$/.test(url) && ['POST', 'PUT', 'PATCH'].includes(method);
+      if (isFolderWrite && init?.body) {
         const selected = document.querySelector('select.folder-animation-select');
         const chosen = normalizeAnimation(selectedAnimationOverride || selected?.value || '');
-        if (VALID.has(chosen)) {
-          const body = JSON.parse(init.body);
-          body.animation = chosen;
-          init = { ...init, body: JSON.stringify(body) };
-        }
-      }
-      if (/\/api\/(item-folders|inventory\/folders)$/.test(url) && method === 'POST' && init?.body) {
-        const selected = document.querySelector('select.folder-animation-select');
-        const chosen = normalizeAnimation(selectedAnimationOverride || selected?.value || '');
-        if (VALID.has(chosen)) {
-          const body = JSON.parse(init.body);
-          body.animation = chosen;
-          init = { ...init, body: JSON.stringify(body) };
-        }
+        const body = JSON.parse(init.body);
+        body.animation = chosen;
+        init = { ...init, body: JSON.stringify(body) };
       }
     } catch {}
     return originalFetch(input, init);
@@ -229,8 +270,8 @@ async function initialLoadForShells() {
 }
 
 function install() {
-  if (typeof window === 'undefined' || window.__VELKTRADE_FOLDER_ANIMATIONS_CLEAN__) return;
-  window.__VELKTRADE_FOLDER_ANIMATIONS_CLEAN__ = true;
+  if (typeof window === 'undefined' || window.__VELKTRADE_FOLDER_ANIMATIONS_CLEAN_V2__) return;
+  window.__VELKTRADE_FOLDER_ANIMATIONS_CLEAN_V2__ = true;
   patchFetchForAnimationSaves();
 
   setTimeout(initialLoadForShells, 0);
