@@ -14,6 +14,7 @@
   background:
     radial-gradient(circle at top left, rgba(124, 77, 255, .14), transparent 34%),
     rgba(8, 6, 14, .34) !important;
+  animation: folder-tools-enter .24s ease both !important;
 }
 
 .folder-tools-head {
@@ -31,6 +32,32 @@
   border-radius: 16px !important;
   border: 1px solid rgba(255, 255, 255, .07) !important;
   background: rgba(0, 0, 0, .22) !important;
+  animation: folder-tools-section-enter .24s ease both !important;
+}
+
+.folder-tools-modern button,
+.folder-export-actions button,
+.inventory-folder-cover {
+  transition:
+    transform .16s ease,
+    box-shadow .18s ease,
+    border-color .18s ease,
+    background .18s ease,
+    filter .18s ease !important;
+}
+
+.folder-tools-modern button:hover:not(:disabled),
+.folder-export-actions button:hover:not(:disabled) {
+  transform: translateY(-1px) !important;
+  filter: brightness(1.08) saturate(1.08) !important;
+  box-shadow: 0 0 18px rgba(124, 77, 255, .20) !important;
+}
+
+.folder-tools-modern button:active:not(:disabled),
+.folder-export-actions button:active:not(:disabled),
+.inventory-folder-cover:active {
+  transform: translateY(1px) scale(.985) !important;
+  filter: brightness(.94) !important;
 }
 
 .folder-tools-count {
@@ -44,6 +71,7 @@
   color: #ffdc93 !important;
   font-size: 12px !important;
   font-weight: 950 !important;
+  animation: folder-count-pop .28s ease both !important;
 }
 
 .folder-tools-layout {
@@ -66,7 +94,12 @@
     radial-gradient(circle at top left, rgba(124, 77, 255, .10), transparent 36%),
     rgba(5, 4, 10, .46) !important;
   box-shadow: inset 0 0 24px rgba(142, 113, 255, .025) !important;
+  animation: folder-tools-section-enter .26s ease both !important;
 }
+
+.folder-tool-card:nth-child(2) { animation-delay: 35ms !important; }
+.folder-tool-card:nth-child(3) { animation-delay: 70ms !important; }
+.folder-tool-card:nth-child(4) { animation-delay: 105ms !important; }
 
 .folder-list-card {
   grid-row: span 2 !important;
@@ -114,6 +147,7 @@
   color: #f4f0ff !important;
   text-align: left !important;
   cursor: pointer !important;
+  transition: transform .16s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease !important;
 }
 
 .folder-modern-row:hover,
@@ -123,6 +157,11 @@
     radial-gradient(circle at left, color-mix(in srgb, var(--folder-color), transparent 85%), transparent 54%),
     rgba(255, 255, 255, .055) !important;
   box-shadow: 0 0 18px color-mix(in srgb, var(--folder-color), transparent 82%) !important;
+  transform: translateX(2px) !important;
+}
+
+.folder-modern-row:active {
+  transform: translateX(1px) scale(.992) !important;
 }
 
 .folder-modern-icon {
@@ -136,6 +175,13 @@
   color: var(--folder-color) !important;
   font-size: 22px !important;
   box-shadow: 0 0 16px color-mix(in srgb, var(--folder-color), transparent 78%) !important;
+  transition: transform .18s ease, box-shadow .18s ease !important;
+}
+
+.folder-modern-row:hover .folder-modern-icon,
+.folder-modern-row.active .folder-modern-icon {
+  transform: rotate(-4deg) scale(1.05) !important;
+  box-shadow: 0 0 22px color-mix(in srgb, var(--folder-color), transparent 62%) !important;
 }
 
 .folder-modern-main {
@@ -164,6 +210,12 @@
   border-radius: 999px !important;
   background: var(--folder-color) !important;
   box-shadow: 0 0 14px color-mix(in srgb, var(--folder-color), transparent 45%) !important;
+  transition: transform .18s ease !important;
+}
+
+.folder-modern-row:hover .folder-modern-swatch,
+.folder-modern-row.active .folder-modern-swatch {
+  transform: scale(1.25) !important;
 }
 
 .folder-editor-grid {
@@ -195,6 +247,15 @@
 .folder-hex-input,
 .folder-editor-grid input {
   width: 100% !important;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .16s ease !important;
+}
+
+.folder-icon-select:focus,
+.folder-color-select:focus,
+.folder-hex-input:focus,
+.folder-editor-grid input:focus {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 0 0 3px rgba(0, 250, 154, .12), 0 0 18px rgba(0, 250, 154, .10) !important;
 }
 
 .folder-color-preview.modern,
@@ -207,6 +268,7 @@
   border-radius: 999px !important;
   border: 2px solid rgba(255, 255, 255, .30) !important;
   box-shadow: 0 0 18px rgba(0, 0, 0, .36) !important;
+  animation: folder-color-pulse 1.9s ease-in-out infinite !important;
 }
 
 .folder-action-row {
@@ -260,13 +322,68 @@
   margin-top: 0 !important;
 }
 
-/* Modernize the visible folder tiles in the inventory mosaic without breaking existing behavior. */
+/* Modernize folder tiles in BOTH inventory and public/profile inventories. */
 .inventory-rewrite-shell .inventory-mosaic-folder,
-.inventory-rewrite-shell .inventory-folder-card {
-  border-radius: 18px !important;
+.inventory-rewrite-shell .inventory-folder-card,
+.profile-page .inventory-mosaic-folder,
+.profile-page .inventory-folder-card,
+.profile-inventory .inventory-mosaic-folder,
+.profile-inventory .inventory-folder-card,
+[data-profile] .inventory-mosaic-folder,
+[data-profile] .inventory-folder-card {
+  border-radius: 20px !important;
+  border: 1px solid color-mix(in srgb, var(--folder-color, #00fa9a), transparent 70%) !important;
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--folder-color, #00fa9a), transparent 88%), transparent 46%),
+    rgba(6, 4, 12, .72) !important;
+  box-shadow: inset 0 0 26px rgba(255, 255, 255, .025), 0 14px 34px rgba(0, 0, 0, .20) !important;
+  overflow: hidden !important;
+  transition:
+    transform .22s cubic-bezier(.2,.8,.2,1),
+    box-shadow .22s ease,
+    border-color .22s ease,
+    background .22s ease !important;
 }
 
-.inventory-rewrite-shell .inventory-folder-stack {
+.inventory-rewrite-shell .inventory-mosaic-folder:hover,
+.profile-page .inventory-mosaic-folder:hover,
+.profile-inventory .inventory-mosaic-folder:hover,
+[data-profile] .inventory-mosaic-folder:hover {
+  transform: translateY(-4px) scale(1.012) !important;
+  border-color: color-mix(in srgb, var(--folder-color, #00fa9a), transparent 38%) !important;
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, .28),
+    0 0 28px color-mix(in srgb, var(--folder-color, #00fa9a), transparent 78%) !important;
+}
+
+.inventory-rewrite-shell .inventory-mosaic-folder.folder-is-open,
+.profile-page .inventory-mosaic-folder.folder-is-open,
+.profile-inventory .inventory-mosaic-folder.folder-is-open,
+[data-profile] .inventory-mosaic-folder.folder-is-open {
+  border-color: color-mix(in srgb, var(--folder-color, #00fa9a), transparent 34%) !important;
+  box-shadow:
+    0 18px 46px rgba(0, 0, 0, .30),
+    0 0 34px color-mix(in srgb, var(--folder-color, #00fa9a), transparent 70%) !important;
+}
+
+.inventory-rewrite-shell .inventory-folder-cover,
+.profile-page .inventory-folder-cover,
+.profile-inventory .inventory-folder-cover,
+[data-profile] .inventory-folder-cover {
+  position: relative !important;
+  display: grid !important;
+  gap: 8px !important;
+  width: 100% !important;
+  background: transparent !important;
+  border: 0 !important;
+  color: inherit !important;
+  cursor: pointer !important;
+}
+
+.inventory-rewrite-shell .inventory-folder-stack,
+.profile-page .inventory-folder-stack,
+.profile-inventory .inventory-folder-stack,
+[data-profile] .inventory-folder-stack {
   position: relative !important;
   border-radius: 18px !important;
   background:
@@ -275,32 +392,104 @@
   box-shadow:
     inset 0 0 36px color-mix(in srgb, var(--folder-color, #00fa9a), transparent 90%),
     0 14px 34px rgba(0, 0, 0, .22) !important;
+  transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease, filter .22s ease !important;
 }
 
 .inventory-rewrite-shell .inventory-folder-stack::before,
-.inventory-rewrite-shell .inventory-folder-stack::after {
+.inventory-rewrite-shell .inventory-folder-stack::after,
+.profile-page .inventory-folder-stack::before,
+.profile-page .inventory-folder-stack::after,
+.profile-inventory .inventory-folder-stack::before,
+.profile-inventory .inventory-folder-stack::after,
+[data-profile] .inventory-folder-stack::before,
+[data-profile] .inventory-folder-stack::after {
   content: '' !important;
   position: absolute !important;
   border-radius: 18px !important;
   border: 1px solid color-mix(in srgb, var(--folder-color, #00fa9a), transparent 68%) !important;
   background: rgba(0, 0, 0, .18) !important;
   pointer-events: none !important;
+  transition: transform .28s cubic-bezier(.2,.8,.2,1), opacity .22s ease, border-color .22s ease !important;
 }
 
-.inventory-rewrite-shell .inventory-folder-stack::before {
+.inventory-rewrite-shell .inventory-folder-stack::before,
+.profile-page .inventory-folder-stack::before,
+.profile-inventory .inventory-folder-stack::before,
+[data-profile] .inventory-folder-stack::before {
   inset: 18px 20px 28px 20px !important;
   transform: translateY(-8px) scale(.94) !important;
   opacity: .62 !important;
 }
 
-.inventory-rewrite-shell .inventory-folder-stack::after {
+.inventory-rewrite-shell .inventory-folder-stack::after,
+.profile-page .inventory-folder-stack::after,
+.profile-inventory .inventory-folder-stack::after,
+[data-profile] .inventory-folder-stack::after {
   inset: 28px 28px 18px 28px !important;
   transform: translateY(-2px) scale(.97) !important;
   opacity: .46 !important;
 }
 
-.inventory-rewrite-shell .inventory-folder-main-icon {
+.inventory-rewrite-shell .folder-is-open .inventory-folder-stack,
+.profile-page .folder-is-open .inventory-folder-stack,
+.profile-inventory .folder-is-open .inventory-folder-stack,
+[data-profile] .folder-is-open .inventory-folder-stack {
+  transform: translateY(-2px) rotateX(5deg) !important;
+  filter: saturate(1.12) brightness(1.05) !important;
+}
+
+.inventory-rewrite-shell .folder-is-open .inventory-folder-stack::before,
+.profile-page .folder-is-open .inventory-folder-stack::before,
+.profile-inventory .folder-is-open .inventory-folder-stack::before,
+[data-profile] .folder-is-open .inventory-folder-stack::before {
+  transform: translateY(-18px) scale(.91) rotate(-2deg) !important;
+  opacity: .86 !important;
+}
+
+.inventory-rewrite-shell .folder-is-open .inventory-folder-stack::after,
+.profile-page .folder-is-open .inventory-folder-stack::after,
+.profile-inventory .folder-is-open .inventory-folder-stack::after,
+[data-profile] .folder-is-open .inventory-folder-stack::after {
+  transform: translateY(-9px) scale(.96) rotate(2deg) !important;
+  opacity: .72 !important;
+}
+
+.inventory-rewrite-shell .inventory-folder-main-icon,
+.profile-page .inventory-folder-main-icon,
+.profile-inventory .inventory-folder-main-icon,
+[data-profile] .inventory-folder-main-icon {
   backdrop-filter: blur(8px) !important;
+  transition: transform .24s cubic-bezier(.2,.8,.2,1), text-shadow .22s ease !important;
+}
+
+.inventory-rewrite-shell .inventory-mosaic-folder:hover .inventory-folder-main-icon,
+.profile-page .inventory-mosaic-folder:hover .inventory-folder-main-icon,
+.profile-inventory .inventory-mosaic-folder:hover .inventory-folder-main-icon,
+[data-profile] .inventory-mosaic-folder:hover .inventory-folder-main-icon {
+  transform: scale(1.08) rotate(-3deg) !important;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--folder-color, #00fa9a), transparent 35%) !important;
+}
+
+.inventory-folder-chevron {
+  position: absolute !important;
+  top: 10px !important;
+  right: 12px !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 999px !important;
+  border: 1px solid color-mix(in srgb, var(--folder-color, #00fa9a), transparent 58%) !important;
+  background: rgba(0, 0, 0, .34) !important;
+  color: var(--folder-color, #00fa9a) !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  transition: transform .24s cubic-bezier(.2,.8,.2,1), background .18s ease, box-shadow .18s ease !important;
+}
+
+.folder-is-open .inventory-folder-chevron {
+  transform: rotate(180deg) !important;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--folder-color, #00fa9a), transparent 55%) !important;
 }
 
 .folder-export-actions {
@@ -308,6 +497,7 @@
   justify-content: center !important;
   gap: 6px !important;
   margin-top: 8px !important;
+  transition: opacity .18s ease, transform .18s ease !important;
 }
 
 .folder-export-actions button {
@@ -315,6 +505,79 @@
   padding: 4px 9px !important;
   border-radius: 999px !important;
   font-size: 11px !important;
+}
+
+.folder-revealed-item {
+  animation: folder-item-reveal .34s cubic-bezier(.2,.8,.2,1) both !important;
+  animation-delay: var(--mosaic-delay, 0ms) !important;
+}
+
+.inventory-mosaic-item:not(.folder-revealed-item) {
+  animation: inventory-card-soft-enter .18s ease both !important;
+}
+
+.inventory-mosaic-item,
+.inventory-mosaic-image-frame,
+.inventory-mosaic-title {
+  transition:
+    transform .18s cubic-bezier(.2,.8,.2,1),
+    box-shadow .18s ease,
+    filter .18s ease,
+    border-color .18s ease,
+    color .18s ease !important;
+}
+
+.inventory-mosaic-item:hover {
+  transform: translateY(-3px) scale(1.012) !important;
+  filter: saturate(1.06) brightness(1.04) !important;
+}
+
+.inventory-mosaic-item:active {
+  transform: translateY(1px) scale(.99) !important;
+}
+
+.bulk-select-pill {
+  transition: transform .15s ease, box-shadow .16s ease, background .16s ease !important;
+}
+
+.bulk-select-pill:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 0 16px rgba(0, 250, 154, .22) !important;
+}
+
+.bulk-select-pill:active {
+  transform: translateY(1px) scale(.96) !important;
+}
+
+@keyframes folder-tools-enter {
+  from { opacity: 0; transform: translateY(-8px) scale(.992); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes folder-tools-section-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes folder-item-reveal {
+  0% { opacity: 0; transform: translateY(-16px) scale(.92); filter: blur(8px) saturate(.7); }
+  62% { opacity: 1; transform: translateY(3px) scale(1.018); filter: blur(0) saturate(1.12); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0) saturate(1); }
+}
+
+@keyframes inventory-card-soft-enter {
+  from { opacity: .001; transform: translateY(5px) scale(.992); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes folder-color-pulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(0, 0, 0, .36); transform: scale(1); }
+  50% { box-shadow: 0 0 20px currentColor; transform: scale(1.045); }
+}
+
+@keyframes folder-count-pop {
+  from { transform: scale(.92); opacity: .3; }
+  to { transform: scale(1); opacity: 1; }
 }
 
 @media (max-width: 1100px) {
@@ -345,5 +608,22 @@
   .folder-tool-card-title {
     flex-direction: column !important;
     align-items: stretch !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .folder-tools-modern,
+  .folder-tool-card,
+  .folder-tools-toolbar,
+  .folder-revealed-item,
+  .inventory-mosaic-item,
+  .folder-color-preview,
+  .folder-modern-row,
+  .inventory-folder-stack,
+  .inventory-folder-chevron,
+  .folder-tools-modern button,
+  .folder-export-actions button {
+    animation: none !important;
+    transition: none !important;
   }
 }
