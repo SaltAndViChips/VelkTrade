@@ -1,21 +1,12 @@
 import { api } from './api';
 
 /*
-  Simplified folder animation controller.
-  Important: this file never moves React-owned DOM nodes. Earlier row grouping used
-  appendChild/insertBefore on React children and caused flickering plus removeChild errors.
+  Lightweight folder animation controller.
+  Performance rule: do not rewrite React-owned DOM, do not rebuild selects, and do not
+  scan the full inventory repeatedly while Bulk Tools is rendering.
 */
 
-const OPTIONS = [
-  ['grow', 'Grow Into Place'],
-  ['sweep', 'Sweep Across'],
-  ['slide', 'Slide In'],
-  ['fade', 'Fade In'],
-  ['deal', 'Deal Out'],
-  ['none', 'No Animation']
-];
-
-const VALID = new Set(OPTIONS.map(([value]) => value));
+const VALID = new Set(['grow', 'sweep', 'slide', 'fade', 'deal', 'none']);
 const LEGACY_MAP = new Map([
   ['popout', 'grow'], ['burst', 'grow'], ['cascade', 'grow'], ['rise', 'grow'],
   ['fan', 'deal'], ['deal', 'deal'],
@@ -31,6 +22,7 @@ const loadingShells = new WeakSet();
 let folderMap = new Map();
 let selectedAnimationOverride = '';
 let refreshing = false;
+let applyTimer = 0;
 
 function normalizeAnimation(value) {
   const raw = String(value || 'grow').trim().toLowerCase();
@@ -74,7 +66,7 @@ function showInitialLoader(shell) {
     if (clicks >= 3) {
       loadedShells.add(shell);
       clearLoader(shell);
-      applyAnimations(true);
+      scheduleApply(true);
     }
   });
 
@@ -103,15 +95,7 @@ function clearAnimationClasses(node) {
   }
 }
 
-function nextCard(element) {
-  let node = element?.nextElementSibling;
-  while (node && !node.matches?.('.inventory-mosaic-folder,.inventory-mosaic-item,.vt-folder-card,.vt-unified-item-card')) {
-    node = node.nextElementSibling;
-  }
-  return node;
-}
-
-function applyAnimationClass(node, animation, index, forceReplay = false) {
+function markNode(node, animation, index, forceReplay) {
   const next = normalizeAnimation(animation);
   clearAnimationClasses(node);
   node.classList.add(`folder-animation-${next}`);
@@ -120,52 +104,56 @@ function applyAnimationClass(node, animation, index, forceReplay = false) {
 
   if (forceReplay) {
     node.style.setProperty('animation', 'none', 'important');
+    // Flush only the single card, never the whole grid.
     void node.offsetWidth;
     node.style.removeProperty('animation');
   }
 }
 
 function applyAnimations(forceReplay = false) {
-  const folderCards = Array.from(document.querySelectorAll('.inventory-mosaic-folder[data-folder-id],.vt-folder-card[data-folder-id]'));
-
-  for (const folderCard of folderCards) {
-    const folderId = String(folderCard.dataset.folderId || '');
-    const animation = normalizeAnimation(folderMap.get(folderId) || folderCard.dataset.folderAnimation || 'grow');
-    clearAnimationClasses(folderCard);
-    folderCard.classList.add(`folder-animation-${animation}`);
-    folderCard.dataset.folderAnimation = animation;
-
+  for (const grid of document.querySelectorAll('.inventory-rewrite-shell .inventory-mosaic-grid, .inventory-rewrite-shell .inventory-grid, .inventory-rewrite-shell .item-grid')) {
+    let activeFolderId = '';
+    let activeAnimation = 'grow';
     let index = 0;
-    let node = nextCard(folderCard);
-    while (node && !node.matches?.('.inventory-mosaic-folder,.vt-folder-card')) {
+
+    for (const node of Array.from(grid.children)) {
+      if (node.matches?.('.inventory-mosaic-folder[data-folder-id],.vt-folder-card[data-folder-id]')) {
+        activeFolderId = String(node.dataset.folderId || '');
+        activeAnimation = normalizeAnimation(folderMap.get(activeFolderId) || node.dataset.folderAnimation || 'grow');
+        clearAnimationClasses(node);
+        node.classList.add(`folder-animation-${activeAnimation}`);
+        node.dataset.folderAnimation = activeAnimation;
+        index = 0;
+        continue;
+      }
+
+      if (!activeFolderId) continue;
       if (node.matches?.('.folder-revealed-item,[data-from-open-folder="true"]')) {
-        const runKey = `${folderId}:${animation}:${node.dataset.itemId || node.dataset.id || index}`;
-        applyAnimationClass(node, animation, index, forceReplay || node.dataset.folderCleanRunKey !== runKey);
+        const runKey = `${activeFolderId}:${activeAnimation}:${node.dataset.itemId || node.dataset.id || index}`;
+        markNode(node, activeAnimation, index, forceReplay || node.dataset.folderCleanRunKey !== runKey);
         node.dataset.folderCleanRunKey = runKey;
         index += 1;
       }
-      node = nextCard(node);
     }
   }
 }
 
-function expandAnimationSelects() {
-  document.querySelectorAll('select.folder-animation-select').forEach(select => {
-    const current = normalizeAnimation(selectedAnimationOverride || select.value || 'grow');
-    select.innerHTML = '';
-    for (const [value, label] of OPTIONS) {
-      const option = document.createElement('option');
-      option.value = value;
-      option.textContent = label;
-      select.appendChild(option);
-    }
-    select.value = current;
-    select.onchange = () => {
-      selectedAnimationOverride = normalizeAnimation(select.value);
-      const preview = document.querySelector('.folder-animation-preview');
-      if (preview) preview.dataset.animation = selectedAnimationOverride;
-    };
-  });
+function scheduleApply(forceReplay = false) {
+  window.clearTimeout(applyTimer);
+  applyTimer = window.setTimeout(() => {
+    window.requestAnimationFrame(() => applyAnimations(forceReplay));
+  }, 80);
+}
+
+function watchAnimationSelects() {
+  // Event delegation only. Do not rewrite select.innerHTML; React owns that DOM.
+  document.addEventListener('change', event => {
+    const select = event.target?.closest?.('select.folder-animation-select');
+    if (!select) return;
+    selectedAnimationOverride = normalizeAnimation(select.value);
+    const preview = document.querySelector('.folder-animation-preview');
+    if (preview) preview.dataset.animation = selectedAnimationOverride;
+  }, true);
 }
 
 function patchFetchForAnimationSaves() {
@@ -202,34 +190,40 @@ async function initialLoadForShells() {
       clearLoader(shell);
     });
     refreshing = false;
-    applyAnimations(true);
+    scheduleApply(true);
   }
 }
 
 function install() {
-  if (typeof window === 'undefined' || window.__VELKTRADE_FOLDER_ANIMATIONS_CLEAN_V3__) return;
-  window.__VELKTRADE_FOLDER_ANIMATIONS_CLEAN_V3__ = true;
+  if (typeof window === 'undefined' || window.__VELKTRADE_FOLDER_ANIMATIONS_LIGHT__) return;
+  window.__VELKTRADE_FOLDER_ANIMATIONS_LIGHT__ = true;
   patchFetchForAnimationSaves();
+  watchAnimationSelects();
 
   setTimeout(initialLoadForShells, 0);
+
   const observer = new MutationObserver(mutations => {
-    expandAnimationSelects();
-    const added = mutations.flatMap(mutation => Array.from(mutation.addedNodes || []));
-    const addedInventory = added.some(node => node.nodeType === 1 && (node.matches?.('.inventory-rewrite-shell,.inventory-mosaic-folder,.vt-folder-card,.folder-revealed-item,[data-from-open-folder="true"]') || node.querySelector?.('.inventory-rewrite-shell,.inventory-mosaic-folder,.vt-folder-card,.folder-revealed-item,[data-from-open-folder="true"]')));
-    if (addedInventory) {
-      initialLoadForShells();
-      setTimeout(() => applyAnimations(true), 30);
+    let shouldLoad = false;
+    let shouldApply = false;
+    for (const mutation of mutations) {
+      for (const node of Array.from(mutation.addedNodes || [])) {
+        if (node.nodeType !== 1) continue;
+        if (node.matches?.('.inventory-rewrite-shell') || node.querySelector?.('.inventory-rewrite-shell')) shouldLoad = true;
+        if (node.matches?.('.inventory-mosaic-folder,.vt-folder-card,.folder-revealed-item,[data-from-open-folder="true"]') || node.querySelector?.('.inventory-mosaic-folder,.vt-folder-card,.folder-revealed-item,[data-from-open-folder="true"]')) shouldApply = true;
+      }
     }
+    if (shouldLoad) initialLoadForShells();
+    if (shouldApply) scheduleApply(true);
   });
   observer.observe(document.body, { childList: true, subtree: true });
 
   window.addEventListener('velktrade:folders-changed', async () => {
     await loadFolderMap();
-    applyAnimations(true);
+    scheduleApply(true);
   });
   window.addEventListener('velktrade:inventory-tools-refresh', async () => {
     await loadFolderMap();
-    applyAnimations(true);
+    scheduleApply(false);
   });
 }
 
