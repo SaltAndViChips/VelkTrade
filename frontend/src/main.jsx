@@ -12,6 +12,7 @@ import './auction-first-bid-minimum-hotfix.js';
 import './admin-test-view-mode.js';
 import './public-bazaar-route.js';
 import './folder-animation-options.js';
+import './folder-animation-webapi.js';
 import App from './App.jsx';
 import AppErrorBoundary from './components/AppErrorBoundary.jsx';
 import './styles.css';
