@@ -1,21 +1,45 @@
 /*
-  Folder animation v2 compatibility routes.
-  Installed before the original folder routes so 10 animation presets + none are accepted.
+  Folder animation compatibility routes.
+  Keeps folder animation values permissive and stable for the simplified frontend animation system.
 */
 
 const { get, run } = require('./db');
 
 const VALID_ANIMATIONS = new Set([
-  'popout', 'fan', 'cascade', 'portal', 'bounce',
-  'slide', 'flip', 'zoom', 'spiral', 'shuffle',
+  'grow',
+  'sweep',
+  'slide',
+  'fade',
+  'deal',
+  'rise',
+  'bloom',
+  'snap',
+  'drift',
+  'flip',
   'none'
+]);
+
+const LEGACY_MAP = new Map([
+  ['popout', 'grow'],
+  ['fan', 'deal'],
+  ['cascade', 'rise'],
+  ['portal', 'bloom'],
+  ['bounce', 'snap'],
+  ['zoom', 'grow'],
+  ['spiral', 'drift'],
+  ['shuffle', 'sweep'],
+  ['flipbook', 'flip'],
+  ['burst', 'grow'],
+  ['warp', 'bloom'],
+  ['scatter', 'sweep']
 ]);
 
 const VALID_ICONS = new Set(['📁', '🗂️', '📦', '🧰', '🏷️', '⭐', '✨', '🔥', '💎', '🪐', '🌌', '☄️', '🌙', '☀️', '⚔️', '🛡️', '🏹', '🎯', '💣', '☠️', '👑', '💰', '🪙', '⚡', '🔮', '🧪', '🧬', '🕯️', '✦', '◆', '◇', '★', '☢', '☣', 'Ω', 'α', 'β', 'Δ', '#', '$', 'IC', 'S', 'A', 'B', 'C']);
 
 function cleanAnimation(value) {
-  const clean = String(value || 'popout').trim().toLowerCase();
-  return VALID_ANIMATIONS.has(clean) ? clean : 'popout';
+  const clean = String(value || 'grow').trim().toLowerCase();
+  if (VALID_ANIMATIONS.has(clean)) return clean;
+  return LEGACY_MAP.get(clean) || 'grow';
 }
 
 function cleanIcon(value) {
@@ -30,7 +54,7 @@ function userId(req) {
 async function ensureFolderAnimationColumn() {
   await run(`ALTER TABLE item_folders ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT '📁'`).catch(() => {});
   await run(`ALTER TABLE item_folders ADD COLUMN IF NOT EXISTS color TEXT DEFAULT ''`).catch(() => {});
-  await run(`ALTER TABLE item_folders ADD COLUMN IF NOT EXISTS animation TEXT DEFAULT 'popout'`).catch(() => {});
+  await run(`ALTER TABLE item_folders ADD COLUMN IF NOT EXISTS animation TEXT DEFAULT 'grow'`).catch(() => {});
 }
 
 function installFolderAnimationV2Routes({ app, authMiddleware }) {
@@ -58,7 +82,7 @@ function installFolderAnimationV2Routes({ app, authMiddleware }) {
       const id = result.rows?.[0]?.id || result.lastID;
       res.json({ ok: true, folder: { id, user_id: uid, name, color, icon, animation, itemCount: 0 } });
     } catch (error) {
-      console.error('folder animation v2 create failed:', error);
+      console.error('folder animation create failed:', error);
       res.status(500).json({ error: error.message || 'Failed to create folder' });
     }
   }
@@ -86,7 +110,7 @@ function installFolderAnimationV2Routes({ app, authMiddleware }) {
       );
       res.json({ ok: true, folder: { ...existing, id, name, color, icon, animation } });
     } catch (error) {
-      console.error('folder animation v2 update failed:', error);
+      console.error('folder animation update failed:', error);
       res.status(500).json({ error: error.message || 'Failed to update folder' });
     }
   }
