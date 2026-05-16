@@ -1,0 +1,317 @@
+/* Modern inventory cards + folder pop-out animation layer. */
+
+.inventory-rewrite-shell {
+  --inventory-card-width: 292px;
+}
+
+.inventory-rewrite-shell .inventory-mosaic-grid,
+.inventory-rewrite-shell .inventory-grid,
+.inventory-rewrite-shell .item-grid,
+.profile-page .inventory-mosaic-grid,
+.profile-inventory .inventory-mosaic-grid,
+[data-profile] .inventory-mosaic-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(var(--inventory-card-width), var(--inventory-card-width))) !important;
+  gap: 20px !important;
+  align-items: start !important;
+  justify-content: start !important;
+  width: 100% !important;
+  padding: 4px 2px 18px !important;
+  perspective: 1200px !important;
+}
+
+.inventory-rewrite-shell .inventory-mosaic-item,
+.inventory-rewrite-shell .inventory-mosaic-folder,
+.inventory-rewrite-shell .vt-unified-item-card,
+.inventory-rewrite-shell .vt-folder-card,
+.profile-page .inventory-mosaic-item,
+.profile-page .inventory-mosaic-folder,
+.profile-page .vt-unified-item-card,
+.profile-page .vt-folder-card,
+.profile-inventory .inventory-mosaic-item,
+.profile-inventory .inventory-mosaic-folder,
+.profile-inventory .vt-unified-item-card,
+.profile-inventory .vt-folder-card,
+[data-profile] .inventory-mosaic-item,
+[data-profile] .inventory-mosaic-folder,
+[data-profile] .vt-unified-item-card,
+[data-profile] .vt-folder-card {
+  width: var(--inventory-card-width) !important;
+  min-width: var(--inventory-card-width) !important;
+  max-width: var(--inventory-card-width) !important;
+  padding: 10px !important;
+  border-radius: 22px !important;
+  border: 1px solid rgba(142, 113, 255, .22) !important;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(124, 77, 255, .13), transparent 38%),
+    linear-gradient(145deg, rgba(16, 11, 28, .88), rgba(5, 4, 10, .96)) !important;
+  box-shadow:
+    0 15px 36px rgba(0, 0, 0, .26),
+    inset 0 1px 0 rgba(255, 255, 255, .045) !important;
+  overflow: visible !important;
+  transform-origin: 50% 72% !important;
+  transition:
+    transform .22s cubic-bezier(.2,.8,.2,1),
+    box-shadow .22s ease,
+    border-color .22s ease,
+    background .22s ease,
+    filter .22s ease !important;
+}
+
+.inventory-rewrite-shell .inventory-mosaic-item::before,
+.profile-page .inventory-mosaic-item::before,
+.profile-inventory .inventory-mosaic-item::before,
+[data-profile] .inventory-mosaic-item::before {
+  content: '' !important;
+  position: absolute !important;
+  inset: 9px !important;
+  border-radius: 18px !important;
+  pointer-events: none !important;
+  background: linear-gradient(135deg, rgba(255,255,255,.075), transparent 28%, transparent 72%, rgba(255,255,255,.045)) !important;
+  opacity: .65 !important;
+  z-index: 2 !important;
+}
+
+.inventory-rewrite-shell .inventory-mosaic-item:hover,
+.profile-page .inventory-mosaic-item:hover,
+.profile-inventory .inventory-mosaic-item:hover,
+[data-profile] .inventory-mosaic-item:hover {
+  transform: translateY(-7px) scale(1.018) rotateX(2deg) !important;
+  border-color: rgba(0, 250, 154, .36) !important;
+  box-shadow:
+    0 22px 48px rgba(0, 0, 0, .34),
+    0 0 28px rgba(0, 250, 154, .10),
+    0 0 44px rgba(124, 77, 255, .15),
+    inset 0 1px 0 rgba(255, 255, 255, .065) !important;
+  filter: saturate(1.08) brightness(1.04) !important;
+}
+
+.inventory-rewrite-shell .inventory-mosaic-item:active,
+.profile-page .inventory-mosaic-item:active,
+.profile-inventory .inventory-mosaic-item:active,
+[data-profile] .inventory-mosaic-item:active {
+  transform: translateY(-2px) scale(.992) !important;
+}
+
+.inventory-rewrite-shell .inventory-mosaic-image-frame,
+.profile-page .inventory-mosaic-image-frame,
+.profile-inventory .inventory-mosaic-image-frame,
+[data-profile] .inventory-mosaic-image-frame {
+  height: clamp(370px, 28vw, 455px) !important;
+  min-height: 370px !important;
+  max-height: 455px !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(255, 255, 255, .07) !important;
+  background:
+    radial-gradient(circle at center, rgba(124, 77, 255, .07), transparent 52%),
+    #030307 !important;
+  box-shadow: inset 0 0 28px rgba(0, 0, 0, .48) !important;
+  transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease !important;
+}
+
+.inventory-rewrite-shell .inventory-mosaic-item:hover .inventory-mosaic-image-frame,
+.profile-page .inventory-mosaic-item:hover .inventory-mosaic-image-frame,
+.profile-inventory .inventory-mosaic-item:hover .inventory-mosaic-image-frame,
+[data-profile] .inventory-mosaic-item:hover .inventory-mosaic-image-frame {
+  transform: translateY(-2px) !important;
+  border-color: rgba(0, 250, 154, .18) !important;
+  box-shadow: inset 0 0 32px rgba(0, 0, 0, .44), 0 0 22px rgba(0, 250, 154, .08) !important;
+}
+
+.inventory-rewrite-shell .inventory-mosaic-title,
+.profile-page .inventory-mosaic-title,
+.profile-inventory .inventory-mosaic-title,
+[data-profile] .inventory-mosaic-title {
+  margin-top: 10px !important;
+  padding: 0 8px !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  letter-spacing: .01em !important;
+}
+
+.inventory-rewrite-shell .inventory-mosaic-folder,
+.profile-page .inventory-mosaic-folder,
+.profile-inventory .inventory-mosaic-folder,
+[data-profile] .inventory-mosaic-folder {
+  border-color: color-mix(in srgb, var(--folder-color, #00fa9a), transparent 54%) !important;
+  background:
+    radial-gradient(circle at 50% 3%, color-mix(in srgb, var(--folder-color, #00fa9a), transparent 80%), transparent 46%),
+    linear-gradient(145deg, rgba(18, 13, 30, .92), rgba(5, 4, 10, .97)) !important;
+}
+
+.inventory-rewrite-shell .inventory-mosaic-folder:hover,
+.profile-page .inventory-mosaic-folder:hover,
+.profile-inventory .inventory-mosaic-folder:hover,
+[data-profile] .inventory-mosaic-folder:hover {
+  transform: translateY(-8px) scale(1.022) rotateX(3deg) !important;
+  border-color: color-mix(in srgb, var(--folder-color, #00fa9a), transparent 25%) !important;
+  box-shadow:
+    0 24px 54px rgba(0, 0, 0, .38),
+    0 0 34px color-mix(in srgb, var(--folder-color, #00fa9a), transparent 72%),
+    inset 0 1px 0 rgba(255, 255, 255, .07) !important;
+}
+
+.inventory-rewrite-shell .inventory-folder-stack,
+.profile-page .inventory-folder-stack,
+.profile-inventory .inventory-folder-stack,
+[data-profile] .inventory-folder-stack {
+  height: clamp(370px, 28vw, 455px) !important;
+  min-height: 370px !important;
+  max-height: 455px !important;
+  border-radius: 18px !important;
+  overflow: hidden !important;
+}
+
+.inventory-rewrite-shell .inventory-folder-stack::before,
+.profile-page .inventory-folder-stack::before,
+.profile-inventory .inventory-folder-stack::before,
+[data-profile] .inventory-folder-stack::before {
+  box-shadow: 0 18px 26px rgba(0,0,0,.20) !important;
+}
+
+.inventory-rewrite-shell .inventory-folder-stack::after,
+.profile-page .inventory-folder-stack::after,
+.profile-inventory .inventory-folder-stack::after,
+[data-profile] .inventory-folder-stack::after {
+  box-shadow: 0 12px 22px rgba(0,0,0,.18) !important;
+}
+
+.inventory-rewrite-shell .inventory-mosaic-folder.folder-is-open,
+.profile-page .inventory-mosaic-folder.folder-is-open,
+.profile-inventory .inventory-mosaic-folder.folder-is-open,
+[data-profile] .inventory-mosaic-folder.folder-is-open {
+  transform: translateY(-8px) scale(1.025) !important;
+  z-index: 6 !important;
+}
+
+.inventory-rewrite-shell .folder-revealed-item,
+.profile-page .folder-revealed-item,
+.profile-inventory .folder-revealed-item,
+[data-profile] .folder-revealed-item {
+  border-color: color-mix(in srgb, var(--source-folder-color, #00fa9a), transparent 44%) !important;
+  background:
+    radial-gradient(circle at 50% -12%, color-mix(in srgb, var(--source-folder-color, #00fa9a), transparent 78%), transparent 44%),
+    linear-gradient(145deg, rgba(18, 13, 30, .91), rgba(5, 4, 10, .98)) !important;
+  box-shadow:
+    0 20px 44px rgba(0, 0, 0, .33),
+    0 0 24px color-mix(in srgb, var(--source-folder-color, #00fa9a), transparent 80%),
+    inset 0 1px 0 rgba(255, 255, 255, .055) !important;
+  animation: folder-popout-card .48s cubic-bezier(.18,.9,.22,1.18) both !important;
+  animation-delay: var(--mosaic-delay, 0ms) !important;
+}
+
+.inventory-rewrite-shell .folder-revealed-item::after,
+.profile-page .folder-revealed-item::after,
+.profile-inventory .folder-revealed-item::after,
+[data-profile] .folder-revealed-item::after {
+  content: '' !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: -14px !important;
+  width: 72% !important;
+  height: 24px !important;
+  transform: translateX(-50%) !important;
+  border-radius: 999px !important;
+  background: radial-gradient(ellipse at center, color-mix(in srgb, var(--source-folder-color, #00fa9a), transparent 58%), transparent 70%) !important;
+  opacity: .72 !important;
+  pointer-events: none !important;
+  filter: blur(5px) !important;
+}
+
+.inventory-rewrite-shell .folder-revealed-item .inventory-mosaic-image-frame,
+.profile-page .folder-revealed-item .inventory-mosaic-image-frame,
+.profile-inventory .folder-revealed-item .inventory-mosaic-image-frame,
+[data-profile] .folder-revealed-item .inventory-mosaic-image-frame {
+  border-color: color-mix(in srgb, var(--source-folder-color, #00fa9a), transparent 74%) !important;
+}
+
+@keyframes folder-popout-card {
+  0% {
+    opacity: 0;
+    transform: translateX(-84px) translateY(-42px) scale(.72) rotate(-8deg);
+    filter: blur(10px) saturate(.55);
+  }
+  58% {
+    opacity: 1;
+    transform: translateX(10px) translateY(-8px) scale(1.035) rotate(1.8deg);
+    filter: blur(0) saturate(1.18);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateY(0) scale(1) rotate(0deg);
+    filter: blur(0) saturate(1);
+  }
+}
+
+@media (min-width: 1600px) {
+  .inventory-rewrite-shell { --inventory-card-width: 282px; }
+}
+
+@media (max-width: 760px) {
+  .inventory-rewrite-shell,
+  .profile-page,
+  .profile-inventory,
+  [data-profile] {
+    --inventory-card-width: minmax(0, 1fr);
+  }
+
+  .inventory-rewrite-shell .inventory-mosaic-grid,
+  .inventory-rewrite-shell .inventory-grid,
+  .inventory-rewrite-shell .item-grid,
+  .profile-page .inventory-mosaic-grid,
+  .profile-inventory .inventory-mosaic-grid,
+  [data-profile] .inventory-mosaic-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+
+  .inventory-rewrite-shell .inventory-mosaic-item,
+  .inventory-rewrite-shell .inventory-mosaic-folder,
+  .inventory-rewrite-shell .vt-unified-item-card,
+  .inventory-rewrite-shell .vt-folder-card,
+  .profile-page .inventory-mosaic-item,
+  .profile-page .inventory-mosaic-folder,
+  .profile-page .vt-unified-item-card,
+  .profile-page .vt-folder-card,
+  .profile-inventory .inventory-mosaic-item,
+  .profile-inventory .inventory-mosaic-folder,
+  .profile-inventory .vt-unified-item-card,
+  .profile-inventory .vt-folder-card,
+  [data-profile] .inventory-mosaic-item,
+  [data-profile] .inventory-mosaic-folder,
+  [data-profile] .vt-unified-item-card,
+  [data-profile] .vt-folder-card {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    padding: 7px !important;
+  }
+
+  .inventory-rewrite-shell .inventory-mosaic-image-frame,
+  .inventory-rewrite-shell .inventory-folder-stack,
+  .profile-page .inventory-mosaic-image-frame,
+  .profile-page .inventory-folder-stack,
+  .profile-inventory .inventory-mosaic-image-frame,
+  .profile-inventory .inventory-folder-stack,
+  [data-profile] .inventory-mosaic-image-frame,
+  [data-profile] .inventory-folder-stack {
+    height: clamp(235px, 62vw, 350px) !important;
+    min-height: 235px !important;
+    max-height: 350px !important;
+  }
+
+  @keyframes folder-popout-card {
+    0% { opacity: 0; transform: translateY(-32px) scale(.78) rotate(-5deg); filter: blur(8px) saturate(.6); }
+    62% { opacity: 1; transform: translateY(5px) scale(1.025) rotate(1deg); filter: blur(0) saturate(1.1); }
+    100% { opacity: 1; transform: translateY(0) scale(1) rotate(0); filter: blur(0) saturate(1); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inventory-rewrite-shell .folder-revealed-item,
+  .profile-page .folder-revealed-item,
+  .profile-inventory .folder-revealed-item,
+  [data-profile] .folder-revealed-item {
+    animation: none !important;
+  }
+}
