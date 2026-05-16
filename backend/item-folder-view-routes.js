@@ -15,9 +15,10 @@ function installItemFolderViewRoutes({ app, authMiddleware }) {
   function requesterId(req) { return Number(req.user?.id || req.userId || req.session?.user?.id || req.session?.userId || 0); }
 
   async function ensureTables() {
-    await run(`CREATE TABLE IF NOT EXISTS item_folders (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, name TEXT NOT NULL, color TEXT DEFAULT '', icon TEXT DEFAULT '📁', created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`);
+    await run(`CREATE TABLE IF NOT EXISTS item_folders (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, name TEXT NOT NULL, color TEXT DEFAULT '', icon TEXT DEFAULT '📁', animation TEXT DEFAULT 'popout', created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`);
     await run(`ALTER TABLE item_folders ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT '📁'`).catch(() => {});
     await run(`ALTER TABLE item_folders ADD COLUMN IF NOT EXISTS color TEXT DEFAULT ''`).catch(() => {});
+    await run(`ALTER TABLE item_folders ADD COLUMN IF NOT EXISTS animation TEXT DEFAULT 'popout'`).catch(() => {});
     await run(`CREATE TABLE IF NOT EXISTS item_folder_assignments (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, item_id INTEGER REFERENCES items(id) ON DELETE CASCADE, folder_id INTEGER REFERENCES item_folders(id) ON DELETE CASCADE, created_at TIMESTAMPTZ DEFAULT NOW())`);
   }
 
@@ -35,7 +36,7 @@ function installItemFolderViewRoutes({ app, authMiddleware }) {
       await ensureTables();
       const uid = await resolveTargetUserId(req);
       if (!uid) return res.status(404).json({ error: 'User not found' });
-      const rows = await all(`SELECT f.id, f.name, COALESCE(f.color, '') AS color, COALESCE(f.icon, '📁') AS icon, f.created_at AS "createdAt", f.updated_at AS "updatedAt", COALESCE(COUNT(a.item_id), 0) AS "itemCount" FROM item_folders f LEFT JOIN item_folder_assignments a ON a.folder_id = f.id AND a.user_id = f.user_id WHERE f.user_id = ? GROUP BY f.id ORDER BY f.updated_at DESC, f.name ASC`, [uid]);
+      const rows = await all(`SELECT f.id, f.name, COALESCE(f.color, '') AS color, COALESCE(f.icon, '📁') AS icon, COALESCE(f.animation, 'popout') AS animation, f.created_at AS "createdAt", f.updated_at AS "updatedAt", COALESCE(COUNT(a.item_id), 0) AS "itemCount" FROM item_folders f LEFT JOIN item_folder_assignments a ON a.folder_id = f.id AND a.user_id = f.user_id WHERE f.user_id = ? GROUP BY f.id ORDER BY f.updated_at DESC, f.name ASC`, [uid]);
       const assignments = await all(`SELECT a.folder_id AS "folderId", a.item_id AS "itemId" FROM item_folder_assignments a JOIN item_folders f ON f.id = a.folder_id AND f.user_id = a.user_id JOIN items i ON i.id = a.item_id WHERE a.user_id = ? ORDER BY a.created_at DESC`, [uid]).catch(() => []);
       const byFolder = new Map();
       for (const assignment of assignments) {
