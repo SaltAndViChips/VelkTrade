@@ -228,7 +228,7 @@ async function downloadFolderZip(folder, items) {
   triggerDownload(makeZip(files), `${sanitizeFilename(folder.name, 'folder')}-images.zip`);
 }
 
-function ItemTile({ item, readOnly = false, selectable = false, selected = false, onToggleSelected, onClickItem, onDoubleClickItem, revealTick = 0, fromOpenFolder = false }) {
+function ItemTile({ item, readOnly = false, selectable = false, selected = false, onToggleSelected, onClickItem, onDoubleClickItem, revealTick = 0, fromOpenFolder = false, folderColor = '#00fa9a' }) {
   const [hovered, setHovered] = useState(false);
   const title = vtText(item.title || item.name, 'Item');
   const image = vtText(item.image || item.imageUrl || item.src);
@@ -276,7 +276,7 @@ function ItemTile({ item, readOnly = false, selectable = false, selected = false
       data-from-open-folder={fromOpenFolder ? 'true' : 'false'}
       data-owner-id={item.userId || item.userid || item.ownerId || item.owner_id || ''}
       data-owner-username={item.ownerUsername || item.owner_username || item.username || ''}
-      style={{ '--mosaic-delay': `${Math.min(revealTick * 32, 520)}ms` }}
+      style={{ '--mosaic-delay': `${Math.min(revealTick * 44, 720)}ms`, '--source-folder-color': safeCssColor(folderColor) }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
@@ -432,12 +432,9 @@ export default function Inventory({
   }).filter(entry => entry.items.length > 0), [folders, items]);
 
   const folderItemIds = useMemo(() => new Set(folderViews.flatMap(entry => entry.items.map(item => Number(item.id)))), [folderViews]);
-  const openFolderItemIds = useMemo(() => {
-    const open = new Set(openFolderIds.map(String));
-    return new Set(folderViews.filter(entry => open.has(String(entry.folder.id))).flatMap(entry => entry.items.map(item => Number(item.id))));
-  }, [folderViews, openFolderIds]);
+  const openFolderIdSet = useMemo(() => new Set(openFolderIds.map(String)), [openFolderIds]);
 
-  const flatItems = shouldLoadFolders ? items.filter(item => !folderItemIds.has(Number(item.id)) || openFolderItemIds.has(Number(item.id))) : items;
+  const unfiledItems = useMemo(() => shouldLoadFolders ? items.filter(item => !folderItemIds.has(Number(item.id))) : items, [shouldLoadFolders, items, folderItemIds]);
 
   function toggleFolderSelected(folderId) {
     const entry = folderViews.find(folderView => String(folderView.folder.id) === String(folderId));
@@ -459,17 +456,40 @@ export default function Inventory({
 
   const mosaicEntries = useMemo(() => {
     const entries = [];
+    const renderedItemIds = new Set();
+
     for (const entry of folderViews) {
       const folderId = entry.folder.id;
-      const open = openFolderIds.map(String).includes(String(folderId));
+      const open = openFolderIdSet.has(String(folderId));
+      const folderColor = safeCssColor(entry.folder.color);
       entries.push({ type: 'folder', key: `folder-${folderId}`, folder: entry.folder, items: entry.items, count: entry.items.length, open });
+
+      if (open) {
+        entry.items.forEach((item, itemIndex) => {
+          const itemId = Number(item.id);
+          if (Number.isInteger(itemId) && renderedItemIds.has(itemId)) return;
+          if (Number.isInteger(itemId)) renderedItemIds.add(itemId);
+          entries.push({
+            type: 'item',
+            key: stableItemKey(item, `folder-${folderId}-item`),
+            item,
+            fromOpenFolder: true,
+            revealTick: itemIndex,
+            folderColor
+          });
+        });
+      }
     }
-    for (const item of flatItems) {
-      const fromOpenFolder = openFolderItemIds.has(Number(item.id));
-      entries.push({ type: 'item', key: stableItemKey(item, fromOpenFolder ? 'folder-item' : 'item'), item, fromOpenFolder });
+
+    for (const item of unfiledItems) {
+      const itemId = Number(item.id);
+      if (Number.isInteger(itemId) && renderedItemIds.has(itemId)) continue;
+      if (Number.isInteger(itemId)) renderedItemIds.add(itemId);
+      entries.push({ type: 'item', key: stableItemKey(item, 'item'), item, fromOpenFolder: false, revealTick: 0, folderColor: '#00fa9a' });
     }
+
     return entries;
-  }, [folderViews, flatItems, openFolderIds, openFolderItemIds]);
+  }, [folderViews, unfiledItems, openFolderIdSet]);
 
   return (
     <section className={`card inventory-card-section inventory-rewrite-shell ${selectionEnabled ? 'bulk-selection-active' : ''}`}>
@@ -496,7 +516,7 @@ export default function Inventory({
 
       <div className="inventory-mosaic-grid item-grid inventory-grid vt-unified-mosaic-grid">
         {mosaicEntries.length === 0 && <p className="muted">No items here.</p>}
-        {mosaicEntries.map((entry, index) => entry.type === 'folder' ? (
+        {mosaicEntries.map((entry) => entry.type === 'folder' ? (
           <FolderTile key={entry.key} folder={entry.folder} items={entry.items} count={entry.count} open={entry.open} selectable={selectionEnabled} selected={folderSelected(entry.folder.id)} onToggle={() => toggleFolder(entry.folder.id)} onSelectFolder={toggleFolderSelected} />
         ) : (
           <ItemTile
@@ -508,8 +528,9 @@ export default function Inventory({
             onToggleSelected={toggleSelected}
             onClickItem={onClickItem}
             onDoubleClickItem={onDoubleClickItem}
-            revealTick={entry.fromOpenFolder ? index : 0}
+            revealTick={entry.revealTick || 0}
             fromOpenFolder={entry.fromOpenFolder}
+            folderColor={entry.folderColor}
           />
         ))}
       </div>
