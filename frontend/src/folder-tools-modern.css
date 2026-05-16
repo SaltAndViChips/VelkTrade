@@ -1,0 +1,349 @@
+/* Modern Inventory Folder Tools */
+
+.folder-tools-modern,
+.folder-tools-modern * {
+  box-sizing: border-box !important;
+}
+
+.folder-tools-modern {
+  display: grid !important;
+  gap: 14px !important;
+  padding: 14px !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(142, 113, 255, .24) !important;
+  background:
+    radial-gradient(circle at top left, rgba(124, 77, 255, .14), transparent 34%),
+    rgba(8, 6, 14, .34) !important;
+}
+
+.folder-tools-head {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.folder-tools-toolbar {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 9px !important;
+  align-items: center !important;
+  padding: 10px !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(255, 255, 255, .07) !important;
+  background: rgba(0, 0, 0, .22) !important;
+}
+
+.folder-tools-count {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 220, 147, .34) !important;
+  background: rgba(255, 220, 147, .08) !important;
+  color: #ffdc93 !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+}
+
+.folder-tools-layout {
+  display: grid !important;
+  grid-template-columns: minmax(250px, 330px) minmax(320px, 1.15fr) minmax(290px, .95fr) !important;
+  grid-auto-rows: auto !important;
+  gap: 14px !important;
+  align-items: stretch !important;
+}
+
+.folder-tool-card {
+  display: grid !important;
+  gap: 12px !important;
+  align-content: start !important;
+  min-width: 0 !important;
+  padding: 14px !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(142, 113, 255, .24) !important;
+  background:
+    radial-gradient(circle at top left, rgba(124, 77, 255, .10), transparent 36%),
+    rgba(5, 4, 10, .46) !important;
+  box-shadow: inset 0 0 24px rgba(142, 113, 255, .025) !important;
+}
+
+.folder-list-card {
+  grid-row: span 2 !important;
+}
+
+.folder-tool-card-title {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  gap: 10px !important;
+}
+
+.folder-tool-card-title strong {
+  color: #f4f0ff !important;
+  font-size: 15px !important;
+  font-weight: 950 !important;
+}
+
+.folder-tool-card-title span {
+  color: rgba(244, 240, 255, .58) !important;
+  font-size: 12px !important;
+  text-align: right !important;
+}
+
+.folder-modern-list {
+  display: grid !important;
+  gap: 8px !important;
+  max-height: 420px !important;
+  overflow: auto !important;
+  padding-right: 4px !important;
+}
+
+.folder-modern-row {
+  --folder-color: #00fa9a;
+  display: grid !important;
+  grid-template-columns: 44px minmax(0, 1fr) 18px !important;
+  gap: 10px !important;
+  align-items: center !important;
+  width: 100% !important;
+  min-height: 58px !important;
+  padding: 9px !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(255, 255, 255, .075) !important;
+  background: rgba(255, 255, 255, .035) !important;
+  color: #f4f0ff !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.folder-modern-row:hover,
+.folder-modern-row.active {
+  border-color: color-mix(in srgb, var(--folder-color), transparent 40%) !important;
+  background:
+    radial-gradient(circle at left, color-mix(in srgb, var(--folder-color), transparent 85%), transparent 54%),
+    rgba(255, 255, 255, .055) !important;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--folder-color), transparent 82%) !important;
+}
+
+.folder-modern-icon {
+  display: grid !important;
+  place-items: center !important;
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 13px !important;
+  border: 1px solid color-mix(in srgb, var(--folder-color), transparent 42%) !important;
+  background: rgba(0, 0, 0, .32) !important;
+  color: var(--folder-color) !important;
+  font-size: 22px !important;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--folder-color), transparent 78%) !important;
+}
+
+.folder-modern-main {
+  display: grid !important;
+  gap: 2px !important;
+  min-width: 0 !important;
+}
+
+.folder-modern-main strong {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  color: #f4f0ff !important;
+  font-size: 13px !important;
+  font-weight: 950 !important;
+}
+
+.folder-modern-main small {
+  color: rgba(244, 240, 255, .56) !important;
+  font-size: 11px !important;
+}
+
+.folder-modern-swatch {
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 999px !important;
+  background: var(--folder-color) !important;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--folder-color), transparent 45%) !important;
+}
+
+.folder-editor-grid {
+  display: grid !important;
+  grid-template-columns: minmax(82px, .5fr) minmax(145px, .95fr) auto minmax(190px, 1.2fr) !important;
+  gap: 10px !important;
+  align-items: end !important;
+}
+
+.folder-editor-grid.compact {
+  grid-template-columns: minmax(220px, 1fr) auto !important;
+}
+
+.folder-editor-grid label {
+  display: grid !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+  color: rgba(244, 240, 255, .66) !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+}
+
+.folder-name-field {
+  grid-column: span 2 !important;
+}
+
+.folder-icon-select,
+.folder-color-select,
+.folder-hex-input,
+.folder-editor-grid input {
+  width: 100% !important;
+}
+
+.folder-color-preview.modern,
+.folder-color-preview {
+  justify-self: center !important;
+  align-self: end !important;
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  border-radius: 999px !important;
+  border: 2px solid rgba(255, 255, 255, .30) !important;
+  box-shadow: 0 0 18px rgba(0, 0, 0, .36) !important;
+}
+
+.folder-action-row {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 9px !important;
+  align-items: center !important;
+}
+
+.folder-action-row .danger,
+.folder-tools-modern button.danger {
+  border-color: rgba(255, 90, 120, .44) !important;
+  background: linear-gradient(135deg, rgba(160, 35, 58, .92), rgba(108, 26, 45, .92)) !important;
+  color: #fff !important;
+}
+
+.folder-action-row .warning {
+  border-color: rgba(255, 220, 147, .36) !important;
+  color: #ffdc93 !important;
+}
+
+.folder-assignment-summary {
+  display: grid !important;
+  gap: 4px !important;
+  padding: 12px !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(255, 220, 147, .22) !important;
+  background: rgba(255, 220, 147, .055) !important;
+}
+
+.folder-assignment-summary span {
+  color: rgba(244, 240, 255, .58) !important;
+  font-size: 11px !important;
+  font-weight: 850 !important;
+  text-transform: uppercase !important;
+  letter-spacing: .045em !important;
+}
+
+.folder-assignment-summary strong {
+  color: #ffdc93 !important;
+  font-size: 14px !important;
+}
+
+.folder-tool-note {
+  margin: 0 !important;
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+}
+
+.inventory-cleanup-results.folder-tool-card {
+  margin-top: 0 !important;
+}
+
+/* Modernize the visible folder tiles in the inventory mosaic without breaking existing behavior. */
+.inventory-rewrite-shell .inventory-mosaic-folder,
+.inventory-rewrite-shell .inventory-folder-card {
+  border-radius: 18px !important;
+}
+
+.inventory-rewrite-shell .inventory-folder-stack {
+  position: relative !important;
+  border-radius: 18px !important;
+  background:
+    radial-gradient(circle at center, color-mix(in srgb, var(--folder-color, #00fa9a), transparent 76%), transparent 58%),
+    linear-gradient(145deg, rgba(18, 13, 30, .84), rgba(3, 2, 7, .92)) !important;
+  box-shadow:
+    inset 0 0 36px color-mix(in srgb, var(--folder-color, #00fa9a), transparent 90%),
+    0 14px 34px rgba(0, 0, 0, .22) !important;
+}
+
+.inventory-rewrite-shell .inventory-folder-stack::before,
+.inventory-rewrite-shell .inventory-folder-stack::after {
+  content: '' !important;
+  position: absolute !important;
+  border-radius: 18px !important;
+  border: 1px solid color-mix(in srgb, var(--folder-color, #00fa9a), transparent 68%) !important;
+  background: rgba(0, 0, 0, .18) !important;
+  pointer-events: none !important;
+}
+
+.inventory-rewrite-shell .inventory-folder-stack::before {
+  inset: 18px 20px 28px 20px !important;
+  transform: translateY(-8px) scale(.94) !important;
+  opacity: .62 !important;
+}
+
+.inventory-rewrite-shell .inventory-folder-stack::after {
+  inset: 28px 28px 18px 28px !important;
+  transform: translateY(-2px) scale(.97) !important;
+  opacity: .46 !important;
+}
+
+.inventory-rewrite-shell .inventory-folder-main-icon {
+  backdrop-filter: blur(8px) !important;
+}
+
+.folder-export-actions {
+  display: flex !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  margin-top: 8px !important;
+}
+
+.folder-export-actions button {
+  min-height: 28px !important;
+  padding: 4px 9px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+}
+
+@media (max-width: 1100px) {
+  .folder-tools-layout {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .folder-list-card {
+    grid-row: auto !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .folder-tools-layout,
+  .folder-editor-grid,
+  .folder-editor-grid.compact,
+  .folder-tools-toolbar,
+  .folder-tool-card-title {
+    grid-template-columns: 1fr !important;
+  }
+
+  .folder-name-field {
+    grid-column: auto !important;
+  }
+
+  .folder-tools-toolbar,
+  .folder-action-row,
+  .folder-tool-card-title {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+}
