@@ -23,6 +23,7 @@ import './admin-economy-testview.css';
 import './admin-test-view-mode.css';
 import './folder-export-actions.css';
 import './folder-tools-modern.css';
+import './inventory-modern-popout.css';
 import './buy-offer-v2.css';
 import './dashboard-trade-badge.css';
 import './public-bazaar-route.css';
