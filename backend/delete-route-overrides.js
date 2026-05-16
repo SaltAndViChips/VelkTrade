@@ -28,6 +28,7 @@ const routeInstallers = [
   ['item-lock-routes', optionalInstaller('./item-lock-routes', 'item-lock-routes')],
   ['buy-offer-audit-price-routes', optionalInstaller('./buy-offer-audit-price-routes', 'buy-offer-audit-price-routes')],
   ['bazaar-watchlist-filter-routes', optionalInstaller('./bazaar-watchlist-filter-routes', 'bazaar-watchlist-filter-routes')],
+  ['folder-animation-v2-routes', optionalInstaller('./folder-animation-v2-routes', 'folder-animation-v2-routes')],
   ['item-folder-note-routes', optionalInstaller('./item-folder-note-routes', 'item-folder-note-routes')],
   ['folder-management-routes', optionalInstaller('./folder-management-routes', 'folder-management-routes')],
   ['item-folder-view-routes', optionalInstaller('./item-folder-view-routes', 'item-folder-view-routes')],
