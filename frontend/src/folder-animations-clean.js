@@ -1,8 +1,9 @@
 import { api } from './api';
 
 /*
-  Clean folder animation controller.
-  Uses only simple, reliable animations and separates opened folders into their own rows.
+  Simplified folder animation controller.
+  Important: this file never moves React-owned DOM nodes. Earlier row grouping used
+  appendChild/insertBefore on React children and caused flickering plus removeChild errors.
 */
 
 const OPTIONS = [
@@ -16,26 +17,13 @@ const OPTIONS = [
 
 const VALID = new Set(OPTIONS.map(([value]) => value));
 const LEGACY_MAP = new Map([
-  ['popout', 'grow'],
-  ['burst', 'grow'],
-  ['fan', 'deal'],
-  ['deal', 'deal'],
-  ['cascade', 'grow'],
-  ['rise', 'grow'],
-  ['portal', 'fade'],
-  ['warp', 'fade'],
-  ['bounce', 'grow'],
-  ['snap', 'grow'],
-  ['drift', 'slide'],
-  ['flipbook', 'grow'],
-  ['flip', 'grow'],
-  ['bloom', 'grow'],
-  ['orbit', 'sweep'],
-  ['spiral', 'sweep'],
-  ['scatter', 'sweep'],
-  ['shuffle', 'sweep'],
-  ['zoom', 'grow'],
-  ['none', 'none']
+  ['popout', 'grow'], ['burst', 'grow'], ['cascade', 'grow'], ['rise', 'grow'],
+  ['fan', 'deal'], ['deal', 'deal'],
+  ['portal', 'fade'], ['warp', 'fade'],
+  ['bounce', 'grow'], ['snap', 'grow'],
+  ['drift', 'slide'], ['flipbook', 'grow'], ['flip', 'grow'],
+  ['bloom', 'grow'], ['orbit', 'sweep'], ['spiral', 'sweep'],
+  ['scatter', 'sweep'], ['shuffle', 'sweep'], ['zoom', 'grow'], ['none', 'none']
 ]);
 
 const loadedShells = new WeakSet();
@@ -109,68 +97,37 @@ async function loadFolderMap() {
   return folderMap;
 }
 
-function nextCard(element) {
-  let node = element?.nextElementSibling;
-  while (node && !node.matches?.('.inventory-mosaic-folder,.inventory-mosaic-item,.vt-folder-card,.vt-unified-item-card,.open-folder-row')) {
-    node = node.nextElementSibling;
-  }
-  return node;
-}
-
 function clearAnimationClasses(node) {
   for (const cls of Array.from(node.classList || [])) {
     if (cls.startsWith('folder-animation-') || cls.startsWith('folder-anim-')) node.classList.remove(cls);
   }
 }
 
-function applyAnimationClass(node, animation, index) {
+function nextCard(element) {
+  let node = element?.nextElementSibling;
+  while (node && !node.matches?.('.inventory-mosaic-folder,.inventory-mosaic-item,.vt-folder-card,.vt-unified-item-card')) {
+    node = node.nextElementSibling;
+  }
+  return node;
+}
+
+function applyAnimationClass(node, animation, index, forceReplay = false) {
   const next = normalizeAnimation(animation);
   clearAnimationClasses(node);
   node.classList.add(`folder-animation-${next}`);
   node.dataset.folderAnimation = next;
   node.style.setProperty('--folder-delay', `${Math.min(index * 55, 880)}ms`);
-  node.style.setProperty('animation', 'none', 'important');
-  void node.offsetWidth;
-  node.style.removeProperty('animation');
-}
 
-function unwrapOpenRows(grid) {
-  grid.querySelectorAll(':scope > .open-folder-row').forEach(row => {
-    while (row.firstChild) grid.insertBefore(row.firstChild, row);
-    row.remove();
-  });
-}
-
-function groupOpenFolders() {
-  document.querySelectorAll('.inventory-mosaic-grid,.inventory-grid,.item-grid').forEach(grid => {
-    unwrapOpenRows(grid);
-    const cards = Array.from(grid.children);
-    for (const folderCard of cards) {
-      if (!folderCard.matches?.('.inventory-mosaic-folder[data-folder-id],.vt-folder-card[data-folder-id]')) continue;
-      if (folderCard.dataset.folderOpen !== 'true' && !folderCard.classList.contains('folder-is-open')) continue;
-      const folderId = String(folderCard.dataset.folderId || '');
-      const animation = normalizeAnimation(folderMap.get(folderId) || folderCard.dataset.folderAnimation || 'grow');
-      const row = document.createElement('section');
-      row.className = 'open-folder-row';
-      row.dataset.folderId = folderId;
-      row.dataset.folderAnimation = animation;
-      row.style.setProperty('--folder-color', folderCard.style.getPropertyValue('--folder-color') || '#00fa9a');
-      grid.insertBefore(row, folderCard);
-      row.appendChild(folderCard);
-
-      let node = row.nextElementSibling;
-      while (node && !node.matches?.('.inventory-mosaic-folder,.vt-folder-card')) {
-        const next = node.nextElementSibling;
-        if (node.matches?.('.folder-revealed-item,[data-from-open-folder="true"]')) row.appendChild(node);
-        node = next;
-      }
-    }
-  });
+  if (forceReplay) {
+    node.style.setProperty('animation', 'none', 'important');
+    void node.offsetWidth;
+    node.style.removeProperty('animation');
+  }
 }
 
 function applyAnimations(forceReplay = false) {
-  groupOpenFolders();
   const folderCards = Array.from(document.querySelectorAll('.inventory-mosaic-folder[data-folder-id],.vt-folder-card[data-folder-id]'));
+
   for (const folderCard of folderCards) {
     const folderId = String(folderCard.dataset.folderId || '');
     const animation = normalizeAnimation(folderMap.get(folderId) || folderCard.dataset.folderAnimation || 'grow');
@@ -178,42 +135,23 @@ function applyAnimations(forceReplay = false) {
     folderCard.classList.add(`folder-animation-${animation}`);
     folderCard.dataset.folderAnimation = animation;
 
-    const row = folderCard.closest('.open-folder-row');
-    if (row) {
-      row.dataset.folderAnimation = animation;
-      row.classList.remove(...Array.from(row.classList).filter(cls => cls.startsWith('folder-animation-')));
-      row.classList.add(`folder-animation-${animation}`);
-    }
-
     let index = 0;
-    const container = row || folderCard.parentElement;
-    const children = row ? Array.from(row.children).slice(1) : [];
-    const targets = row ? children : (() => {
-      const found = [];
-      let node = nextCard(folderCard);
-      while (node && !node.matches?.('.inventory-mosaic-folder,.vt-folder-card,.open-folder-row')) {
-        if (node.matches?.('.folder-revealed-item,[data-from-open-folder="true"]')) found.push(node);
-        node = nextCard(node);
-      }
-      return found;
-    })();
-
-    targets.forEach(node => {
-      const runKey = `${folderId}:${animation}:${node.dataset.itemId || node.dataset.id || index}`;
-      if (forceReplay || node.dataset.folderCleanRunKey !== runKey) {
+    let node = nextCard(folderCard);
+    while (node && !node.matches?.('.inventory-mosaic-folder,.vt-folder-card')) {
+      if (node.matches?.('.folder-revealed-item,[data-from-open-folder="true"]')) {
+        const runKey = `${folderId}:${animation}:${node.dataset.itemId || node.dataset.id || index}`;
+        applyAnimationClass(node, animation, index, forceReplay || node.dataset.folderCleanRunKey !== runKey);
         node.dataset.folderCleanRunKey = runKey;
-        applyAnimationClass(node, animation, index);
-      } else {
-        clearAnimationClasses(node);
-        node.classList.add(`folder-animation-${animation}`);
+        index += 1;
       }
-      index += 1;
-    });
+      node = nextCard(node);
+    }
   }
 }
 
 function expandAnimationSelects() {
   document.querySelectorAll('select.folder-animation-select').forEach(select => {
+    const current = normalizeAnimation(selectedAnimationOverride || select.value || 'grow');
     select.innerHTML = '';
     for (const [value, label] of OPTIONS) {
       const option = document.createElement('option');
@@ -221,7 +159,6 @@ function expandAnimationSelects() {
       option.textContent = label;
       select.appendChild(option);
     }
-    const current = normalizeAnimation(selectedAnimationOverride || select.value || 'grow');
     select.value = current;
     select.onchange = () => {
       selectedAnimationOverride = normalizeAnimation(select.value);
@@ -270,8 +207,8 @@ async function initialLoadForShells() {
 }
 
 function install() {
-  if (typeof window === 'undefined' || window.__VELKTRADE_FOLDER_ANIMATIONS_CLEAN_V2__) return;
-  window.__VELKTRADE_FOLDER_ANIMATIONS_CLEAN_V2__ = true;
+  if (typeof window === 'undefined' || window.__VELKTRADE_FOLDER_ANIMATIONS_CLEAN_V3__) return;
+  window.__VELKTRADE_FOLDER_ANIMATIONS_CLEAN_V3__ = true;
   patchFetchForAnimationSaves();
 
   setTimeout(initialLoadForShells, 0);
