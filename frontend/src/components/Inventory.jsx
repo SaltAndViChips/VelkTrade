@@ -228,7 +228,7 @@ async function downloadFolderZip(folder, items) {
   triggerDownload(makeZip(files), `${sanitizeFilename(folder.name, 'folder')}-images.zip`);
 }
 
-function ItemTile({ item, readOnly = false, selectable = false, selected = false, onToggleSelected, onClickItem, onDoubleClickItem, revealTick = 0 }) {
+function ItemTile({ item, readOnly = false, selectable = false, selected = false, onToggleSelected, onClickItem, onDoubleClickItem, revealTick = 0, fromOpenFolder = false }) {
   const [hovered, setHovered] = useState(false);
   const title = vtText(item.title || item.name, 'Item');
   const image = vtText(item.image || item.imageUrl || item.src);
@@ -264,7 +264,7 @@ function ItemTile({ item, readOnly = false, selectable = false, selected = false
 
   return (
     <article
-      className={`inventory-mosaic-item item-card vt-unified-item-card ${readOnly ? 'readonly' : ''} ${selected ? 'bulk-selected' : ''} ${hovered && price ? 'vt-hover-price-title' : ''}`}
+      className={`inventory-mosaic-item item-card vt-unified-item-card ${readOnly ? 'readonly' : ''} ${selected ? 'bulk-selected' : ''} ${hovered && price ? 'vt-hover-price-title' : ''} ${fromOpenFolder ? 'folder-revealed-item' : ''}`}
       data-item-id={item.id || ''}
       data-id={item.id || ''}
       data-title={title}
@@ -273,9 +273,10 @@ function ItemTile({ item, readOnly = false, selectable = false, selected = false
       data-vt-price={price}
       data-vt-react-hover="true"
       data-vt-hover-swap-bound="true"
+      data-from-open-folder={fromOpenFolder ? 'true' : 'false'}
       data-owner-id={item.userId || item.userid || item.ownerId || item.owner_id || ''}
       data-owner-username={item.ownerUsername || item.owner_username || item.username || ''}
-      style={{ '--mosaic-delay': `${Math.min(revealTick * 28, 420)}ms` }}
+      style={{ '--mosaic-delay': `${Math.min(revealTick * 32, 520)}ms` }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
@@ -323,12 +324,13 @@ function FolderTile({ folder, items = [], count, open, selectable = false, selec
   }
 
   return (
-    <article className={`inventory-folder-card vt-folder-card inventory-mosaic-folder ${open ? 'open' : ''} ${selected ? 'bulk-selected' : ''}`} data-folder-id={folder.id} data-title={name} data-no-item-popup="true" style={{ '--folder-color': color }}>
+    <article className={`inventory-folder-card vt-folder-card inventory-mosaic-folder ${open ? 'open folder-is-open' : 'folder-is-closed'} ${selected ? 'bulk-selected' : ''}`} data-folder-id={folder.id} data-title={name} data-no-item-popup="true" data-folder-open={open ? 'true' : 'false'} style={{ '--folder-color': color }}>
       {selectable && <button type="button" className="bulk-select-pill folder-select-pill" onPointerDown={selectFolder} onPointerUp={suppressSelectPopup} onMouseDown={selectFolder} onMouseUp={suppressSelectPopup} onClick={selectFolder}>{selected ? '✓ Selected' : 'Select'}</button>}
-      <button type="button" className="inventory-folder-cover" onClick={onToggle} aria-expanded={open}>
+      <button type="button" className="inventory-folder-cover" onClick={onToggle} aria-expanded={open} aria-label={`${open ? 'Close' : 'Open'} folder ${name}`}>
         <div className="inventory-folder-stack"><span className="inventory-folder-main-icon">{icon}</span></div>
         <strong className="item-title inventory-mosaic-title">{name}</strong>
         <span className="inventory-folder-count">{count} item{count === 1 ? '' : 's'}</span>
+        <span className="inventory-folder-chevron" aria-hidden="true">⌄</span>
       </button>
       <div className="folder-export-actions" data-no-item-popup="true">
         <button type="button" onPointerDown={suppressSelectPopup} onMouseDown={suppressSelectPopup} onClick={event => exportFolder(event, 'zip')} disabled={Boolean(exportBusy) || !items.length}>{exportBusy === 'zip' ? 'Zipping…' : 'ZIP'}</button>
@@ -507,6 +509,7 @@ export default function Inventory({
             onClickItem={onClickItem}
             onDoubleClickItem={onDoubleClickItem}
             revealTick={entry.fromOpenFolder ? index : 0}
+            fromOpenFolder={entry.fromOpenFolder}
           />
         ))}
       </div>
