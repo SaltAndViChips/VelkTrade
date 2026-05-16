@@ -8,9 +8,14 @@
 const { get, all, run } = require('./db');
 
 const FOLDER_ICONS = new Set(['📁', '🗂️', '📦', '🧰', '🏷️', '⭐', '✨', '🔥', '💎', '🪐', '🌌', '☄️', '🌙', '☀️', '⚔️', '🛡️', '🏹', '🎯', '💣', '☠️', '👑', '💰', '🪙', '⚡', '🔮', '🧪', '🧬', '🕯️', '✦', '◆', '◇', '★', '☢', '☣', 'Ω', 'α', 'β', 'Δ', '#', '$', 'IC', 'S', 'A', 'B', 'C']);
+const FOLDER_ANIMATIONS = new Set(['popout', 'fan', 'cascade', 'portal', 'bounce', 'none']);
 function cleanIcon(value) {
   const icon = String(value || '📁').trim().slice(0, 6);
   return FOLDER_ICONS.has(icon) ? icon : '📁';
+}
+function cleanAnimation(value) {
+  const animation = String(value || 'popout').trim().toLowerCase();
+  return FOLDER_ANIMATIONS.has(animation) ? animation : 'popout';
 }
 
 function installItemFolderNoteRoutes({ app, authMiddleware }) {
@@ -37,11 +42,13 @@ function installItemFolderNoteRoutes({ app, authMiddleware }) {
         name TEXT NOT NULL,
         color TEXT DEFAULT '',
         icon TEXT DEFAULT '📁',
+        animation TEXT DEFAULT 'popout',
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
     await run(`ALTER TABLE item_folders ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT '📁'`).catch(() => {});
+    await run(`ALTER TABLE item_folders ADD COLUMN IF NOT EXISTS animation TEXT DEFAULT 'popout'`).catch(() => {});
 
     await run(`
       CREATE TABLE IF NOT EXISTS item_folder_assignments (
@@ -84,7 +91,7 @@ function installItemFolderNoteRoutes({ app, authMiddleware }) {
       const uid = userId(req);
       if (!uid) return res.status(401).json({ error: 'Not authenticated' });
       const rows = await all(`
-        SELECT f.*, COALESCE(f.icon, '📁') AS icon, COUNT(a.id) AS "itemCount"
+        SELECT f.*, COALESCE(f.icon, '📁') AS icon, COALESCE(f.animation, 'popout') AS animation, COUNT(a.id) AS "itemCount"
         FROM item_folders f
         LEFT JOIN item_folder_assignments a ON a.folder_id = f.id
         WHERE f.user_id = ?
@@ -103,11 +110,12 @@ function installItemFolderNoteRoutes({ app, authMiddleware }) {
       const name = String(req.body?.name || '').trim().slice(0, 80);
       const color = String(req.body?.color || '').trim().slice(0, 40);
       const icon = cleanIcon(req.body?.icon);
+      const animation = cleanAnimation(req.body?.animation);
       if (!name) return res.status(400).json({ error: 'Folder name is required' });
-      const result = await run(`INSERT INTO item_folders (user_id, name, color, icon, updated_at) VALUES (?, ?, ?, ?, NOW()) RETURNING id`, [uid, name, color, icon]);
+      const result = await run(`INSERT INTO item_folders (user_id, name, color, icon, animation, updated_at) VALUES (?, ?, ?, ?, ?, NOW()) RETURNING id`, [uid, name, color, icon, animation]);
       const id = result.rows?.[0]?.id || result.lastID;
-      await audit(req, 'item_folder.created', 'item_folder', id, { name, color, icon });
-      res.json({ ok: true, folder: { id, name, color, icon, itemCount: 0 } });
+      await audit(req, 'item_folder.created', 'item_folder', id, { name, color, icon, animation });
+      res.json({ ok: true, folder: { id, name, color, icon, animation, itemCount: 0 } });
     } catch (error) { console.error('create item folder failed:', error); res.status(500).json({ error: error.message || 'Failed to create folder' }); }
   }
 
@@ -122,10 +130,11 @@ function installItemFolderNoteRoutes({ app, authMiddleware }) {
       const name = req.body?.name !== undefined ? String(req.body.name || '').trim().slice(0, 80) : existing.name;
       const color = req.body?.color !== undefined ? String(req.body.color || '').trim().slice(0, 40) : existing.color;
       const icon = req.body?.icon !== undefined ? cleanIcon(req.body.icon) : cleanIcon(existing.icon);
+      const animation = req.body?.animation !== undefined ? cleanAnimation(req.body.animation) : cleanAnimation(existing.animation);
       if (!name) return res.status(400).json({ error: 'Folder name is required' });
-      await run(`UPDATE item_folders SET name = ?, color = ?, icon = ?, updated_at = NOW() WHERE id = ? AND user_id = ?`, [name, color, icon, Number(id), uid]);
-      await audit(req, 'item_folder.updated', 'item_folder', id, { name, color, icon });
-      res.json({ ok: true, folder: { ...existing, id: Number(id), name, color, icon } });
+      await run(`UPDATE item_folders SET name = ?, color = ?, icon = ?, animation = ?, updated_at = NOW() WHERE id = ? AND user_id = ?`, [name, color, icon, animation, Number(id), uid]);
+      await audit(req, 'item_folder.updated', 'item_folder', id, { name, color, icon, animation });
+      res.json({ ok: true, folder: { ...existing, id: Number(id), name, color, icon, animation } });
     } catch (error) { console.error('update item folder failed:', error); res.status(500).json({ error: error.message || 'Failed to update folder' }); }
   }
 
@@ -152,7 +161,7 @@ function installItemFolderNoteRoutes({ app, authMiddleware }) {
       const viewerOwnsItem = ownsItem(req, item);
       if (!viewerOwnsItem && !isAdminOrDeveloper(req)) return res.status(403).json({ error: 'Not allowed' });
       const noteRow = await get(`SELECT note, updated_at AS "updatedAt" FROM item_private_notes WHERE user_id = ? AND item_id = ?`, [uid, Number(itemId)]).catch(() => null);
-      const folders = await all(`SELECT f.id, f.name, f.color, COALESCE(f.icon, '📁') AS icon, a.created_at AS "assignedAt" FROM item_folder_assignments a JOIN item_folders f ON f.id = a.folder_id WHERE a.user_id = ? AND a.item_id = ? ORDER BY f.name ASC`, [uid, Number(itemId)]).catch(() => []);
+      const folders = await all(`SELECT f.id, f.name, f.color, COALESCE(f.icon, '📁') AS icon, COALESCE(f.animation, 'popout') AS animation, a.created_at AS "assignedAt" FROM item_folder_assignments a JOIN item_folders f ON f.id = a.folder_id WHERE a.user_id = ? AND a.item_id = ? ORDER BY f.name ASC`, [uid, Number(itemId)]).catch(() => []);
       res.json({ ok: true, itemId: Number(itemId), note: noteRow?.note || '', noteUpdatedAt: noteRow?.updatedAt || null, folders });
     } catch (error) { console.error('get item organization failed:', error); res.status(500).json({ error: error.message || 'Failed to load item organization' }); }
   }
