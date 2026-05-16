@@ -1,11 +1,10 @@
 /*
-  Folder animations clean system.
-  This file is the only folder animation stylesheet loaded by main.jsx.
-  Older folder animation files/imports were removed.
+  Simplified folder animations.
+  Only reliable animations remain, and opened folders are grouped into their own full-width rows.
 */
 
 :root {
-  --vt-folder-ease: cubic-bezier(.18,.9,.22,1.12);
+  --vt-folder-ease: cubic-bezier(.2, .85, .2, 1);
 }
 
 .inventory-rewrite-shell.folder-initial-loading {
@@ -109,37 +108,61 @@
   box-shadow:
     0 10px 20px rgba(0, 0, 0, .28),
     0 0 16px color-mix(in srgb, var(--folder-color), transparent 84%) !important;
-  animation-duration: 1.35s !important;
+  animation-duration: 1.2s !important;
   animation-iteration-count: infinite !important;
   animation-timing-function: var(--vt-folder-ease) !important;
 }
 .preview-card.one { animation-delay: 0ms !important; }
-.preview-card.two { animation-delay: 110ms !important; }
-.preview-card.three { animation-delay: 220ms !important; }
+.preview-card.two { animation-delay: 100ms !important; }
+.preview-card.three { animation-delay: 200ms !important; }
 
-.folder-animation-preview[data-animation="burst"] .preview-card { animation-name: vt-preview-burst !important; }
+.folder-animation-preview[data-animation="grow"] .preview-card { animation-name: vt-preview-grow !important; }
+.folder-animation-preview[data-animation="sweep"] .preview-card { animation-name: vt-preview-sweep !important; }
+.folder-animation-preview[data-animation="slide"] .preview-card { animation-name: vt-preview-slide !important; }
+.folder-animation-preview[data-animation="fade"] .preview-card { animation-name: vt-preview-fade !important; }
 .folder-animation-preview[data-animation="deal"] .preview-card { animation-name: vt-preview-deal !important; }
-.folder-animation-preview[data-animation="rise"] .preview-card { animation-name: vt-preview-rise !important; }
-.folder-animation-preview[data-animation="warp"] .preview-card { animation-name: vt-preview-warp !important; }
-.folder-animation-preview[data-animation="snap"] .preview-card { animation-name: vt-preview-snap !important; }
-.folder-animation-preview[data-animation="drift"] .preview-card { animation-name: vt-preview-drift !important; }
-.folder-animation-preview[data-animation="flipbook"] .preview-card { animation-name: vt-preview-flipbook !important; }
-.folder-animation-preview[data-animation="bloom"] .preview-card { animation-name: vt-preview-bloom !important; }
-.folder-animation-preview[data-animation="orbit"] .preview-card { animation-name: vt-preview-orbit !important; }
-.folder-animation-preview[data-animation="scatter"] .preview-card { animation-name: vt-preview-scatter !important; }
 .folder-animation-preview[data-animation="none"] .preview-card { animation: none !important; opacity: 1 !important; }
 .folder-animation-preview[data-animation="none"] .preview-card.one { transform: translateX(0) rotate(-5deg) !important; }
 .folder-animation-preview[data-animation="none"] .preview-card.two { transform: translateX(48px) rotate(0deg) !important; }
 .folder-animation-preview[data-animation="none"] .preview-card.three { transform: translateX(96px) rotate(5deg) !important; }
 
 .inventory-mosaic-folder.folder-is-open .inventory-folder-stack {
-  animation: vt-folder-cover-open .32s var(--vt-folder-ease) both !important;
+  animation: vt-folder-cover-open .28s var(--vt-folder-ease) both !important;
+}
+
+.open-folder-row {
+  grid-column: 1 / -1 !important;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(var(--inventory-card-width, 292px), var(--inventory-card-width, 292px))) !important;
+  gap: 20px !important;
+  align-items: start !important;
+  justify-content: start !important;
+  width: 100% !important;
+  margin: 6px 0 18px !important;
+  padding: 18px !important;
+  border-radius: 24px !important;
+  border: 1px solid color-mix(in srgb, var(--folder-color, #00fa9a), transparent 70%) !important;
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--folder-color, #00fa9a), transparent 86%), transparent 36%),
+    rgba(5, 4, 10, .36) !important;
+  box-shadow: inset 0 0 28px rgba(255, 255, 255, .025), 0 14px 30px rgba(0, 0, 0, .18) !important;
+  animation: vt-row-open .26s ease both !important;
+}
+
+.open-folder-row > .inventory-mosaic-folder,
+.open-folder-row > .vt-folder-card {
+  align-self: start !important;
+}
+
+.open-folder-row > .folder-revealed-item,
+.open-folder-row > [data-from-open-folder="true"] {
+  align-self: start !important;
 }
 
 .folder-revealed-item {
   animation: none !important;
   transform-origin: center center !important;
-  will-change: transform, opacity, filter, clip-path !important;
+  will-change: transform, opacity, filter !important;
 }
 
 .folder-revealed-item.folder-animation-none {
@@ -147,102 +170,70 @@
   animation: none !important;
 }
 
-.folder-revealed-item.folder-animation-burst { animation: vt-card-burst .56s var(--vt-folder-ease) var(--folder-delay, 0ms) both !important; }
-.folder-revealed-item.folder-animation-deal { animation: vt-card-deal .64s var(--vt-folder-ease) var(--folder-delay, 0ms) both !important; }
-.folder-revealed-item.folder-animation-rise { animation: vt-card-rise .54s var(--vt-folder-ease) var(--folder-delay, 0ms) both !important; }
-.folder-revealed-item.folder-animation-warp { animation: vt-card-warp .62s var(--vt-folder-ease) var(--folder-delay, 0ms) both !important; }
-.folder-revealed-item.folder-animation-snap { animation: vt-card-snap .44s cubic-bezier(.08,.92,.2,1.35) var(--folder-delay, 0ms) both !important; }
-.folder-revealed-item.folder-animation-drift { animation: vt-card-drift .72s cubic-bezier(.18,.9,.18,1) var(--folder-delay, 0ms) both !important; }
-.folder-revealed-item.folder-animation-flipbook { animation: vt-card-flipbook .66s var(--vt-folder-ease) var(--folder-delay, 0ms) both !important; }
-.folder-revealed-item.folder-animation-bloom { animation: vt-card-bloom .58s var(--vt-folder-ease) var(--folder-delay, 0ms) both !important; }
-.folder-revealed-item.folder-animation-orbit { animation: vt-card-orbit .70s var(--vt-folder-ease) var(--folder-delay, 0ms) both !important; }
-.folder-revealed-item.folder-animation-scatter { animation: vt-card-scatter .62s var(--vt-folder-ease) var(--folder-delay, 0ms) both !important; }
+.folder-revealed-item.folder-animation-grow { animation: vt-card-grow .36s ease-out var(--folder-delay, 0ms) both !important; }
+.folder-revealed-item.folder-animation-sweep { animation: vt-card-sweep .42s ease-out var(--folder-delay, 0ms) both !important; }
+.folder-revealed-item.folder-animation-slide { animation: vt-card-slide .38s ease-out var(--folder-delay, 0ms) both !important; }
+.folder-revealed-item.folder-animation-fade { animation: vt-card-fade .34s ease-out var(--folder-delay, 0ms) both !important; }
+.folder-revealed-item.folder-animation-deal { animation: vt-card-deal-simple .42s ease-out var(--folder-delay, 0ms) both !important; }
 
-@keyframes vt-card-burst {
-  0% { opacity: 0; transform: translate(-72px, -54px) scale(.48); filter: blur(10px) saturate(.45); }
-  58% { opacity: 1; transform: translate(12px, -8px) scale(1.05); filter: blur(0) saturate(1.18); }
-  100% { opacity: 1; transform: none; filter: none; }
-}
-
-@keyframes vt-card-deal {
-  0% { opacity: 0; transform: translateX(-110px) rotate(-18deg) scale(.62); filter: blur(8px); }
-  62% { opacity: 1; transform: translateX(18px) rotate(7deg) scale(1.04); filter: none; }
-  100% { opacity: 1; transform: none; filter: none; }
-}
-
-@keyframes vt-card-rise {
-  0% { opacity: 0; transform: translateY(70px) scale(.72); clip-path: inset(100% 0 0 0 round 18px); filter: blur(6px); }
-  66% { opacity: 1; transform: translateY(-8px) scale(1.02); clip-path: inset(0 0 0 0 round 18px); filter: none; }
-  100% { opacity: 1; transform: none; clip-path: inset(0 0 0 0 round 18px); filter: none; }
-}
-
-@keyframes vt-card-warp {
-  0% { opacity: 0; transform: scale(.18) rotate(42deg); filter: blur(14px) hue-rotate(70deg); }
-  52% { opacity: 1; transform: scale(1.08) rotate(-5deg); filter: blur(0) saturate(1.25); }
-  100% { opacity: 1; transform: none; filter: none; }
-}
-
-@keyframes vt-card-snap {
-  0% { opacity: 0; transform: scale(.08); filter: blur(6px); }
-  52% { opacity: 1; transform: scale(1.12); filter: none; }
+@keyframes vt-card-grow {
+  0% { opacity: 0; transform: scale(.84); filter: blur(3px); }
   100% { opacity: 1; transform: scale(1); filter: none; }
 }
 
-@keyframes vt-card-drift {
-  0% { opacity: 0; transform: translate(-34px, -80px) rotate(-6deg); filter: blur(10px); }
-  55% { opacity: 1; transform: translate(8px, 12px) rotate(2deg); filter: none; }
-  100% { opacity: 1; transform: none; filter: none; }
+@keyframes vt-card-sweep {
+  0% { opacity: 0; transform: translateX(-42px); filter: blur(2px); }
+  100% { opacity: 1; transform: translateX(0); filter: none; }
 }
 
-@keyframes vt-card-flipbook {
-  0% { opacity: 0; transform: perspective(900px) rotateY(-92deg) translateX(-58px) scale(.78); filter: blur(5px); }
-  62% { opacity: 1; transform: perspective(900px) rotateY(9deg) translateX(6px) scale(1.03); filter: none; }
-  100% { opacity: 1; transform: perspective(900px) rotateY(0deg) translateX(0) scale(1); filter: none; }
+@keyframes vt-card-slide {
+  0% { opacity: 0; transform: translateY(28px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes vt-card-bloom {
-  0% { opacity: 0; transform: scale(.32); filter: blur(18px) brightness(1.5); box-shadow: 0 0 0 rgba(0,250,154,0); }
-  48% { opacity: 1; transform: scale(1.10); filter: blur(0) brightness(1.12); box-shadow: 0 0 38px color-mix(in srgb, var(--source-folder-color, #00fa9a), transparent 62%); }
-  100% { opacity: 1; transform: scale(1); filter: none; }
+@keyframes vt-card-fade {
+  0% { opacity: 0; filter: blur(4px); }
+  100% { opacity: 1; filter: none; }
 }
 
-@keyframes vt-card-orbit {
-  0% { opacity: 0; transform: translate(-86px, -54px) rotate(-220deg) scale(.30); filter: blur(10px); }
-  65% { opacity: 1; transform: translate(10px, -6px) rotate(18deg) scale(1.05); filter: none; }
-  100% { opacity: 1; transform: none; filter: none; }
-}
-
-@keyframes vt-card-scatter {
-  0% { opacity: 0; transform: translate(-86px, -22px) skewX(-16deg) scale(.68); filter: blur(9px); }
-  35% { opacity: 1; transform: translate(24px, 12px) skewX(9deg) scale(1.05); filter: none; }
-  68% { transform: translate(-9px, -6px) skewX(-4deg) scale(.996); }
-  100% { opacity: 1; transform: none; filter: none; }
+@keyframes vt-card-deal-simple {
+  0% { opacity: 0; transform: translateX(-36px) rotate(-5deg) scale(.94); }
+  100% { opacity: 1; transform: translateX(0) rotate(0deg) scale(1); }
 }
 
 @keyframes vt-folder-cover-open {
   0% { transform: translateY(0) scale(1); }
-  55% { transform: translateY(-8px) scale(1.025); }
+  60% { transform: translateY(-7px) scale(1.018); }
   100% { transform: translateY(-2px) scale(1); }
+}
+
+@keyframes vt-row-open {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes vt-folder-loader-spin { to { transform: rotate(360deg); } }
 
-@keyframes vt-preview-burst { 0%,100% { opacity:.25; transform: translateX(-28px) translateY(-14px) scale(.48); } 55%,76% { opacity:1; transform: translateX(82px) scale(1); } }
-@keyframes vt-preview-deal { 0%,100% { opacity:.25; transform: translateX(-32px) rotate(-18deg) scale(.62); } 55%,76% { opacity:1; transform: translateX(82px) rotate(7deg) scale(1); } }
-@keyframes vt-preview-rise { 0%,100% { opacity:.25; transform: translateY(36px) translateX(0) scale(.70); } 55%,76% { opacity:1; transform: translateY(0) translateX(82px) scale(1); } }
-@keyframes vt-preview-warp { 0%,100% { opacity:.2; transform: scale(.18) rotate(42deg); filter: blur(8px); } 55%,76% { opacity:1; transform: translateX(82px) scale(1) rotate(0); filter: none; } }
-@keyframes vt-preview-snap { 0%,100% { opacity:.2; transform: scale(.08); } 55%,76% { opacity:1; transform: translateX(82px) scale(1); } }
-@keyframes vt-preview-drift { 0%,100% { opacity:.25; transform: translate(-20px, -40px) rotate(-6deg); } 55%,76% { opacity:1; transform: translateX(82px) rotate(2deg); } }
-@keyframes vt-preview-flipbook { 0%,100% { opacity:.25; transform: perspective(400px) rotateY(-88deg); } 55%,76% { opacity:1; transform: perspective(400px) translateX(82px) rotateY(0); } }
-@keyframes vt-preview-bloom { 0%,100% { opacity:.2; transform: scale(.32); filter: blur(8px); } 55%,76% { opacity:1; transform: translateX(82px) scale(1); filter:none; } }
-@keyframes vt-preview-orbit { 0%,100% { opacity:.2; transform: translate(-28px, -18px) rotate(-220deg) scale(.3); } 55%,76% { opacity:1; transform: translateX(82px) rotate(0) scale(1); } }
-@keyframes vt-preview-scatter { 0%,100% { opacity:.25; transform: translateX(-28px) skewX(-16deg) scale(.68); } 35% { opacity:1; transform: translateX(100px) skewX(9deg) scale(1.05); } 60%,76% { opacity:1; transform: translateX(82px) skewX(0deg) scale(1); } }
+@keyframes vt-preview-grow { 0%,100% { opacity:.25; transform: translateX(0) scale(.84); } 50%,76% { opacity:1; transform: translateX(82px) scale(1); } }
+@keyframes vt-preview-sweep { 0%,100% { opacity:.25; transform: translateX(-26px); } 50%,76% { opacity:1; transform: translateX(92px); } }
+@keyframes vt-preview-slide { 0%,100% { opacity:.25; transform: translateY(28px); } 50%,76% { opacity:1; transform: translateY(0) translateX(82px); } }
+@keyframes vt-preview-fade { 0%,100% { opacity:.18; filter: blur(4px); transform: translateX(0); } 50%,76% { opacity:1; filter:none; transform: translateX(82px); } }
+@keyframes vt-preview-deal { 0%,100% { opacity:.25; transform: translateX(-28px) rotate(-5deg) scale(.94); } 50%,76% { opacity:1; transform: translateX(82px) rotate(0deg) scale(1); } }
+
+@media (max-width: 760px) {
+  .open-folder-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    padding: 10px !important;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .folder-loader-ring,
   .preview-card,
   .folder-revealed-item,
-  .inventory-mosaic-folder.folder-is-open .inventory-folder-stack {
+  .inventory-mosaic-folder.folder-is-open .inventory-folder-stack,
+  .open-folder-row {
     animation: none !important;
   }
 }
