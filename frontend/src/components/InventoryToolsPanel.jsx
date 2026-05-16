@@ -36,8 +36,14 @@ function formatPrice(value) {
   return Number.isFinite(num) && num > 0 ? `${num.toLocaleString()} IC` : raw;
 }
 
-function normalizeBulkResponse(data) {
-  return Number(data?.updated ?? data?.count ?? data?.affectedRows ?? data?.changed ?? 0);
+function normalizeBulkResponse(data, fallback = 0) {
+  return Number(data?.updated ?? data?.count ?? data?.affectedRows ?? data?.changed ?? data?.removed ?? data?.deleted ?? data?.assigned ?? fallback ?? 0);
+}
+
+function selectedFolderLabel(folder) {
+  if (!folder) return 'No folder selected';
+  const count = Number(folder.itemCount || 0);
+  return `${folder.icon || '📁'} ${folder.name} · ${count} item${count === 1 ? '' : 's'}`;
 }
 
 export default function InventoryToolsPanel({ items = [], selectedIds = [], setSelectedIds, onRefresh, open: controlledOpen, onOpenChange }) {
@@ -48,6 +54,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
     if (typeof onOpenChange === 'function') onOpenChange(Boolean(value));
     setLocalOpen(Boolean(value));
   }
+
   const [folders, setFolders] = useState([]);
   const [folderName, setFolderName] = useState('');
   const [folderIcon, setFolderIcon] = useState('📁');
@@ -60,6 +67,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
   const [busy, setBusy] = useState(false);
 
   const normalizedFolderColor = useMemo(() => cleanHex(folderColor), [folderColor]);
+  const selectedFolder = useMemo(() => folders.find(folder => String(folder.id) === String(folderId)) || null, [folders, folderId]);
 
   function setColorFromValue(value) {
     if (value === 'custom') {
@@ -80,15 +88,22 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
     setFolderColorMode(preset ? preset.value : 'custom');
   }
 
+  function syncFolderControls(folder) {
+    if (!folder) return;
+    setFolderId(String(folder.id));
+    setFolderIcon(folder.icon || '📁');
+    syncColorControls(folder.color || '#00fa9a');
+  }
+
   async function loadFolders() {
     try {
       const data = await api('/api/item-folders');
       const next = Array.isArray(data.folders) ? data.folders : [];
       setFolders(next);
-      if (!folderId && next[0]?.id) {
-        setFolderId(String(next[0].id));
-        setFolderIcon(next[0].icon || '📁');
-        syncColorControls(next[0].color || '#00fa9a');
+      if (!folderId && next[0]?.id) syncFolderControls(next[0]);
+      if (folderId && !next.some(folder => String(folder.id) === String(folderId))) {
+        if (next[0]?.id) syncFolderControls(next[0]);
+        else setFolderId('');
       }
     } catch (error) {
       velkToast(error.message || 'Could not load folders.', 'error');
@@ -97,6 +112,12 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
 
   useEffect(() => { if (open) loadFolders(); }, [open]);
   useEffect(() => { if (!open && selectedIds.length) setSelectedIds([]); }, [open]);
+
+  function broadcastFolderChange() {
+    window.dispatchEvent(new CustomEvent('velktrade:folders-changed'));
+    window.dispatchEvent(new CustomEvent('velktrade:inventory-bulk-updated'));
+    onRefresh?.();
+  }
 
   async function createFolder() {
     const name = folderName.trim();
@@ -108,8 +129,7 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
       await loadFolders();
       if (data.folder?.id) setFolderId(String(data.folder.id));
       velkToast('Folder created.', 'success');
-      window.dispatchEvent(new CustomEvent('velktrade:folders-changed'));
-      onRefresh?.();
+      broadcastFolderChange();
     } catch (error) {
       velkToast(error.message || 'Could not create folder.', 'error');
     } finally {
@@ -123,11 +143,30 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
     try {
       await api(`/api/item-folders/${encodeURIComponent(folderId)}`, { method: 'PATCH', body: JSON.stringify({ icon: folderIcon, color: normalizedFolderColor }) });
       await loadFolders();
-      window.dispatchEvent(new CustomEvent('velktrade:folders-changed'));
-      onRefresh?.();
+      broadcastFolderChange();
       velkToast('Folder style updated.', 'success');
     } catch (error) {
       velkToast(error.message || 'Could not update folder style.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteSelectedFolder() {
+    if (!folderId || !selectedFolder) return velkToast('Choose a folder first.', 'warning');
+    const count = Number(selectedFolder.itemCount || 0);
+    const ok = window.confirm(`Delete folder "${selectedFolder.name}"?\n\nThis only deletes the folder and removes ${count} folder assignment${count === 1 ? '' : 's'}. Your items will stay in your inventory.`);
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await api(`/api/item-folders/${encodeURIComponent(folderId)}`, { method: 'DELETE' });
+      velkToast('Folder deleted. Items were kept in inventory.', 'success');
+      setFolderId('');
+      setSelectedIds([]);
+      await loadFolders();
+      broadcastFolderChange();
+    } catch (error) {
+      velkToast(error.message || 'Could not delete folder.', 'error');
     } finally {
       setBusy(false);
     }
@@ -153,12 +192,10 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
     setBusy(true);
     try {
       const data = await api('/api/inventory/bulk-update', { method: 'POST', body: JSON.stringify({ itemIds: ids, ids, ...payload }) });
-      const updated = normalizeBulkResponse(data);
+      const updated = normalizeBulkResponse(data, ids.length);
       if (updated === 0 && data?.ok !== true) throw new Error('Bulk update returned no changed items.');
       velkToast(updated > 0 ? `${message} (${updated} item${updated === 1 ? '' : 's'})` : message, 'success');
-      window.dispatchEvent(new CustomEvent('velktrade:folders-changed'));
-      window.dispatchEvent(new CustomEvent('velktrade:inventory-bulk-updated', { detail: { itemIds: ids, payload } }));
-      onRefresh?.();
+      broadcastFolderChange();
     } catch (error) {
       velkToast(error.message || 'Bulk update failed.', 'error');
     } finally {
@@ -171,12 +208,12 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
     if (!folderId) return velkToast('Create or choose a folder first.', 'warning');
     setBusy(true);
     try {
-      await api('/api/inventory/bulk-folder', { method: 'POST', body: JSON.stringify({ itemIds: selectedIds, folderId }) });
-      velkToast('Selected items added to folder.', 'success');
+      const data = await api('/api/inventory/bulk-folder', { method: 'POST', body: JSON.stringify({ itemIds: selectedIds, folderId }) });
+      const count = normalizeBulkResponse(data, selectedIds.length);
+      velkToast(`Selected items added to folder${count ? ` (${count})` : ''}.`, 'success');
       setSelectedIds([]);
       await loadFolders();
-      window.dispatchEvent(new CustomEvent('velktrade:folders-changed'));
-      onRefresh?.();
+      broadcastFolderChange();
     } catch (error) {
       velkToast(error.message || 'Folder assignment failed.', 'error');
     } finally {
@@ -184,47 +221,114 @@ export default function InventoryToolsPanel({ items = [], selectedIds = [], setS
     }
   }
 
+  async function removeSelectedFromFolder() {
+    if (!selectedIds.length) return velkToast('Select at least one item first.', 'warning');
+    if (!folderId) return velkToast('Choose the folder to remove selected items from.', 'warning');
+    setBusy(true);
+    try {
+      const data = await api('/api/inventory/bulk-folder-remove', { method: 'POST', body: JSON.stringify({ itemIds: selectedIds, folderId }) });
+      const removed = normalizeBulkResponse(data, selectedIds.length);
+      velkToast(`Selected items removed from folder${removed ? ` (${removed})` : ''}.`, 'success');
+      setSelectedIds([]);
+      await loadFolders();
+      broadcastFolderChange();
+    } catch (error) {
+      velkToast(error.message || 'Could not remove items from folder.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <section className={`inventory-tools-panel tidy-tab-panel ${open ? 'bulk-tools-open' : 'bulk-tools-closed'}`}>
-      <div className="panel-title-row compact">
+    <section className={`inventory-tools-panel folder-tools-modern ${open ? 'bulk-tools-open' : 'bulk-tools-closed'}`}>
+      <div className="panel-title-row compact folder-tools-head">
         <div>
           <h3>Inventory Tools</h3>
-          <p className="muted">Folders, cleanup scan, and bulk editing.</p>
+          <p className="muted">Modern folder management, cleanup scans, and bulk editing.</p>
         </div>
         <button type="button" className="ghost" onClick={() => setOpen(value => !value)}>{open ? 'Hide Tools' : 'Show Tools'}</button>
       </div>
+
       {open && <>
-        <div className="tidy-toolbar inventory-tools-toolbar">
-          <button type="button" disabled={busy} onClick={() => setSelectedIds(items.map(item => item.id).filter(Boolean))}>Select All</button>
-          <button type="button" className="ghost" disabled={busy} onClick={() => setSelectedIds([])}>Clear</button>
-          <span className="status-pill">{selectedIds.length} selected</span>
-          <button type="button" disabled={busy} onClick={scanCleanup}>Run Cleanup Scan</button>
+        <div className="folder-tools-toolbar">
+          <button type="button" disabled={busy} onClick={() => setSelectedIds(items.map(item => item.id).filter(Boolean))}>Select All Items</button>
+          <button type="button" className="ghost" disabled={busy} onClick={() => setSelectedIds([])}>Clear Selection</button>
+          <span className="folder-tools-count">{selectedIds.length} selected</span>
+          <button type="button" className="ghost" disabled={busy} onClick={scanCleanup}>Run Cleanup Scan</button>
         </div>
-        <div className="inventory-tools-grid">
-          <div className="inventory-tool-card">
-            <strong>Folders</strong>
-            <div className="inline-controls">
-              <select className="folder-icon-select" value={folderIcon} disabled={busy} onChange={event => setFolderIcon(event.target.value)} aria-label="Folder icon">
-                {FOLDER_ICON_PRESETS.map(icon => <option key={icon} value={icon}>{icon}</option>)}
-              </select>
-              <select className="folder-color-select" value={folderColorMode} disabled={busy} onChange={event => setColorFromValue(event.target.value)} aria-label="Folder color preset">
-                {FOLDER_COLOR_PRESETS.map(entry => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
-              </select>
-              {folderColorMode === 'custom' && <input className="folder-hex-input" value={customFolderColor} disabled={busy} onChange={event => { setCustomFolderColor(event.target.value); setFolderColor(cleanHex(event.target.value)); }} placeholder="#00fa9a" maxLength={7} aria-label="Custom folder hex color" />}
-              <span className="folder-color-preview" style={{ backgroundColor: normalizedFolderColor }} aria-hidden="true" />
-              <input value={folderName} onChange={event => setFolderName(event.target.value)} placeholder="New folder name" />
-              <button type="button" disabled={busy || !folderName.trim()} onClick={createFolder}>Create</button>
+
+        <div className="folder-tools-layout">
+          <aside className="folder-tool-card folder-list-card">
+            <div className="folder-tool-card-title">
+              <strong>Folders</strong>
+              <span>{folders.length} total</span>
             </div>
-            <div className="inline-controls"><select value={folderId} onChange={event => { setFolderId(event.target.value); const next = folders.find(folder => String(folder.id) === event.target.value); if (next?.icon) setFolderIcon(next.icon); syncColorControls(next?.color || '#00fa9a'); }}><option value="">Choose folder</option>{folders.map(folder => <option key={folder.id} value={folder.id}>{folder.icon || '📁'} {folder.name} ({folder.itemCount || 0})</option>)}</select><button type="button" disabled={busy || !folderId || !selectedIds.length} onClick={assignFolder}>Add Selected</button></div>
-            <div className="inline-controls"><button type="button" className="ghost" disabled={busy || !folderId} onClick={updateSelectedFolderStyle}>Apply Icon/Color To Folder</button></div>
+            <div className="folder-modern-list">
+              {folders.length === 0 && <p className="muted">No folders yet. Create one below.</p>}
+              {folders.map(folder => {
+                const selected = String(folder.id) === String(folderId);
+                const color = cleanHex(folder.color || '#00fa9a');
+                return <button type="button" key={folder.id} className={`folder-modern-row ${selected ? 'active' : ''}`} style={{ '--folder-color': color }} onClick={() => syncFolderControls(folder)}>
+                  <span className="folder-modern-icon">{folder.icon || '📁'}</span>
+                  <span className="folder-modern-main"><strong>{folder.name}</strong><small>{folder.itemCount || 0} item{Number(folder.itemCount || 0) === 1 ? '' : 's'}</small></span>
+                  <span className="folder-modern-swatch" />
+                </button>;
+              })}
+            </div>
+          </aside>
+
+          <div className="folder-tool-card folder-editor-card">
+            <div className="folder-tool-card-title">
+              <strong>Create / Style Folder</strong>
+              <span>{selectedFolderLabel(selectedFolder)}</span>
+            </div>
+            <div className="folder-editor-grid">
+              <label><span>Icon</span><select className="folder-icon-select" value={folderIcon} disabled={busy} onChange={event => setFolderIcon(event.target.value)}>{FOLDER_ICON_PRESETS.map(icon => <option key={icon} value={icon}>{icon}</option>)}</select></label>
+              <label><span>Color</span><select className="folder-color-select" value={folderColorMode} disabled={busy} onChange={event => setColorFromValue(event.target.value)}>{FOLDER_COLOR_PRESETS.map(entry => <option key={entry.value} value={entry.value}>{entry.label}</option>)}</select></label>
+              {folderColorMode === 'custom' && <label><span>Hex</span><input className="folder-hex-input" value={customFolderColor} disabled={busy} onChange={event => { setCustomFolderColor(event.target.value); setFolderColor(cleanHex(event.target.value)); }} placeholder="#00fa9a" maxLength={7} /></label>}
+              <span className="folder-color-preview modern" style={{ backgroundColor: normalizedFolderColor }} />
+              <label className="folder-name-field"><span>New folder name</span><input value={folderName} onChange={event => setFolderName(event.target.value)} placeholder="Example: Planetaries" /></label>
+            </div>
+            <div className="folder-action-row">
+              <button type="button" disabled={busy || !folderName.trim()} onClick={createFolder}>Create Folder</button>
+              <button type="button" className="ghost" disabled={busy || !folderId} onClick={updateSelectedFolderStyle}>Save Style</button>
+              <button type="button" className="danger" disabled={busy || !folderId} onClick={deleteSelectedFolder}>Delete Folder</button>
+            </div>
           </div>
-          <div className="inventory-tool-card">
-            <strong>Bulk Edit</strong>
-            <div className="inline-controls"><input value={bulkPrice} onChange={event => setBulkPrice(event.target.value)} placeholder="Set selected price" /><button type="button" disabled={busy || !selectedIds.length || !bulkPrice.trim()} onClick={() => bulkUpdate({ price: formatPrice(bulkPrice) }, 'Bulk price updated.')}>Set Price</button></div>
-            <div className="inline-controls"><button type="button" disabled={busy || !selectedIds.length} onClick={() => bulkUpdate({ showBazaar: true, show_bazaar: true, bazaar: true }, 'Selected items shown on Bazaar.')}>Show Bazaar</button><button type="button" disabled={busy || !selectedIds.length} onClick={() => bulkUpdate({ showBazaar: false, show_bazaar: false, bazaar: false }, 'Selected items hidden from Bazaar.')}>Hide Bazaar</button></div>
+
+          <div className="folder-tool-card folder-assignment-card">
+            <div className="folder-tool-card-title">
+              <strong>Selected Item Actions</strong>
+              <span>{selectedIds.length} selected</span>
+            </div>
+            <div className="folder-assignment-summary">
+              <span>Target folder</span>
+              <strong>{selectedFolderLabel(selectedFolder)}</strong>
+            </div>
+            <div className="folder-action-row">
+              <button type="button" disabled={busy || !folderId || !selectedIds.length} onClick={assignFolder}>Add Selected To Folder</button>
+              <button type="button" className="ghost warning" disabled={busy || !folderId || !selectedIds.length} onClick={removeSelectedFromFolder}>Remove Selected From Folder</button>
+            </div>
+            <p className="muted folder-tool-note">Tip: selecting a folder card in your inventory selects all visible items inside it. Use this panel to move or remove the selected items.</p>
+          </div>
+
+          <div className="folder-tool-card bulk-editor-card">
+            <div className="folder-tool-card-title">
+              <strong>Bulk Edit</strong>
+              <span>Price + Bazaar visibility</span>
+            </div>
+            <div className="folder-editor-grid compact">
+              <label className="folder-name-field"><span>Set selected price</span><input value={bulkPrice} onChange={event => setBulkPrice(event.target.value)} placeholder="Example: 500,000 IC" /></label>
+              <button type="button" disabled={busy || !selectedIds.length || !bulkPrice.trim()} onClick={() => bulkUpdate({ price: formatPrice(bulkPrice) }, 'Bulk price updated.')}>Set Price</button>
+            </div>
+            <div className="folder-action-row">
+              <button type="button" disabled={busy || !selectedIds.length} onClick={() => bulkUpdate({ showBazaar: true, show_bazaar: true, bazaar: true }, 'Selected items shown on Bazaar.')}>Show Bazaar</button>
+              <button type="button" className="ghost" disabled={busy || !selectedIds.length} onClick={() => bulkUpdate({ showBazaar: false, show_bazaar: false, bazaar: false }, 'Selected items hidden from Bazaar.')}>Hide Bazaar</button>
+            </div>
           </div>
         </div>
-        {cleanup && <div className="inventory-cleanup-results"><strong>Cleanup Results</strong><div className="tidy-meta-grid"><span><strong>Total</strong>{cleanup.summary?.totalItems ?? 0}</span><span><strong>Duplicate Groups</strong>{cleanup.summary?.duplicateImageGroups ?? 0}</span><span><strong>Missing Titles</strong>{cleanup.summary?.missingTitles ?? 0}</span><span><strong>Missing Images</strong>{cleanup.summary?.missingImages ?? 0}</span><span><strong>Blank Prices</strong>{cleanup.summary?.blankPrices ?? 0}</span><span><strong>Bad Imgur Links</strong>{cleanup.summary?.brokenImgurLinks ?? 0}</span></div></div>}
+
+        {cleanup && <div className="inventory-cleanup-results folder-tool-card"><strong>Cleanup Results</strong><div className="tidy-meta-grid"><span><strong>Total</strong>{cleanup.summary?.totalItems ?? 0}</span><span><strong>Duplicate Groups</strong>{cleanup.summary?.duplicateImageGroups ?? 0}</span><span><strong>Missing Titles</strong>{cleanup.summary?.missingTitles ?? 0}</span><span><strong>Missing Images</strong>{cleanup.summary?.missingImages ?? 0}</span><span><strong>Blank Prices</strong>{cleanup.summary?.blankPrices ?? 0}</span><span><strong>Bad Imgur Links</strong>{cleanup.summary?.brokenImgurLinks ?? 0}</span></div></div>}
       </>}
     </section>
   );
