@@ -65,31 +65,66 @@
 .folder-animation-preview[data-animation="none"] .preview-card.two { transform: translateX(48px) rotate(0) !important; }
 .folder-animation-preview[data-animation="none"] .preview-card.three { transform: translateX(96px) rotate(5deg) !important; }
 
-.folder-anim-none.folder-revealed-item {
+/*
+  Hard reset the older generic folder-revealed-item animation from inventory-modern-popout.css.
+  Without this reset, the original popout shorthand wins before the JS animation class is applied.
+*/
+.inventory-rewrite-shell .folder-revealed-item,
+.profile-page .folder-revealed-item,
+.profile-inventory .folder-revealed-item,
+[data-profile] .folder-revealed-item {
   animation: none !important;
 }
 
-.folder-anim-popout.folder-revealed-item {
-  animation-name: folder-anim-popout-card !important;
+.folder-anim-none.folder-revealed-item,
+.inventory-rewrite-shell .folder-anim-none.folder-revealed-item,
+.profile-page .folder-anim-none.folder-revealed-item,
+.profile-inventory .folder-anim-none.folder-revealed-item,
+[data-profile] .folder-anim-none.folder-revealed-item {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
 }
 
-.folder-anim-fan.folder-revealed-item {
-  animation-name: folder-anim-fan-card !important;
+.folder-anim-popout.folder-revealed-item,
+.inventory-rewrite-shell .folder-anim-popout.folder-revealed-item,
+.profile-page .folder-anim-popout.folder-revealed-item,
+.profile-inventory .folder-anim-popout.folder-revealed-item,
+[data-profile] .folder-anim-popout.folder-revealed-item {
+  animation: folder-anim-popout-card .50s cubic-bezier(.18,.9,.22,1.18) var(--mosaic-delay, 0ms) both !important;
 }
 
-.folder-anim-cascade.folder-revealed-item {
-  animation-name: folder-anim-cascade-card !important;
-  animation-timing-function: cubic-bezier(.16,.84,.28,1) !important;
+.folder-anim-fan.folder-revealed-item,
+.inventory-rewrite-shell .folder-anim-fan.folder-revealed-item,
+.profile-page .folder-anim-fan.folder-revealed-item,
+.profile-inventory .folder-anim-fan.folder-revealed-item,
+[data-profile] .folder-anim-fan.folder-revealed-item {
+  animation: folder-anim-fan-card .54s cubic-bezier(.18,.9,.22,1.18) var(--mosaic-delay, 0ms) both !important;
 }
 
-.folder-anim-portal.folder-revealed-item {
-  animation-name: folder-anim-portal-card !important;
-  animation-timing-function: cubic-bezier(.19,1,.22,1) !important;
+.folder-anim-cascade.folder-revealed-item,
+.inventory-rewrite-shell .folder-anim-cascade.folder-revealed-item,
+.profile-page .folder-anim-cascade.folder-revealed-item,
+.profile-inventory .folder-anim-cascade.folder-revealed-item,
+[data-profile] .folder-anim-cascade.folder-revealed-item {
+  animation: folder-anim-cascade-card .46s cubic-bezier(.16,.84,.28,1) var(--mosaic-delay, 0ms) both !important;
 }
 
-.folder-anim-bounce.folder-revealed-item {
-  animation-name: folder-anim-bounce-card !important;
-  animation-timing-function: cubic-bezier(.2,1.35,.28,1) !important;
+.folder-anim-portal.folder-revealed-item,
+.inventory-rewrite-shell .folder-anim-portal.folder-revealed-item,
+.profile-page .folder-anim-portal.folder-revealed-item,
+.profile-inventory .folder-anim-portal.folder-revealed-item,
+[data-profile] .folder-anim-portal.folder-revealed-item {
+  animation: folder-anim-portal-card .52s cubic-bezier(.19,1,.22,1) var(--mosaic-delay, 0ms) both !important;
+}
+
+.folder-anim-bounce.folder-revealed-item,
+.inventory-rewrite-shell .folder-anim-bounce.folder-revealed-item,
+.profile-page .folder-anim-bounce.folder-revealed-item,
+.profile-inventory .folder-anim-bounce.folder-revealed-item,
+[data-profile] .folder-anim-bounce.folder-revealed-item {
+  animation: folder-anim-bounce-card .62s cubic-bezier(.2,1.35,.28,1) var(--mosaic-delay, 0ms) both !important;
 }
 
 .folder-anim-popout.inventory-mosaic-folder.folder-is-open .inventory-folder-stack::before,
