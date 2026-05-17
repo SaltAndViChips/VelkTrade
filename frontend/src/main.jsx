@@ -1,3 +1,4 @@
+import './react-dom-safety-guard.js';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './auto-refresh-on-update.js';
